@@ -22,9 +22,11 @@ describe('Command execution', () => {
 
   it('fails if an executer is defined twice in the same Aggregate', () => {
     (() => {
+      //noinspection JSUnusedLocalSymbols
       new Domain()
 
-        .add(new Aggregate('One')
+        .add(class One extends Aggregate {
+        }
           .executing('Foo')
           .executing('Foo'))
 
@@ -33,24 +35,28 @@ describe('Command execution', () => {
 
   it('fails if an executer is defined twice across Aggregate', () => {
     (() => {
+      //noinspection JSUnusedLocalSymbols
       new Domain()
 
-        .add(new Aggregate('One')
+        .add(class One extends Aggregate {
+        }
           .executing('Foo'))
 
-        .add(new Aggregate('Two')
+        .add(class extends Aggregate {
+        }
           .executing('Foo'))
 
         .execute(new Command('Foo'));
 
-    }).should.throw(Error, '[Two] is already executing [Foo]')
+    }).should.throw(Error, '[One] is already executing [Foo]')
   });
 
   it('fails if the Command cannot be mapped to an Aggregate', () => {
     (() => {
       new Domain()
 
-        .add(new Aggregate()
+        .add(class extends Aggregate {
+        }
           .executing('Foo', ()=>null))
 
         .execute(new Command('Foo'))
@@ -63,7 +69,8 @@ describe('Command execution', () => {
 
     return new Domain(new FakeEventBus())
 
-      .add(new Aggregate()
+      .add(class extends Aggregate {
+      }
         .executing('Foo', ()=>1, command => {
           executed.push(command);
         }))
@@ -80,7 +87,8 @@ describe('Command execution', () => {
   it('fails if the Command is rejected', () => {
     return new Domain()
 
-      .add(new Aggregate()
+      .add(class extends Aggregate {
+      }
         .executing('Foo', ()=>1, function () {
           throw new Error('Nope')
         }))
@@ -95,7 +103,8 @@ describe('Command execution', () => {
 
     return new Domain(bus)
 
-      .add(new Aggregate()
+      .add(class extends Aggregate {
+      }
         .executing('Foo', ()=>1, function (command) {
           this.record('food', command.payload);
           this.record('bard', 'two');
@@ -122,7 +131,8 @@ describe('Command execution', () => {
 
     return new Domain(bus)
 
-      .add(new Aggregate()
+      .add(class extends Aggregate {
+      }
         .executing('Foo', ()=>1, function () {
         }))
 
@@ -140,7 +150,8 @@ describe('Command execution', () => {
 
     return new Domain(bus)
 
-      .add(new Aggregate()
+      .add(class extends Aggregate {
+      }
         .executing('Foo', ()=>1, function () {
         }))
 
@@ -199,33 +210,6 @@ class Command {
 }
 
 class Aggregate {
-  constructor(name) {
-    this.name = name;
-    this._executers = {};
-    this._mappers = {};
-  }
-
-  mapToId(command) {
-    var aggregateId = this._mappers[command.name](command);
-    if (!aggregateId) {
-      throw new Error(`Cannot map [${command.name}]`)
-    }
-
-    return aggregateId;
-  }
-
-  executing(commandName, mapper, executer) {
-    if (commandName in this._executers) {
-      throw new Error(`[${this.name}] is already executing [${commandName}]`)
-    }
-
-    this._executers[commandName] = executer;
-    this._mappers[commandName] = mapper;
-    return this
-  }
-}
-
-class AggregateInstance {
   constructor(definition) {
     this.definition = definition;
     this.offset = 0;
@@ -244,6 +228,28 @@ class AggregateInstance {
       y(events)
     })
   }
+
+  static mapToId(command) {
+    var aggregateId = this._mappers[command.name](command);
+    if (!aggregateId) {
+      throw new Error(`Cannot map [${command.name}]`)
+    }
+
+    return aggregateId;
+  }
+
+  static executing(commandName, mapper, executer) {
+    if (!this._executers) this._executers = {};
+    if (!this._mappers) this._mappers = {};
+
+    if (commandName in this._executers) {
+      throw new Error(`[${this.name}] is already executing [${commandName}]`)
+    }
+
+    this._executers[commandName] = executer;
+    this._mappers[commandName] = mapper;
+    return this
+  }
 }
 
 class AggregateRepository {
@@ -254,7 +260,7 @@ class AggregateRepository {
   add(definition) {
     Object.keys(definition._executers).forEach(cn => {
       if (cn in this._definitions) {
-        throw new Error(`[${definition.name}] is already executing [${cn}]`)
+        throw new Error(`[${this._definitions[cn].name}] is already executing [${cn}]`)
       }
 
       this._definitions[cn] = definition;
@@ -267,7 +273,7 @@ class AggregateRepository {
       throw new Error(`Cannot execute [${command.name}]`)
     }
 
-    return new AggregateInstance(definition);
+    return new Aggregate(definition);
   }
 }
 
