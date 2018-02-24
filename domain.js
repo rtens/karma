@@ -23,11 +23,9 @@ describe('Command execution', () => {
 
   it('fails if an executer is defined twice in the same Aggregate', () => {
     (() => {
-      //noinspection JSUnusedLocalSymbols
       new Domain()
 
-        .add(class One extends Aggregate {
-        }
+        .add(new Aggregate('One')
           .executing('Foo')
           .executing('Foo'))
 
@@ -36,15 +34,12 @@ describe('Command execution', () => {
 
   it('fails if an executer is defined twice across Aggregate', () => {
     (() => {
-      //noinspection JSUnusedLocalSymbols
       new Domain()
 
-        .add(class One extends Aggregate {
-        }
+        .add(new Aggregate('One')
           .executing('Foo'))
 
-        .add(class extends Aggregate {
-        }
+        .add(new Aggregate()
           .executing('Foo'))
 
         .execute(new Command('Foo'));
@@ -56,8 +51,7 @@ describe('Command execution', () => {
     (() => {
       new Domain(new EventBus())
 
-        .add(class extends Aggregate {
-        }
+        .add(new Aggregate()
           .executing('Foo', ()=>null))
 
         .execute(new Command('Foo'))
@@ -70,8 +64,7 @@ describe('Command execution', () => {
 
     return new Domain(new EventBus(), new SnapshotStore())
 
-      .add(class extends Aggregate {
-      }
+      .add(new Aggregate()
         .executing('Foo', ()=>1, command => {
           executed.push(command);
         }))
@@ -84,8 +77,7 @@ describe('Command execution', () => {
   it('fails if the Command is rejected', () => {
     return new Domain(new EventBus(), new SnapshotStore())
 
-      .add(class extends Aggregate {
-      }
+      .add(new Aggregate()
         .executing('Foo', ()=>1, function () {
           throw new Error('Nope')
         }))
@@ -100,11 +92,12 @@ describe('Command execution', () => {
 
     return new Domain(bus, new SnapshotStore())
 
-      .add(class extends Aggregate {
-      }
+      .add(new Aggregate()
         .executing('Foo', ()=>1, function (command) {
-          this.record('food', command.payload);
-          this.record('bard', 'two');
+          return [
+            new Event('food', command.payload),
+            new Event('bard', 'two')
+          ]
         }))
 
       .execute(new Command('Foo', 'one', 'trace'))
@@ -126,10 +119,8 @@ describe('Command execution', () => {
 
     return new Domain(bus, new SnapshotStore())
 
-      .add(class extends Aggregate {
-      }
-        .executing('Foo', ()=>1, function () {
-        }))
+      .add(new Aggregate()
+        .executing('Foo', ()=>1, () => null))
 
       .execute(new Command('Foo'))
 
@@ -145,8 +136,7 @@ describe('Command execution', () => {
 
     return new Domain(bus, new SnapshotStore())
 
-      .add(class extends Aggregate {
-      }
+      .add(new Aggregate()
         .executing('Foo', ()=>1, function () {
         }))
 
@@ -168,18 +158,16 @@ describe('Command execution', () => {
 
     return new Domain(bus, new SnapshotStore())
 
-      .add(class extends Aggregate {
-        constructor(id) {
-          super(id);
+      .add(new Aggregate()
+        .init(function () {
           this.bards = [];
-        }
-      }
+        })
         .applying('nothing')
         .applying('bard', event=>event.payload.id, function (event) {
           this.bards.push(event.payload.baz);
         })
         .executing('Foo', command=>command.payload, function () {
-          this.record('food', this.bards)
+          return [new Event('food', this.bards)]
         }))
 
       .execute(new Command('Foo', 'foo'))
@@ -202,17 +190,17 @@ describe('Command execution', () => {
     ]);
 
     let snapshots = new FakeSnapshotStore();
-    snapshots.store('foo', 1, new Snapshot(21, {bards: ['snap']}));
+    snapshots.store('foo', 'v1', new Snapshot(21, {bards: ['snap']}));
 
     return new Domain(bus, snapshots)
 
-      .add(class extends Aggregate {
-      }
+      .add(new Aggregate()
+        .withVersion('v1')
         .applying('bard', ()=>'foo', function (event) {
           this.bards.push(event.payload)
         })
         .executing('Foo', ()=>'foo', function () {
-          this.record('food', this.bards)
+          return [new Event('food', this.bards)]
         }))
 
       .execute(new Command('Foo'))
@@ -228,11 +216,11 @@ describe('Command execution', () => {
       }))
   });
 
-  it('keeps the reconstituted Aggregate');
+  it.skip('keeps the reconstituted Aggregate');
 
-  it('can take a Snapshot and unload an Aggregate');
+  it.skip('can take a Snapshot and unload an Aggregate');
 
-  it('can use singleton Aggregates');
+  it.skip('can use singleton Aggregates');
 });
 
 class Domain {
@@ -276,16 +264,43 @@ class Command {
 }
 
 class Unit {
-  constructor(id, version = 1) {
-    this.id = id;
+  constructor(name) {
+    this.name = name;
+    this.version = null;
+    this._initializers = [];
+    this._appliers = {};
+  }
+
+  withVersion(version) {
     this.version = version;
+    return this
+  }
+
+  init(initializer) {
+    this._initializers.push(initializer);
+    return this
+  }
+
+  applying(eventName, mapper, applier) {
+    (this._appliers[eventName] = this._appliers[eventName] || []).push({mapper, applier});
+    return this
+  }
+}
+
+class UnitInstance {
+  constructor(definition, id) {
+    this.definition = definition;
+    this.id = id;
+    this.state = {};
     this.offset = 0;
+
+    definition._initializers.forEach(i => i.call(this.state));
   }
 
   loadFrom(snapshots) {
-    let snapshot = snapshots.fetch(this.id, this.version);
+    let snapshot = snapshots.fetch(this.id, this.definition.version);
     if (snapshot) {
-      Object.keys(snapshot.state).forEach(k => this[k] = snapshot.state[k]);
+      this.state = snapshot.state;
       this.offset = snapshot.offset;
     }
     return this
@@ -293,43 +308,30 @@ class Unit {
 
   subscribeTo(bus) {
     bus.subscribe(this.apply.bind(this), bus.filter()
-      .nameIsIn(Object.keys(this.constructor._appliers || {}))
+      .nameIsIn(Object.keys(this.definition._appliers || {}))
       .afterOffset(this.offset));
     return this
   }
 
   apply(event) {
-    if (this.constructor._appliers[event.name]) {
-      this.constructor._appliers[event.name].forEach(a => {
+    if (this.definition._appliers[event.name]) {
+      this.definition._appliers[event.name].forEach(a => {
         if (a.mapper(event) == this.id) {
-          a.applier.call(this, event)
+          a.applier.call(this.state, event)
         }
       });
       this.offset = event.offset
     }
   }
-
-  static applying(eventName, mapper, applier) {
-    this._appliers = this._appliers || {};
-    (this._appliers[eventName] = this._appliers[eventName] || []).push({mapper, applier});
-    return this
-  }
 }
 
 class Aggregate extends Unit {
-  execute(command) {
-    return new Promise(y => {
-      let events = [];
-      this.record = (eventName, payload) =>
-        events.push(new Event(eventName, payload, new Date(), command.traceId));
-
-      this.constructor._executers[command.name].call(this, command);
-
-      y(events)
-    })
+  constructor(name) {
+    super(name);
+    this._executers = {};
+    this._mappers = {};
   }
-
-  static mapToId(command) {
+  mapToId(command) {
     var aggregateId = this._mappers[command.name](command);
     if (!aggregateId) {
       throw new Error(`Cannot map [${command.name}]`)
@@ -338,10 +340,7 @@ class Aggregate extends Unit {
     return aggregateId;
   }
 
-  static executing(commandName, mapper, executer) {
-    this._executers = this._executers || {};
-    this._mappers = this._mappers || {};
-
+  executing(commandName, mapper, executer) {
     if (commandName in this._executers) {
       throw new Error(`[${this.name}] is already executing [${commandName}]`)
     }
@@ -352,29 +351,38 @@ class Aggregate extends Unit {
   }
 }
 
+class AggregateInstance extends UnitInstance {
+  execute(command) {
+    return new Promise(y => {
+      y((this.definition._executers[command.name].call(this.state, command) || [])
+        .map(e => new Event(e.name, e.payload, new Date(), command.traceId)));
+    })
+  }
+}
+
 class AggregateRepository {
   constructor() {
-    this._classes = {};
+    this._definitions = {};
   }
 
   add(aggregateClass) {
     Object.keys(aggregateClass._executers).forEach(cn => {
-      if (cn in this._classes) {
-        throw new Error(`[${this._classes[cn].name}] is already executing [${cn}]`)
+      if (cn in this._definitions) {
+        throw new Error(`[${this._definitions[cn].name}] is already executing [${cn}]`)
       }
 
-      this._classes[cn] = aggregateClass;
+      this._definitions[cn] = aggregateClass;
     });
   }
 
   mapToInstance(command) {
-    var clasz = this._classes[command.name];
+    var defintion = this._definitions[command.name];
 
-    if (!clasz) {
+    if (!defintion) {
       throw new Error(`Cannot execute [${command.name}]`)
     }
 
-    return new clasz(clasz.mapToId(command));
+    return new AggregateInstance(defintion, defintion.mapToId(command));
   }
 }
 
