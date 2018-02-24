@@ -236,11 +236,11 @@ class Domain {
   }
 
   execute(command) {
-    return this._executeAndPublish(command,
-      this._aggregates
-        .mapToInstance(command)
-        .loadFrom(this._snapshots)
-        .subscribeTo(this._bus));
+    return this._aggregates
+      .mapToInstance(command)
+      .loadFrom(this._snapshots)
+      .then(aggregate => aggregate.subscribeTo(this._bus))
+      .then(aggregate => this._executeAndPublish(command, aggregate));
   }
 
   _executeAndPublish(command, aggregate, tries = 0) {
@@ -298,19 +298,23 @@ class UnitInstance {
   }
 
   loadFrom(snapshots) {
-    let snapshot = snapshots.fetch(this.id, this.definition.version);
-    if (snapshot) {
-      this.state = snapshot.state;
-      this.offset = snapshot.offset;
-    }
-    return this
+    return snapshots.fetch(this.id, this.definition.version)
+      .then(snapshot => {
+        if (snapshot) {
+          this.state = snapshot.state;
+          this.offset = snapshot.offset;
+        }
+        return this
+      })
   }
 
   subscribeTo(bus) {
-    bus.subscribe(this.apply.bind(this), bus.filter()
+    let filter = bus.filter()
       .nameIsIn(Object.keys(this.definition._appliers || {}))
-      .afterOffset(this.offset));
-    return this
+      .afterOffset(this.offset);
+
+    return bus.subscribe(this.apply.bind(this), filter)
+      .then(() => this);
   }
 
   apply(event) {
@@ -331,6 +335,7 @@ class Aggregate extends Unit {
     this._executers = {};
     this._mappers = {};
   }
+
   mapToId(command) {
     var aggregateId = this._mappers[command.name](command);
     if (!aggregateId) {
@@ -376,21 +381,22 @@ class AggregateRepository {
   }
 
   mapToInstance(command) {
-    var defintion = this._definitions[command.name];
-
-    if (!defintion) {
+    var definition = this._definitions[command.name];
+    if (!definition) {
       throw new Error(`Cannot execute [${command.name}]`)
     }
 
-    return new AggregateInstance(defintion, defintion.mapToId(command));
+    return new AggregateInstance(definition, definition.mapToId(command));
   }
 }
 
 class EventBus {
   publish(event, followOffset) {
+    return Promise.resolve()
   }
 
   subscribe(subscriber, filter) {
+    return Promise.resolve()
   }
 
   filter() {
@@ -416,12 +422,14 @@ class FakeEventBus extends EventBus {
   }
 
   publish(events, followOffset) {
-    this.published.push({events, followOffset})
+    this.published.push({events, followOffset});
+    return Promise.resolve();
   }
 
   subscribe(subscriber, filter) {
     this.subscribed.push(filter);
-    this.published.forEach(({events}) => events.forEach(subscriber))
+    this.published.forEach(({events}) => events.forEach(subscriber));
+    return Promise.resolve();
   }
 
   filter() {
@@ -461,6 +469,7 @@ class SnapshotStore {
   }
 
   fetch(id, version) {
+    return Promise.resolve()
   }
 }
 
@@ -481,6 +490,6 @@ class FakeSnapshotStore {
   }
 
   fetch(id, version) {
-    return this.snapshots[id + version];
+    return Promise.resolve(this.snapshots[id + version])
   }
 }
