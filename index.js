@@ -1,3 +1,5 @@
+let queue = require('queue');
+
 class Domain {
   constructor(eventBus, snapshotStore, repositoryStrategy) {
     this._bus = eventBus;
@@ -12,20 +14,9 @@ class Domain {
   execute(command) {
     return this._aggregates
       .getInstance(command)
-      .then(aggregate =>
-        this._executeAndPublish(command, aggregate))
+      .then(instance =>
+        instance.execute(command))
       .then(() => this)
-  }
-
-  _executeAndPublish(command, aggregate, tries = 0) {
-    return aggregate
-      .execute(command)
-      .then(events =>
-        this._bus.publish(events, aggregate.offset))
-      .catch(e => {
-        if (tries > 3) throw e;
-        return this._executeAndPublish(command, aggregate, tries + 1)
-      });
   }
 }
 
@@ -62,37 +53,43 @@ class Unit {
 }
 
 class UnitInstance {
-  constructor(definition, id) {
+  constructor(definition, id, bus, snapshots) {
     this.definition = definition;
     this.id = id;
+    this._bus = bus;
+    this._snapshots = snapshots;
     this.offset = 0;
     this.state = {};
 
     definition._initializers.forEach(i => i.call(this.state));
   }
 
-  loadFrom(snapshots) {
-    return snapshots.fetch(this.id, this.definition.version)
+  load() {
+    return this._loadSnapshot()
+      .then(() => this._subscribeToBus())
+      .then(() => this);
+  }
+
+  _loadSnapshot() {
+    return this._snapshots.fetch(this.id, this.definition.version)
       .then(snapshot => {
         if (snapshot) {
           this.state = snapshot.state;
           this.offset = snapshot.offset;
         }
-        return this
       })
   }
 
-  storeTo(snapshots) {
-    snapshots.store(this.id, this.definition.version, new Snapshot(this.offset, this.state));
-  }
-
-  subscribeTo(bus) {
-    let filter = bus.filter()
+  _subscribeToBus() {
+    let filter = this._bus.filter()
       .nameIsIn(Object.keys(this.definition._appliers || {}))
       .afterOffset(this.offset);
 
-    return bus.subscribe(this.apply.bind(this), filter)
-      .then(() => this);
+    return this._bus.subscribe(this.apply.bind(this), filter);
+  }
+
+  takeSnapshot() {
+    this._snapshots.store(this.id, this.definition.version, new Snapshot(this.offset, this.state));
   }
 
   apply(event) {
@@ -135,11 +132,32 @@ class Aggregate extends Unit {
 }
 
 class AggregateInstance extends UnitInstance {
-  execute(command) {
-    return new Promise(y => {
-      y((this.definition._executers[command.name].call(this.state, command) || [])
-        .map(e => new Event(e.name, e.payload, new Date(), command.traceId)));
+  constructor(definition, id, bus, snapshots) {
+    super(definition, id, bus, snapshots);
+    this._queue = queue({
+      concurrency: 1,
+      autostart: true
     })
+  }
+
+  execute(command) {
+    return new Promise(y =>
+      this._queue.push(() => this._execute(command).then(y)));
+  }
+
+  _execute(command, tries = 0) {
+    let events = this.definition._executers[command.name].call(this.state, command);
+    if (!Array.isArray(events)) {
+      return Promise.resolve();
+    }
+
+    let fullEvents = events.map(e => new Event(e.name, e.payload, new Date(), command.traceId));
+
+    return this._bus.publish(fullEvents, this.offset)
+      .catch(e => {
+        if (tries > 3) throw e;
+        return this._execute(command, tries + 1)
+      })
   }
 }
 
@@ -163,30 +181,29 @@ class AggregateRepository {
   }
 
   getInstance(command) {
-    var definition = this._definitions[command.name];
+    let definition = this._definitions[command.name];
     if (!definition) {
       throw new Error(`Cannot execute [${command.name}]`)
     }
 
-    var aggregateId = definition.mapToId(command);
-    return Promise.resolve(this._instances[aggregateId] || this._loadInstance(definition, aggregateId))
+    return this._load(definition, command)
       .then(instance => {
         this._strategy.notifyAccess(instance);
         return instance
       });
   }
 
-  _loadInstance(definition, aggregateId) {
-    let instance = new AggregateInstance(definition, aggregateId);
-    this._instances[aggregateId] = instance;
+  _load(definition, command) {
+    let aggregateId = definition.mapToId(command);
+    if (this._instances[aggregateId]) {
+      return Promise.resolve(this._instances[aggregateId]);
+    }
 
-    return instance.loadFrom(this._snapshots)
-      .then(() => instance.subscribeTo(this._bus))
-      .then(() => instance);
+    this._instances[aggregateId] = new AggregateInstance(definition, aggregateId, this._bus, this._snapshots);
+    return this._instances[aggregateId].load();
   }
 
   unload(unit) {
-    unit.storeTo(this._snapshots);
     delete this._instances[unit.id];
   }
 }

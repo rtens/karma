@@ -41,6 +41,11 @@ class FakeEventFilter extends EventFilter {
 }
 
 class FakeRepositoryStrategy extends RepositoryStrategy {
+  constructor() {
+    super();
+    this._onAccess = ()=>null;
+  }
+
   onAccess(callback) {
     this._onAccess = callback;
     return this

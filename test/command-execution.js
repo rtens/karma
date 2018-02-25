@@ -110,12 +110,10 @@ describe('Command execution', () => {
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
 
       .add(new Aggregate()
-        .executing('Foo', ()=>1, function (command) {
-          return [
-            new Event('food', command.payload),
-            new Event('bard', 'two')
-          ]
-        }))
+        .executing('Foo', ()=>1, command => [
+          new Event('food', command.payload),
+          new Event('bard', 'two')
+        ]))
 
       .execute(new Command('Foo', 'one', 'trace'))
 
@@ -137,7 +135,7 @@ describe('Command execution', () => {
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
 
       .add(new Aggregate()
-        .executing('Foo', ()=>1, () => null))
+        .executing('Foo', ()=>1, ()=>[]))
 
       .execute(new Command('Foo'))
 
@@ -147,15 +145,15 @@ describe('Command execution', () => {
   it('retries publishing before giving up', () => {
     let bus = new FakeEventBus();
     let count = 0;
-    bus.publish = () => {
-      if (count++ < 3) throw new Error()
-    };
+    bus.publish = () => new Promise(y => {
+      if (count++ < 3) throw new Error(count);
+      y()
+    });
 
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
 
       .add(new Aggregate()
-        .executing('Foo', ()=>1, function () {
-        }))
+        .executing('Foo', ()=>1, ()=>[]))
 
       .execute(new Command('Foo'))
 
@@ -266,7 +264,40 @@ describe('Command execution', () => {
       }]))
   });
 
-  it('can take a Snapshot and unload an Aggregate', () => {
+  it('can take a Snapshot', () => {
+    let bus = new FakeEventBus();
+    bus.publish([
+      new Event('bard', 'one').withOffset(21)
+    ]);
+
+    let snapshots = new FakeSnapshotStore();
+
+    let strategy = new FakeRepositoryStrategy()
+      .onAccess(unit => unit.takeSnapshot());
+
+    return new Domain(bus, snapshots, strategy)
+
+      .add(new Aggregate()
+        .init(function () {
+          this.bards = [];
+        })
+        .withVersion('v1')
+        .applying('bard', ()=>'foo', function (event) {
+          this.bards.push(event.payload);
+        })
+        .executing('Foo', ()=>'foo', ()=>null))
+
+      .execute(new Command('Foo', 'foo'))
+
+      .then(domain => domain.execute(new Command('Foo')))
+
+      .then(() => snapshots.stored.should.eql([
+        {id: 'foo', version: 'v1', snapshot: {offset: 21, state: {bards: ['one']}}},
+        {id: 'foo', version: 'v1', snapshot: {offset: 21, state: {bards: ['one']}}},
+      ]))
+  });
+
+  it('can unload an Aggregate', () => {
     let bus = new FakeEventBus();
     bus.publish([
       new Event('bard', 'one').withOffset(21)
@@ -295,19 +326,34 @@ describe('Command execution', () => {
 
       .then(domain => domain.execute(new Command('Foo')))
 
-      .then(() => snapshots.fetched.should.eql([
-        {id: 'foo', version: 'v1'},
-        {id: 'foo', version: 'v1'}
-      ]))
+      .then(() => snapshots.fetched.length.should.equal(2))
 
-      .then(() => bus.subscribed.should.eql([
-        {names: ['bard'], offset: 0},
-        {names: ['bard'], offset: 21}
-      ]))
+      .then(() => bus.subscribed.length.should.equal(2))
+  });
 
-      .then(() => snapshots.stored.should.eql([
-        {id: 'foo', version: 'v1', snapshot: {offset: 21, state: {bards: ['one', 'one']}}},
-        {id: 'foo', version: 'v1', snapshot: {offset: 21, state: {bards: ['one', 'one']}}},
-      ]))
+  it('queues Commands per Aggregate', () => {
+    var bus = new (class extends FakeEventBus {
+      //noinspection JSUnusedGlobalSymbols
+      publish(events, followOffset) {
+        return new Promise(y => {
+          setTimeout(() => y(super.publish(events, followOffset)),
+            events[0].name == 'Foo' ? 30 : 0);
+        })
+      }
+    });
+
+    var domain = new Domain(bus, new FakeSnapshotStore(), new FakeRepositoryStrategy())
+
+      .add(new Aggregate()
+        .executing('Foo', ()=>'one', () => [new Event('Foo')])
+        .executing('Bar', ()=>'one', () => [new Event('Bar')])
+        .executing('Baz', ()=>'two', () => [new Event('Baz')]));
+
+    return new Promise(y => {
+      setTimeout(() => domain.execute(new Command('Foo')), 0);
+      setTimeout(() => domain.execute(new Command('Bar')).then(y), 10);
+      setTimeout(() => domain.execute(new Command('Baz')), 15);
+    }).then(() =>
+      bus.published.map(p=>p.events[0].name).should.eql(['Baz', 'Foo', 'Bar']))
   });
 });
