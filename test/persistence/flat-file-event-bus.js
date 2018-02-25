@@ -7,7 +7,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const karma = require('../../index');
+const karma = require('../../src/index');
 const flatFile = require('../../src/persistence/flat-file');
 
 chai.should();

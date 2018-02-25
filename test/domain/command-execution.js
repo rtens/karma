@@ -12,7 +12,7 @@ const {
   Event,
   SnapshotStore,
   Snapshot
-} = require('../../index');
+} = require('../../src/index');
 
 const {
   FakeEventBus,

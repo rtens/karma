@@ -7,7 +7,7 @@ const should = chai.should();
 
 chai.use(promised);
 
-const karma = require('../../index');
+const karma = require('../../src/index');
 const flatFile = require('../../src/persistence/flat-file');
 
 describe('Flat file Snapshot store', () => {

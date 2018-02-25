@@ -3,7 +3,7 @@ const {
   EventBus,
   EventFilter,
   SnapshotStore,
-} = require('../../index');
+} = require('../../src/index');
 
 class FakeEventBus extends EventBus {
   constructor() {

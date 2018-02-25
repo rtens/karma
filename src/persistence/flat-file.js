@@ -3,7 +3,7 @@ const path = require('path');
 const lockFile = require('lockfile');
 const chokidar = require('chokidar');
 
-const karma = require('../../index');
+const karma = require('../index');
 
 class EventBus extends karma.EventBus {
   constructor(baseDir) {
