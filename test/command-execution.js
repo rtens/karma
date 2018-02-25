@@ -119,10 +119,10 @@ describe('Command execution', () => {
 
       .then(() => bus.published.should.eql([{
         events: [
-          {name: 'food', payload: 'one', timestamp: new Date(), traceId: 'trace', offset: null},
-          {name: 'bard', payload: 'two', timestamp: new Date(), traceId: 'trace', offset: null},
+          {name: 'food', payload: 'one', timestamp: new Date(), traceId: 'trace', sequence: null},
+          {name: 'bard', payload: 'two', timestamp: new Date(), traceId: 'trace', sequence: null},
         ],
-        followOffset: 0
+        onSequence: 0
       }]))
   });
 
@@ -165,10 +165,10 @@ describe('Command execution', () => {
   it('reconstitutes an Aggregate from Events', () => {
     let bus = new FakeEventBus();
     bus.publish([
-      new Event('bard', {id: 'foo', baz: 'one'}).withOffset(21),
-      new Event('bard', {id: 'not'}).withOffset(22),
-      new Event('bard', {id: 'foo', baz: 'two'}).withOffset(23),
-      new Event('not').withOffset(24)
+      new Event('bard', {id: 'foo', baz: 'one'}).withSequence(21),
+      new Event('bard', {id: 'not'}).withSequence(22),
+      new Event('bard', {id: 'foo', baz: 'two'}).withSequence(23),
+      new Event('not').withSequence(24)
     ]);
 
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
@@ -189,18 +189,18 @@ describe('Command execution', () => {
 
       .then(() => bus.subscribed.should.eql([{
         names: ['nothing', 'bard'],
-        offset: 0
+        sequence: 0
       }]))
 
       .then(() => bus.published[1].should.eql({
         events: [new Event('food', ['one', 'two'], new Date())],
-        followOffset: 23
+        onSequence: 23
       }))
   });
 
   it('reconstitutes an Aggregate from a Snapshot and Events', () => {
     let bus = new FakeEventBus();
-    bus.publish([new Event('bard', 'one').withOffset(42)]);
+    bus.publish([new Event('bard', 'one').withSequence(42)]);
 
     let snapshots = new FakeSnapshotStore();
     snapshots.store('foo', 'v1', new Snapshot(21, {bards: ['snap']}));
@@ -220,17 +220,17 @@ describe('Command execution', () => {
 
       .then(() => snapshots.fetched.should.eql([{id: 'foo', version: 'v1'}]))
 
-      .then(() => bus.subscribed.should.eql([{names: ['bard'], offset: 21}]))
+      .then(() => bus.subscribed.should.eql([{names: ['bard'], sequence: 21}]))
 
       .then(() => bus.published.slice(1).should.eql([{
         events: [new Event('food', ['snap', 'one'], new Date())],
-        followOffset: 42
+        onSequence: 42
       }]))
   });
 
   it('keeps the reconstituted Aggregate', () => {
     let bus = new FakeEventBus();
-    bus.publish([new Event('bard', 'a ').withOffset(21)]);
+    bus.publish([new Event('bard', 'a ').withSequence(21)]);
 
     let snapshots = new FakeSnapshotStore();
 
@@ -257,17 +257,17 @@ describe('Command execution', () => {
 
       .then(() => bus.published.slice(1).should.eql([{
         events: [new Event('food', 'a one', new Date())],
-        followOffset: 21
+        onSequence: 21
       }, {
         events: [new Event('food', 'a two', new Date())],
-        followOffset: 21
+        onSequence: 21
       }]))
   });
 
   it('can take a Snapshot', () => {
     let bus = new FakeEventBus();
     bus.publish([
-      new Event('bard', 'one').withOffset(21)
+      new Event('bard', 'one').withSequence(21)
     ]);
 
     let snapshots = new FakeSnapshotStore();
@@ -292,15 +292,15 @@ describe('Command execution', () => {
       .then(domain => domain.execute(new Command('Foo')))
 
       .then(() => snapshots.stored.should.eql([
-        {id: 'foo', version: 'v1', snapshot: {offset: 21, state: {bards: ['one']}}},
-        {id: 'foo', version: 'v1', snapshot: {offset: 21, state: {bards: ['one']}}},
+        {id: 'foo', version: 'v1', snapshot: {sequence: 21, state: {bards: ['one']}}},
+        {id: 'foo', version: 'v1', snapshot: {sequence: 21, state: {bards: ['one']}}},
       ]))
   });
 
   it('can unload an Aggregate', () => {
     let bus = new FakeEventBus();
     bus.publish([
-      new Event('bard', 'one').withOffset(21)
+      new Event('bard', 'one').withSequence(21)
     ]);
 
     let snapshots = new FakeSnapshotStore();
@@ -334,9 +334,9 @@ describe('Command execution', () => {
   it('queues Commands per Aggregate', () => {
     var bus = new (class extends FakeEventBus {
       //noinspection JSUnusedGlobalSymbols
-      publish(events, followOffset) {
+      publish(events, onSequence) {
         return new Promise(y => {
-          setTimeout(() => y(super.publish(events, followOffset)),
+          setTimeout(() => y(super.publish(events, onSequence)),
             events[0].name == 'Foo' ? 30 : 0);
         })
       }

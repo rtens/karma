@@ -12,8 +12,8 @@ class FakeEventBus extends EventBus {
     this.subscribed = [];
   }
 
-  publish(events, followOffset) {
-    this.published.push({events, followOffset});
+  publish(events, onSequence) {
+    this.published.push({events, onSequence});
     return Promise.resolve();
   }
 
@@ -34,8 +34,8 @@ class FakeEventFilter extends EventFilter {
     return this
   }
 
-  afterOffset(offset) {
-    this.offset = offset;
+  after(sequence) {
+    this.sequence = sequence;
     return this
   }
 }

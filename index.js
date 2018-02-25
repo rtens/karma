@@ -58,7 +58,7 @@ class UnitInstance {
     this.id = id;
     this._bus = bus;
     this._snapshots = snapshots;
-    this.offset = 0;
+    this.sequence = 0;
     this.state = {};
 
     definition._initializers.forEach(i => i.call(this.state));
@@ -75,7 +75,7 @@ class UnitInstance {
       .then(snapshot => {
         if (snapshot) {
           this.state = snapshot.state;
-          this.offset = snapshot.offset;
+          this.sequence = snapshot.sequence;
         }
       })
   }
@@ -83,13 +83,13 @@ class UnitInstance {
   _subscribeToBus() {
     let filter = this._bus.filter()
       .nameIsIn(Object.keys(this.definition._appliers || {}))
-      .afterOffset(this.offset);
+      .after(this.sequence);
 
     return this._bus.subscribe(this.apply.bind(this), filter);
   }
 
   takeSnapshot() {
-    this._snapshots.store(this.id, this.definition.version, new Snapshot(this.offset, this.state));
+    this._snapshots.store(this.id, this.definition.version, new Snapshot(this.sequence, this.state));
   }
 
   apply(event) {
@@ -99,7 +99,7 @@ class UnitInstance {
           a.applier.call(this.state, event)
         }
       });
-      this.offset = event.offset
+      this.sequence = event.sequence
     }
   }
 }
@@ -153,7 +153,7 @@ class AggregateInstance extends UnitInstance {
 
     let fullEvents = events.map(e => new Event(e.name, e.payload, new Date(), command.traceId));
 
-    return this._bus.publish(fullEvents, this.offset)
+    return this._bus.publish(fullEvents, this.sequence)
       .catch(e => {
         if (tries > 3) throw e;
         return this._execute(command, tries + 1)
@@ -186,14 +186,14 @@ class AggregateRepository {
       throw new Error(`Cannot execute [${command.name}]`)
     }
 
-    return this._load(definition, command)
+    return this._getOrLoad(definition, command)
       .then(instance => {
         this._strategy.notifyAccess(instance);
         return instance
       });
   }
 
-  _load(definition, command) {
+  _getOrLoad(definition, command) {
     let aggregateId = definition.mapToId(command);
     if (this._instances[aggregateId]) {
       return Promise.resolve(this._instances[aggregateId]);
@@ -219,7 +219,7 @@ class RepositoryStrategy {
 }
 
 class EventBus {
-  publish(event, followOffset) {
+  publish(event, onSequence) {
     return Promise.resolve()
   }
 
@@ -237,22 +237,22 @@ class EventFilter {
     return this
   }
 
-  afterOffset(offset) {
+  after(sequence) {
     return this
   }
 }
 
 class Event {
-  constructor(name, payload, timestamp, traceId, offset = null) {
+  constructor(name, payload, timestamp, traceId, sequence = null) {
     this.name = name;
     this.payload = payload;
     this.timestamp = timestamp;
     this.traceId = traceId;
-    this.offset = offset;
+    this.sequence = sequence;
   }
 
-  withOffset(v) {
-    this.offset = v;
+  withSequence(sequence) {
+    this.sequence = sequence;
     return this
   }
 }
@@ -267,8 +267,8 @@ class SnapshotStore {
 }
 
 class Snapshot {
-  constructor(offset, state) {
-    this.offset = offset;
+  constructor(sequence, state) {
+    this.sequence = sequence;
     this.state = state;
   }
 }
