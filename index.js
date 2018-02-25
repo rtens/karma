@@ -1,4 +1,4 @@
-let queue = require('queue');
+const queue = require('queue');
 
 class Domain {
   constructor(eventBus, snapshotStore, repositoryStrategy) {
@@ -153,7 +153,7 @@ class AggregateInstance extends UnitInstance {
 
     let fullEvents = events.map(e => new Event(e.name, e.payload, new Date(), command.traceId));
 
-    return this._bus.publish(fullEvents, this.sequence)
+    return this._bus.publish(fullEvents, this.id, this.sequence)
       .catch(e => {
         if (tries > 3) throw e;
         return this._execute(command, tries + 1)
@@ -219,12 +219,12 @@ class RepositoryStrategy {
 }
 
 class EventBus {
-  publish(event, onSequence) {
-    return Promise.resolve()
+  publish(sequenceId, headSequence, events) {
+    return Promise.resolve(this)
   }
 
   subscribe(subscriber, filter) {
-    return Promise.resolve()
+    return Promise.resolve(this)
   }
 
   filter() {

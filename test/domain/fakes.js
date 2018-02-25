@@ -1,9 +1,9 @@
-let {
+const {
   RepositoryStrategy,
   EventBus,
   EventFilter,
   SnapshotStore,
-} = require('../index');
+} = require('../../index');
 
 class FakeEventBus extends EventBus {
   constructor() {
@@ -12,8 +12,8 @@ class FakeEventBus extends EventBus {
     this.subscribed = [];
   }
 
-  publish(events, onSequence) {
-    this.published.push({events, onSequence});
+  publish(events, sequenceId, headSequence) {
+    this.published.push({events, sequenceId, headSequence});
     return Promise.resolve();
   }
 

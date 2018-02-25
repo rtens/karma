@@ -1,7 +1,9 @@
-let chai = require('chai');
-let promised = require('chai-as-promised');
+const chai = require('chai');
+const promised = require('chai-as-promised');
+chai.use(promised);
+chai.should();
 
-let {
+const {
   Domain,
   Command,
   Aggregate,
@@ -10,24 +12,29 @@ let {
   Event,
   SnapshotStore,
   Snapshot
-} = require('../index');
+} = require('../../index');
 
-let {
+const {
   FakeEventBus,
   FakeRepositoryStrategy,
   FakeSnapshotStore
 } = require('./fakes');
 
-chai.use(promised);
-chai.should();
-
-let _Date = Date;
-Date = function () {
-  return new _Date('2011-12-13T14:15:16Z');
-};
-Date.prototype = _Date.prototype;
 
 describe('Command execution', () => {
+
+  let _Date = Date;
+
+  before(() => {
+    Date = function () {
+      return new _Date('2011-12-13T14:15:16Z');
+    };
+    Date.prototype = _Date.prototype;
+  });
+
+  after(() => {
+    Date = _Date;
+  });
 
   it('fails if no executer is defined', () => {
     (() => {
@@ -110,7 +117,7 @@ describe('Command execution', () => {
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
 
       .add(new Aggregate()
-        .executing('Foo', ()=>1, command => [
+        .executing('Foo', ()=>'id', command => [
           new Event('food', command.payload),
           new Event('bard', 'two')
         ]))
@@ -122,8 +129,9 @@ describe('Command execution', () => {
           {name: 'food', payload: 'one', timestamp: new Date(), traceId: 'trace', sequence: null},
           {name: 'bard', payload: 'two', timestamp: new Date(), traceId: 'trace', sequence: null},
         ],
-        onSequence: 0
-      }]))
+        sequenceId: 'id',
+        headSequence: 0
+      }]));
   });
 
   it('fails if Events cannot be published', () => {
@@ -194,7 +202,8 @@ describe('Command execution', () => {
 
       .then(() => bus.published[1].should.eql({
         events: [new Event('food', ['one', 'two'], new Date())],
-        onSequence: 23
+        sequenceId: 'foo',
+        headSequence: 23
       }))
   });
 
@@ -224,7 +233,8 @@ describe('Command execution', () => {
 
       .then(() => bus.published.slice(1).should.eql([{
         events: [new Event('food', ['snap', 'one'], new Date())],
-        onSequence: 42
+        sequenceId: 'foo',
+        headSequence: 42
       }]))
   });
 
@@ -257,10 +267,12 @@ describe('Command execution', () => {
 
       .then(() => bus.published.slice(1).should.eql([{
         events: [new Event('food', 'a one', new Date())],
-        onSequence: 21
+        sequenceId: 'foo',
+        headSequence: 21
       }, {
         events: [new Event('food', 'a two', new Date())],
-        onSequence: 21
+        sequenceId: 'foo',
+        headSequence: 21
       }]))
   });
 
