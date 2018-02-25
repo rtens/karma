@@ -8,6 +8,7 @@ const should = chai.should();
 chai.use(promised);
 
 const karma = require('../../index');
+const flatFile = require('../../src/persistence/flat-file');
 
 describe('Flat file Snapshot store', () => {
   let directory;
@@ -17,7 +18,7 @@ describe('Flat file Snapshot store', () => {
   });
 
   it('stores Snapshots in files', () => {
-    return new FlatFileSnapshotStore(directory)
+    return new flatFile.SnapshotStore(directory)
 
       .store('foo', 'v1', new karma.Snapshot(42, 'bar'))
 
@@ -41,7 +42,7 @@ describe('Flat file Snapshot store', () => {
       }), y)
     })
 
-      .then(() => new FlatFileSnapshotStore(directory)
+      .then(() => new flatFile.SnapshotStore(directory)
 
         .fetch('foo', 'v1'))
 
@@ -52,7 +53,7 @@ describe('Flat file Snapshot store', () => {
   });
 
   it('returns null if Snapshot does not exist', () => {
-    return new FlatFileSnapshotStore(directory)
+    return new flatFile.SnapshotStore(directory)
 
       .fetch('foo', 'v1')
 
@@ -67,7 +68,7 @@ describe('Flat file Snapshot store', () => {
       fs.writeFile(directory + '/snapshots/foo/v1', 'old version', y)
     })
 
-      .then(() => new FlatFileSnapshotStore(directory)
+      .then(() => new flatFile.SnapshotStore(directory)
 
         .fetch('foo', 'v2'))
 
@@ -76,61 +77,3 @@ describe('Flat file Snapshot store', () => {
       .then(() => fs.existsSync(directory + '/snapshots/foo/v1').should.be.false)
   });
 });
-
-const path = require('path');
-
-class FlatFileSnapshotStore extends karma.SnapshotStore {
-  constructor(baseDir) {
-    super();
-    this._dir = baseDir;
-
-    FlatFileSnapshotStore._mkdir(baseDir);
-    FlatFileSnapshotStore._mkdir(baseDir + '/snapshots');
-  }
-
-  store(id, version, snapshot) {
-    return new Promise(y => {
-      var path = this._dir + '/snapshots/' + id;
-      FlatFileSnapshotStore._mkdir(path);
-      fs.writeFile(path + '/' + version, JSON.stringify(snapshot, null, 2), y)
-    })
-  }
-
-  fetch(id, version) {
-    return new Promise((y, n) => {
-      var path = this._dir + '/snapshots/' + id;
-      var file = path + '/' + version;
-
-      if (fs.existsSync(path) && !fs.existsSync(file)) {
-        return this._clear(path).then(y).catch(n);
-      }
-
-      fs.readFile(file, (e, c) =>
-        (e || !c) ? y(null) : y(JSON.parse(c)))
-    })
-  }
-
-  static _mkdir(dir) {
-    try {
-      fs.mkdirSync(dir)
-    } catch (err) {
-      if (err.code !== 'EEXIST') throw err
-    }
-  }
-
-  _clear(directory) {
-    return new Promise((y, n) => {
-      fs.readdir(directory, (err, files) => {
-        if (err) return n(err);
-
-        for (const file of files) {
-          fs.unlink(path.join(directory, file), err => {
-            if (err) n(err);
-          });
-        }
-
-        y()
-      })
-    })
-  }
-}
