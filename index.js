@@ -259,6 +259,7 @@ class Event {
 
 class SnapshotStore {
   store(id, version, snapshot) {
+    return Promise.resolve()
   }
 
   fetch(id, version) {
