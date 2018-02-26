@@ -2,99 +2,108 @@ const fs = require('fs');
 const path = require('path');
 const lockFile = require('lockfile');
 const chokidar = require('chokidar');
+const Promise = require("bluebird");
 
-const karma = require('../index');
+const karma = require('../karma');
+
+Promise.promisifyAll(fs);
+Promise.promisifyAll(lockFile);
 
 class EventBus extends karma.EventBus {
   constructor(baseDir) {
     super();
     this._dir = baseDir;
+    this._subscriptions = {};
 
     EventBus._mkdir(baseDir);
     EventBus._mkdir(baseDir + '/events');
 
     this._watcher = chokidar.watch(baseDir + '/events');
+    this._watcher.on('add', (file) =>
+      Object.values(this._subscriptions).forEach(subscriptions => this._notifySubscribers(file, subscriptions)));
+  }
+
+  _notifySubscribers(file, subscriptions) {
+    return fs.readFileAsync(file)
+
+      .then(content => JSON.parse(content))
+
+      .then(event => subscriptions
+        .filter(subscription => !subscription.filter || subscription.filter.matches(event))
+        .forEach(subscription => subscription.subscriber(event)))
   }
 
   publish(events, sequenceId, headSequence) {
     return Promise.resolve()
+      .then(() => this._aquireLock())
+      .then(() => this._readWriteFile())
+      .then(write => this._guardHeads(write, sequenceId, headSequence))
+      .then(write => this._writeEvents(write, events))
+      .then(write => this._writeWriteFile(write, events, sequenceId))
+      .then(() => this._releaseLock())
+      .catch(e => this._releaseLock().then(() => Promise.reject(e)))
+      .then(() => this)
+  }
 
-      .then(() => new Promise((y, n) => {
-        var opts = {wait: 100, pollPeriod: 10};
-        lockFile.lock(this._dir + '/write.lock', opts, e => e ? n(new Error('Locked')) : y())
-      }))
+  _aquireLock() {
+    return lockFile.lockAsync(this._dir + '/write.lock', {wait: 100, pollPeriod: 10})
+      .catch(e => Promise.reject(new Error('Locked')))
+  }
 
-      .then(() => new Promise(y => {
-        fs.readFile(this._dir + '/write', (err, c) => (err || !c) ? y({sequence: 0, heads: {}}) : y(JSON.parse(c)))
-      }))
+  _releaseLock() {
+    return lockFile.unlockAsync(this._dir + '/write.lock')
+  }
 
-      .then(write => new Promise((y, n) => {
-        if (sequenceId && sequenceId in write.heads && write.heads[sequenceId] != headSequence) {
-          return n(new Error('Head occupied.'));
-        }
-        return y(write);
-      }))
+  _readWriteFile() {
+    return fs.readFileAsync(this._dir + '/write')
+      .then(writeContent => JSON.parse(writeContent))
+      .catch(() => ({sequence: 0, heads: {}}))
+  }
 
-      .then(write => Promise.all(
-        events.map(event => new Promise((y, n) => {
-          write.sequence++;
-          var content = JSON.stringify(event.withSequence(write.sequence), null, 2);
-          fs.writeFile(this._dir + '/events/' + write.sequence, content, (err) => err ? n(err) : y())
-        })))
-        .then(() => write))
+  _guardHeads(write, sequenceId, headSequence) {
+    if (sequenceId && sequenceId in write.heads && write.heads[sequenceId] != headSequence) {
+      throw new Error('Head occupied.');
+    }
+    return write;
+  }
 
-      .then(write => new Promise((y, n) => {
-        if (sequenceId) {
-          write.heads[sequenceId] = write.sequence;
-        }
-        var content = JSON.stringify(write, null, 2);
-        fs.writeFile(this._dir + '/write', content, (err) => err ? n(err) : y())
-      }))
+  _writeEvents(write, events) {
+    return Promise.each(events
+        .map((event, i) => event.withSequence(write.sequence + i + 1))
+        .map(event => ({event: JSON.stringify(event, null, 2), sequence: event.sequence})),
+      content => fs.writeFileAsync(this._dir + '/events/' + content.sequence, content.event)
+    )
+      .then(() => write)
+  }
 
-      .then(() => new Promise((y, n) => {
-        lockFile.unlock(this._dir + '/write.lock', e => e ? n(e) : y())
-      }))
+  _writeWriteFile(write, events, sequenceId) {
+    write = {
+      sequence: write.sequence + events.length,
+      heads: !sequenceId
+        ? write.heads
+        : {...write.heads, [sequenceId]: write.sequence + events.length}
+    };
 
-      .catch(e => new Promise((y, n) => {
-        lockFile.unlock(this._dir + '/write.lock', n(e))
-      }))
+    return fs.writeFileAsync(this._dir + '/write', JSON.stringify(write, null, 2));
+  }
+
+  subscribe(id, subscriber, filter) {
+    return fs.readdirAsync(this._dir + '/events')
+
+      .then(files => files.sort((a, b) => parseInt(a) - parseInt(b)))
+
+      .then(files => Promise.each(files, file =>
+          this._notifySubscribers(this._dir + '/events/' + file, [{filter, subscriber}]),
+        {concurrency: 1}))
+
+      .then(() => (this._subscriptions[id] = this._subscriptions[id] || [])
+        .push({filter, subscriber}))
 
       .then(() => this)
   }
 
-  subscribe(subscriber, filter) {
-    return new Promise((y, n) => {
-      fs.readdir(this._dir + '/events', (err, files) => {
-        if (err) return n(err);
-
-        files.sort((a, b) => parseInt(a) - parseInt(b));
-
-        Promise.all(files.map(f => this._dir + '/events/' + f)
-          .map(f => new Promise((y, n) => {
-            fs.readFile(f, (err, c) => {
-              if (err) return n(err);
-              y(JSON.parse(c))
-            })
-          })))
-          .then(y);
-      })
-    })
-
-      .then(files => files
-        .filter(event => !filter || filter.matches(event))
-        .forEach(subscriber))
-
-      .then(() => this._watcher.on('add', (path) => {
-          fs.readFile(path, (err, c) => {
-            if (err) return n(err);
-            let event = JSON.parse(c);
-
-            if (event => !filter || filter.matches(event)) {
-              subscriber(event)
-            }
-          })
-        }
-      ))
+  unsubscribe(id) {
+    delete this._subscriptions[id];
   }
 
   close() {
@@ -141,25 +150,23 @@ class SnapshotStore extends karma.SnapshotStore {
   }
 
   store(id, version, snapshot) {
-    return new Promise(y => {
-      var path = this._dir + '/snapshots/' + id;
-      SnapshotStore._mkdir(path);
-      fs.writeFile(path + '/' + version, JSON.stringify(snapshot, null, 2), y)
-    })
+    var path = this._dir + '/snapshots/' + id;
+    SnapshotStore._mkdir(path);
+
+    return fs.writeFileAsync(path + '/' + version, JSON.stringify(snapshot, null, 2))
   }
 
   fetch(id, version) {
-    return new Promise((y, n) => {
-      var path = this._dir + '/snapshots/' + id;
-      var file = path + '/' + version;
+    var path = this._dir + '/snapshots/' + id;
+    var file = path + '/' + version;
 
-      if (fs.existsSync(path) && !fs.existsSync(file)) {
-        return this._clear(path).then(y).catch(n);
-      }
+    if (fs.existsSync(path) && !fs.existsSync(file)) {
+      return this._clear(path).then(() => null);
+    }
 
-      fs.readFile(file, (e, c) =>
-        (e || !c) ? y(null) : y(JSON.parse(c)))
-    })
+    return fs.readFileAsync(file)
+      .then(content => JSON.parse(content))
+      .catch(() => null)
   }
 
   static _mkdir(dir) {
@@ -171,19 +178,9 @@ class SnapshotStore extends karma.SnapshotStore {
   }
 
   _clear(directory) {
-    return new Promise((y, n) => {
-      fs.readdir(directory, (err, files) => {
-        if (err) return n(err);
-
-        for (const file of files) {
-          fs.unlink(path.join(directory, file), err => {
-            if (err) n(err);
-          });
-        }
-
-        y()
-      })
-    })
+    return fs.readdirAsync(directory)
+      .then(files => Promise.all(files.map(file =>
+        fs.unlinkAsync(path.join(directory, file)))))
   }
 }
 

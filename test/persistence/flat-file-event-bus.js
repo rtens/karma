@@ -7,7 +7,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const karma = require('../../src/index');
+const karma = require('../../src/karma');
 const flatFile = require('../../src/persistence/flat-file');
 
 chai.should();
@@ -191,7 +191,7 @@ describe('Flat file Event Bus', () => {
       }),
     ])
 
-      .then(() => bus.subscribe(e => events.push(e)))
+      .then(() => bus.subscribe('foo', e => events.push(e)))
 
       .then(() => bus.close())
 
@@ -231,7 +231,7 @@ describe('Flat file Event Bus', () => {
       }),
     ])
 
-      .then(() => bus.subscribe(e => events.push(e),
+      .then(() => bus.subscribe('foo', e => events.push(e),
         bus.filter().nameIsIn(['One', 'Three'])))
 
       .then(() => bus.close())
@@ -272,7 +272,7 @@ describe('Flat file Event Bus', () => {
       }),
     ])
 
-      .then(() => bus.subscribe(e => events.push(e),
+      .then(() => bus.subscribe('foo', e => events.push(e),
         bus.filter().after(11)))
 
       .then(() => bus.close())
@@ -288,13 +288,13 @@ describe('Flat file Event Bus', () => {
       ]))
   });
 
-  it('notifies subscribers about published Events', () => {
+  it('subscribes to published Events', () => {
     let events = [];
     let bus = new flatFile.EventBus(directory);
 
     return bus
 
-      .subscribe(e => events.push(e))
+      .subscribe('foo', e => events.push(e))
 
       .then(() => new Promise(y => {
         fs.writeFile(directory + '/events/42', JSON.stringify({
@@ -311,5 +311,31 @@ describe('Flat file Event Bus', () => {
         name: "One",
         sequence: 11
       }]))
+  });
+
+  it('un-subscribes Events', () => {
+    let events = [];
+    let bus = new flatFile.EventBus(directory);
+
+    return bus
+
+      .subscribe('foo', e => events.push(e))
+
+      .then(() => bus.subscribe('foo', e => events.push(e)))
+
+      .then(() => bus.unsubscribe('foo'))
+
+      .then(() => new Promise(y => {
+        fs.writeFile(directory + '/events/42', JSON.stringify({
+          name: "One",
+          sequence: 11
+        }), y)
+      }))
+
+      .then(() => new Promise(y => setTimeout(y, 10)))
+
+      .then(() => bus.close())
+
+      .then(() => events.should.eql([]))
   });
 });

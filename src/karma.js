@@ -86,7 +86,7 @@ class UnitInstance {
       .after(this.sequence);
 
     if (process.env.DEBUG) console.log('subscribe', {filter, id: this.id});
-    return this._bus.subscribe(this.apply.bind(this), filter);
+    return this._bus.subscribe(this.id, this.apply.bind(this), filter);
   }
 
   takeSnapshot() {
@@ -206,6 +206,7 @@ class AggregateRepository {
 
   unload(unit) {
     delete this._instances[unit.id];
+    this._bus.unsubscribe(unit.id);
   }
 }
 
@@ -224,8 +225,11 @@ class EventBus {
     return Promise.resolve(this)
   }
 
-  subscribe(subscriber, filter) {
+  subscribe(id, subscriber, filter) {
     return Promise.resolve(this)
+  }
+
+  unsubscribe(id) {
   }
 
   filter() {

@@ -3,6 +3,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
+const fake = require('./fakes');
 const {
   Domain,
   Command,
@@ -12,14 +13,7 @@ const {
   Event,
   SnapshotStore,
   Snapshot
-} = require('../../src/index');
-
-const {
-  FakeEventBus,
-  FakeRepositoryStrategy,
-  FakeSnapshotStore
-} = require('./fakes');
-
+} = require('../../src/karma');
 
 describe('Command execution', () => {
 
@@ -112,7 +106,7 @@ describe('Command execution', () => {
   });
 
   it('publishes Events', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
 
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
 
@@ -135,7 +129,7 @@ describe('Command execution', () => {
   });
 
   it('fails if Events cannot be published', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     bus.publish = () => {
       return Promise.reject(new Error('Nope'))
     };
@@ -151,7 +145,7 @@ describe('Command execution', () => {
   });
 
   it('retries publishing before giving up', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     let count = 0;
     bus.publish = () => new Promise(y => {
       if (count++ < 3) throw new Error(count);
@@ -171,11 +165,11 @@ describe('Command execution', () => {
   });
 
   it('reconstitutes an Aggregate from Events', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     bus.publish([
       new Event('bard', {id: 'foo', baz: 'one'}).withSequence(21),
       new Event('bard', {id: 'foo', baz: 'two'}).withSequence(22),
-      new Event('not',  {id: 'foo', baz: 'three'}).withSequence(23)
+      new Event('not', {id: 'foo', baz: 'three'}).withSequence(23)
     ]);
 
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
@@ -195,8 +189,8 @@ describe('Command execution', () => {
       .execute(new Command('Foo', 'foo'))
 
       .then(() => bus.subscribed.should.eql([{
-        names: ['nothing', 'bard'],
-        sequence: 0
+        id: 'foo',
+        filter: {names: ['nothing', 'bard'], sequence: 0}
       }]))
 
       .then(() => bus.published[1].should.eql({
@@ -207,7 +201,7 @@ describe('Command execution', () => {
   });
 
   it('reconstitutes only owning Aggregate from Events', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     bus.publish([
       new Event('bard', {id: 'foo', baz: 'one'}).withSequence(21),
       new Event('bard', {id: 'bar', baz: 'two'}).withSequence(22),
@@ -229,8 +223,8 @@ describe('Command execution', () => {
       .execute(new Command('Foo', 'foo'))
 
       .then(() => bus.subscribed.should.eql([{
-        names: ['bard'],
-        sequence: 0
+        id: 'foo',
+        filter: {names: ['bard'], sequence: 0}
       }]))
 
       .then(() => bus.published[1].should.eql({
@@ -241,10 +235,10 @@ describe('Command execution', () => {
   });
 
   it('reconstitutes an Aggregate from a Snapshot and Events', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     bus.publish([new Event('bard', 'one').withSequence(42)]);
 
-    let snapshots = new FakeSnapshotStore();
+    let snapshots = new fake.SnapshotStore();
     snapshots.store('foo', 'v1', new Snapshot(21, {bards: ['snap']}));
 
     return new Domain(bus, snapshots, new RepositoryStrategy())
@@ -262,7 +256,10 @@ describe('Command execution', () => {
 
       .then(() => snapshots.fetched.should.eql([{id: 'foo', version: 'v1'}]))
 
-      .then(() => bus.subscribed.should.eql([{names: ['bard'], sequence: 21}]))
+      .then(() => bus.subscribed.should.eql([{
+        id: 'foo',
+        filter: {names: ['bard'], sequence: 21}
+      }]))
 
       .then(() => bus.published.slice(1).should.eql([{
         events: [new Event('food', ['snap', 'one'], new Date())],
@@ -272,10 +269,10 @@ describe('Command execution', () => {
   });
 
   it('keeps the reconstituted Aggregate', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     bus.publish([new Event('bard', 'a ').withSequence(21)]);
 
-    let snapshots = new FakeSnapshotStore();
+    let snapshots = new fake.SnapshotStore();
 
     return new Domain(bus, snapshots, new RepositoryStrategy())
 
@@ -310,14 +307,14 @@ describe('Command execution', () => {
   });
 
   it('can take a Snapshot', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     bus.publish([
       new Event('bard', 'one').withSequence(21)
     ]);
 
-    let snapshots = new FakeSnapshotStore();
+    let snapshots = new fake.SnapshotStore();
 
-    let strategy = new FakeRepositoryStrategy()
+    let strategy = new fake.RepositoryStrategy()
       .onAccess(unit => unit.takeSnapshot());
 
     return new Domain(bus, snapshots, strategy)
@@ -343,14 +340,14 @@ describe('Command execution', () => {
   });
 
   it('can unload an Aggregate', () => {
-    let bus = new FakeEventBus();
+    let bus = new fake.EventBus();
     bus.publish([
       new Event('bard', 'one').withSequence(21)
     ]);
 
-    let snapshots = new FakeSnapshotStore();
+    let snapshots = new fake.SnapshotStore();
 
-    let strategy = new FakeRepositoryStrategy()
+    let strategy = new fake.RepositoryStrategy()
       .onAccess(function (unit) {
         this.repository.unload(unit);
       });
@@ -374,10 +371,15 @@ describe('Command execution', () => {
       .then(() => snapshots.fetched.length.should.equal(2))
 
       .then(() => bus.subscribed.length.should.equal(2))
+
+      .then(() => bus.unsubscribed.should.eql([
+        {id: 'foo'},
+        {id: 'foo'}
+      ]))
   });
 
   it('queues Commands per Aggregate', () => {
-    var bus = new (class extends FakeEventBus {
+    var bus = new (class extends fake.EventBus {
       //noinspection JSUnusedGlobalSymbols
       publish(events, onSequence) {
         return new Promise(y => {
@@ -387,7 +389,7 @@ describe('Command execution', () => {
       }
     });
 
-    var domain = new Domain(bus, new FakeSnapshotStore(), new FakeRepositoryStrategy())
+    var domain = new Domain(bus, new fake.SnapshotStore(), new fake.RepositoryStrategy())
 
       .add(new Aggregate()
         .executing('Foo', ()=>'one', () => [new Event('Foo')])

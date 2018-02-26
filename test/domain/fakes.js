@@ -1,15 +1,11 @@
-const {
-  RepositoryStrategy,
-  EventBus,
-  EventFilter,
-  SnapshotStore,
-} = require('../../src/index');
+const karma = require('../../src/karma');
 
-class FakeEventBus extends EventBus {
+class EventBus extends karma.EventBus {
   constructor() {
     super();
     this.published = [];
     this.subscribed = [];
+    this.unsubscribed = [];
   }
 
   publish(events, sequenceId, headSequence) {
@@ -17,18 +13,22 @@ class FakeEventBus extends EventBus {
     return Promise.resolve();
   }
 
-  subscribe(subscriber, filter) {
-    this.subscribed.push(filter);
+  subscribe(id, subscriber, filter) {
+    this.subscribed.push({id, filter});
     this.published.forEach(({events}) => events.forEach(subscriber));
     return Promise.resolve();
   }
 
+  unsubscribe(id) {
+    this.unsubscribed.push({id});
+  }
+
   filter() {
-    return new FakeEventFilter()
+    return new EventFilter()
   }
 }
 
-class FakeEventFilter extends EventFilter {
+class EventFilter extends karma.EventFilter {
   nameIsIn(strings) {
     this.names = strings;
     return this
@@ -40,7 +40,7 @@ class FakeEventFilter extends EventFilter {
   }
 }
 
-class FakeRepositoryStrategy extends RepositoryStrategy {
+class RepositoryStrategy extends karma.RepositoryStrategy {
   constructor() {
     super();
     this._onAccess = ()=>null;
@@ -56,7 +56,7 @@ class FakeRepositoryStrategy extends RepositoryStrategy {
   }
 }
 
-class FakeSnapshotStore extends SnapshotStore {
+class SnapshotStore extends karma.SnapshotStore {
   constructor() {
     super();
     this.snapshots = {};
@@ -76,8 +76,8 @@ class FakeSnapshotStore extends SnapshotStore {
 }
 
 module.exports = {
-  FakeEventBus,
-  FakeEventFilter,
-  FakeRepositoryStrategy,
-  FakeSnapshotStore
+  EventBus,
+  EventFilter,
+  RepositoryStrategy,
+  SnapshotStore
 };
