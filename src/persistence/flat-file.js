@@ -13,7 +13,7 @@ class EventBus extends karma.EventBus {
     EventBus._mkdir(baseDir);
     EventBus._mkdir(baseDir + '/events');
 
-    this._watcher = chokidar.watch(baseDir + '/events', {ignored: /^\./, persistent: true});
+    this._watcher = chokidar.watch(baseDir + '/events');
   }
 
   publish(events, sequenceId, headSequence) {
@@ -55,6 +55,10 @@ class EventBus extends karma.EventBus {
         lockFile.unlock(this._dir + '/write.lock', e => e ? n(e) : y())
       }))
 
+      .catch(e => new Promise((y, n) => {
+        lockFile.unlock(this._dir + '/write.lock', n(e))
+      }))
+
       .then(() => this)
   }
 
@@ -91,7 +95,6 @@ class EventBus extends karma.EventBus {
           })
         }
       ))
-      ;
   }
 
   close() {

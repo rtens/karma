@@ -149,6 +149,29 @@ describe('Flat file Event Bus', () => {
       .then(() => fs.writeFile = _writeFile)
   });
 
+  it('unlocks after collision', () => {
+    var bus = new flatFile.EventBus(directory);
+
+    return bus
+
+      .publish([new karma.Event()], 'foo')
+
+      .then(bus =>
+        bus.publish([new karma.Event()], 'foo', 1))
+
+      .then(bus =>
+        bus.publish([new karma.Event()], 'foo', 1))
+
+      .catch(() => null)
+
+      .then(() =>
+        bus.publish([new karma.Event()], 'foo', 2))
+
+      .then(() => bus.close())
+
+      .should.not.be.rejected
+  });
+
   it('reads Events from files', () => {
     let events = [];
     let bus = new flatFile.EventBus(directory);
