@@ -85,6 +85,7 @@ class UnitInstance {
       .nameIsIn(Object.keys(this.definition._appliers || {}))
       .after(this.sequence);
 
+    if (process.env.DEBUG) console.log('subscribe', {filter, id: this.id});
     return this._bus.subscribe(this.apply.bind(this), filter);
   }
 
@@ -96,10 +97,11 @@ class UnitInstance {
     if (this.definition._appliers[event.name]) {
       this.definition._appliers[event.name].forEach(a => {
         if (a.mapper(event) == this.id) {
-          a.applier.call(this.state, event)
+          if (process.env.DEBUG) console.log('apply', {event, id: this.id});
+          a.applier.call(this.state, event);
+          this.sequence = event.sequence;
         }
       });
-      this.sequence = event.sequence
     }
   }
 }
@@ -134,13 +136,11 @@ class Aggregate extends Unit {
 class AggregateInstance extends UnitInstance {
   constructor(definition, id, bus, snapshots) {
     super(definition, id, bus, snapshots);
-    this._queue = queue({
-      concurrency: 1,
-      autostart: true
-    })
+    this._queue = queue({concurrency: 1, autostart: true})
   }
 
   execute(command) {
+    if (process.env.DEBUG) console.log('execute', {command, id: this.id});
     return new Promise(y =>
       this._queue.push(() => this._execute(command).then(y)));
   }
@@ -153,6 +153,7 @@ class AggregateInstance extends UnitInstance {
 
     let fullEvents = events.map(e => new Event(e.name, e.payload, new Date(), command.traceId));
 
+    if (process.env.DEBUG) console.log('publish', {id: this.id, seq: this.sequence});
     return this._bus.publish(fullEvents, this.id, this.sequence)
       .catch(e => {
         if (tries > 3) throw e;

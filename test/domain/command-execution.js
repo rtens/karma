@@ -174,9 +174,8 @@ describe('Command execution', () => {
     let bus = new FakeEventBus();
     bus.publish([
       new Event('bard', {id: 'foo', baz: 'one'}).withSequence(21),
-      new Event('bard', {id: 'not'}).withSequence(22),
-      new Event('bard', {id: 'foo', baz: 'two'}).withSequence(23),
-      new Event('not').withSequence(24)
+      new Event('bard', {id: 'foo', baz: 'two'}).withSequence(22),
+      new Event('not',  {id: 'foo', baz: 'three'}).withSequence(23)
     ]);
 
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
@@ -203,7 +202,41 @@ describe('Command execution', () => {
       .then(() => bus.published[1].should.eql({
         events: [new Event('food', ['one', 'two'], new Date())],
         sequenceId: 'foo',
-        headSequence: 23
+        headSequence: 22
+      }))
+  });
+
+  it('reconstitutes only owning Aggregate from Events', () => {
+    let bus = new FakeEventBus();
+    bus.publish([
+      new Event('bard', {id: 'foo', baz: 'one'}).withSequence(21),
+      new Event('bard', {id: 'bar', baz: 'two'}).withSequence(22),
+    ]);
+
+    return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
+
+      .add(new Aggregate()
+        .init(function () {
+          this.bards = [];
+        })
+        .applying('bard', event=>event.payload.id, function (event) {
+          this.bards.push(event.payload.baz);
+        })
+        .executing('Foo', command=>command.payload, function () {
+          return [new Event('food', this.bards)]
+        }))
+
+      .execute(new Command('Foo', 'foo'))
+
+      .then(() => bus.subscribed.should.eql([{
+        names: ['bard'],
+        sequence: 0
+      }]))
+
+      .then(() => bus.published[1].should.eql({
+        events: [new Event('food', ['one'], new Date())],
+        sequenceId: 'foo',
+        headSequence: 21
       }))
   });
 
