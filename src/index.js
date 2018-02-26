@@ -141,8 +141,8 @@ class AggregateInstance extends UnitInstance {
 
   execute(command) {
     if (process.env.DEBUG) console.log('execute', {command, id: this.id});
-    return new Promise(y =>
-      this._queue.push(() => this._execute(command).then(y)));
+    return new Promise((y, n) =>
+      this._queue.push(() => this._execute(command).then(y).catch(n)));
   }
 
   _execute(command, tries = 0) {

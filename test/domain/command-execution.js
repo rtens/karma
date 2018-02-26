@@ -137,7 +137,7 @@ describe('Command execution', () => {
   it('fails if Events cannot be published', () => {
     let bus = new FakeEventBus();
     bus.publish = () => {
-      throw new Error('Nope')
+      return Promise.reject(new Error('Nope'))
     };
 
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
