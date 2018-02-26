@@ -16,14 +16,26 @@ const domain = new karma.Domain(new flatFile.EventBus('./data'), new flatFile.Sn
 
     .init(function () {
       this.total = 0;
-    })
-
-    .applying('food', e=>e.payload.to, function (e) {
-      this.total = e.payload.total;
+      this.limit = 3;
     })
 
     .executing('Foo', e=>e.payload.target, function ({payload:{target, count}}) {
+      if (this.total + count > this.limit) {
+        throw new Error('Too much');
+      }
       return [new karma.Event('food', {to: target, total: this.total + count})]
+    })
+
+    .applying('food', e=>e.payload.to, function ({payload:{total}}) {
+      this.total = total;
+    })
+
+    .executing('Inc', e=>e.payload.where, function ({payload:{where, by}}) {
+      return [new karma.Event('incd', {in: where, by})];
+    })
+
+    .applying('incd', e=>e.payload.in, function ({payload:{by}}) {
+      this.limit += by;
     }));
 
 
