@@ -297,20 +297,33 @@ describe('Flat file Event Bus', () => {
       .subscribe('foo', e => events.push(e))
 
       .then(() => new Promise(y => {
-        fs.writeFile(directory + '/events/42', JSON.stringify({
-          name: "One",
-          sequence: 11
-        }), y)
+        fs.writeFile(directory + '/events/42', JSON.stringify('one'), y)
       }))
-
-      .then(() => new Promise(y => setTimeout(y, 10)))
 
       .then(() => bus.close())
 
-      .then(() => events.should.eql([{
-        name: "One",
-        sequence: 11
-      }]))
+      .then(() => events.should.eql(['one']))
+  });
+
+  it('keeps sequence of published Events', () => {
+    let events = [];
+    let bus = new flatFile.EventBus(directory);
+
+    return bus
+
+      .subscribe('foo', e => events.push(e))
+
+      .then(() => new Promise(y => {
+        fs.writeFile(directory + '/events/1', JSON.stringify('one'), y)
+      }))
+
+      .then(() => new Promise(y => {
+        fs.writeFile(directory + '/events/2', JSON.stringify('two'), y)
+      }))
+
+      .then(() => bus.close())
+
+      .then(() => events.should.eql(['one', 'two']))
   });
 
   it('un-subscribes Events', () => {
@@ -331,8 +344,6 @@ describe('Flat file Event Bus', () => {
           sequence: 11
         }), y)
       }))
-
-      .then(() => new Promise(y => setTimeout(y, 10)))
 
       .then(() => bus.close())
 

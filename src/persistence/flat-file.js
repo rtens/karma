@@ -3,6 +3,7 @@ const path = require('path');
 const lockFile = require('lockfile');
 const chokidar = require('chokidar');
 const Promise = require("bluebird");
+const queue = require('queue');
 
 const karma = require('../karma');
 
@@ -14,23 +15,35 @@ class EventBus extends karma.EventBus {
     super();
     this._dir = baseDir;
     this._subscriptions = {};
+    this._notified = {};
+    this._notificationQueue = queue({concurrency: 1, autostart: true});
 
     EventBus._mkdir(baseDir);
     EventBus._mkdir(baseDir + '/events');
 
     this._watcher = chokidar.watch(baseDir + '/events');
     this._watcher.on('add', (file) =>
-      Object.values(this._subscriptions).forEach(subscriptions => this._notifySubscribers(file, subscriptions)));
+      this._notificationQueue.push(() => this._notifyAllSubscribers(file)))
+  }
+
+  _notifyAllSubscribers(file) {
+    return Promise.all(Object.values(this._subscriptions)
+      .map(subscriptions => this._notifySubscribers(file, subscriptions)))
   }
 
   _notifySubscribers(file, subscriptions) {
+    if (file in this._notified) {
+      return Promise.resolve();
+    }
+    this._notified[file] = true;
+
     return fs.readFileAsync(file)
 
       .then(content => JSON.parse(content))
 
       .then(event => subscriptions
         .filter(subscription => !subscription.filter || subscription.filter.matches(event))
-        .forEach(subscription => subscription.subscriber(event)))
+        .forEach(subscription => subscription.subscriber(event)));
   }
 
   publish(events, sequenceId, headSequence) {
@@ -107,7 +120,10 @@ class EventBus extends karma.EventBus {
   }
 
   close() {
-    this._watcher.close();
+    if (this._notificationQueue.length == 0) {
+      return new Promise(y => setTimeout(() => y(this._watcher.close()), 100));
+    }
+    return new Promise(y => setTimeout(() => y(this.close()), 100));
   }
 
   filter() {
