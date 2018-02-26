@@ -71,9 +71,11 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
+    if (process.env.DEBUG) console.log('fetch', {id: this.id, version: this.definition.version});
     return this._snapshots.fetch(this.id, this.definition.version)
       .then(snapshot => {
         if (snapshot) {
+          if (process.env.DEBUG) console.log('fetched', {id: this.id, snapshot});
           this.state = snapshot.state;
           this.sequence = snapshot.sequence;
         }
@@ -90,6 +92,7 @@ class UnitInstance {
   }
 
   takeSnapshot() {
+    if (process.env.DEBUG) console.log('store', {id: this.id, version: this.definition.version});
     this._snapshots.store(this.id, this.definition.version, new Snapshot(this.sequence, this.state));
   }
 
@@ -205,6 +208,7 @@ class AggregateRepository {
   }
 
   unload(unit) {
+    if (process.env.DEBUG) console.log('unload', {id: unit.id});
     delete this._instances[unit.id];
     this._bus.unsubscribe(unit.id);
   }

@@ -1,12 +1,12 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const karma = require('./src');
+const karma = require('./src/karma');
 const flatFile = require('./src/persistence/flat-file');
 
 class RepositoryStrategy extends karma.RepositoryStrategy {
   notifyAccess(unit) {
     unit.takeSnapshot();
-    // this.repository.unload(unit);
+    this.repository.unload(unit);
   }
 }
 
