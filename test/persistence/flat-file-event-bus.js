@@ -305,6 +305,33 @@ describe('Flat file Event Bus', () => {
       .then(() => events.should.eql(['one']))
   });
 
+  it('de-duplicates published Events', () => {
+    let events = [];
+    let bus = new flatFile.EventBus(directory);
+
+    return bus
+
+      .subscribe('foo', e => events.push('foo ' + e))
+
+      .then(() => new Promise(y => {
+        fs.writeFile(directory + '/events/42', JSON.stringify('one'), y)
+      }))
+
+      .then(() => new Promise(y => {
+        setTimeout(() => fs.unlink(directory + '/events/42', y), 100)
+      }))
+
+      .then(() => bus.subscribe('bar', e => events.push('bar ' + e)))
+
+      .then(() => new Promise(y => {
+        setTimeout(() => fs.writeFile(directory + '/events/42', JSON.stringify('two'), y), 100)
+      }))
+
+      .then(() => bus.close())
+
+      .then(() => events.should.eql(['foo one', 'bar two']))
+  });
+
   it('keeps sequence of published Events', () => {
     let events = [];
     let bus = new flatFile.EventBus(directory);
@@ -348,5 +375,22 @@ describe('Flat file Event Bus', () => {
       .then(() => bus.close())
 
       .then(() => events.should.eql([]))
+  });
+
+  it('resets de-duplication on un-subscibe', () => {
+    let events = [];
+    let bus = new flatFile.EventBus(directory);
+
+    return new Promise(y => fs.writeFile(directory + '/events/42', JSON.stringify('one'), y))
+
+      .then(() => bus.subscribe('foo', e => events.push('a ' + e)))
+
+      .then(() => bus.unsubscribe('foo'))
+
+      .then(() => bus.subscribe('foo', e => events.push('b ' + e)))
+
+      .then(() => bus.close())
+
+      .then(() => events.should.eql(['a one', 'b one']))
   });
 });

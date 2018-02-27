@@ -22,20 +22,22 @@ class EventBus extends karma.EventBus {
     EventBus._mkdir(baseDir + '/events');
 
     this._watcher = chokidar.watch(baseDir + '/events');
-    this._watcher.on('add', (file) =>
-      this._notificationQueue.push(() => this._notifyAllSubscribers(file)))
+    this._watcher.on('add', (file) => {
+      console.log('add', file);
+      return this._notificationQueue.push(() => this._notifyAllSubscribers(file))
+    })
   }
 
   _notifyAllSubscribers(file) {
-    return Promise.all(Object.values(this._subscriptions)
-      .map(subscriptions => this._notifySubscribers(file, subscriptions)))
+    return Promise.all(Object.keys(this._subscriptions)
+      .map(id => this._notifySubscribers(file, id, this._subscriptions[id])))
   }
 
-  _notifySubscribers(file, subscriptions) {
-    if (file in this._notified) {
+  _notifySubscribers(file, subscriptionId, subscriptions) {
+    if (file in this._notified[subscriptionId]) {
       return Promise.resolve();
     }
-    this._notified[file] = true;
+    this._notified[subscriptionId][file] = true;
 
     return fs.readFileAsync(file)
 
@@ -101,12 +103,14 @@ class EventBus extends karma.EventBus {
   }
 
   subscribe(id, subscriber, filter) {
+    this._notified[id] = this._notified[id] || {};
+
     return fs.readdirAsync(this._dir + '/events')
 
       .then(files => files.sort((a, b) => parseInt(a) - parseInt(b)))
 
       .then(files => Promise.each(files, file =>
-          this._notifySubscribers(this._dir + '/events/' + file, [{filter, subscriber}]),
+          this._notifySubscribers(this._dir + '/events/' + file, id, [{filter, subscriber}]),
         {concurrency: 1}))
 
       .then(() => (this._subscriptions[id] = this._subscriptions[id] || [])
@@ -116,7 +120,9 @@ class EventBus extends karma.EventBus {
   }
 
   unsubscribe(id) {
+    delete this._notified[id];
     delete this._subscriptions[id];
+    return Promise.resolve(this);
   }
 
   close() {
