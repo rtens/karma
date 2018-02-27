@@ -25,7 +25,7 @@ describe('Flat file Snapshot store', () => {
       .then(() => new Promise(y => {
         fs.readFile(directory + '/snapshots/foo/v1', (e, c) =>
           y(JSON.parse(c).should.eql({
-            sequence: 42,
+            head: 42,
             state: 'bar'
           })))
       }))
@@ -37,7 +37,7 @@ describe('Flat file Snapshot store', () => {
       fs.mkdirSync(directory + '/snapshots');
       fs.mkdirSync(directory + '/snapshots/foo');
       fs.writeFile(directory + '/snapshots/foo/v1', JSON.stringify({
-        sequence: 42,
+        head: 42,
         state: 'bar'
       }), y)
     })
@@ -46,10 +46,7 @@ describe('Flat file Snapshot store', () => {
 
         .fetch('foo', 'v1'))
 
-      .then(snapshot => snapshot.should.eql({
-        sequence: 42,
-        state: 'bar'
-      }))
+      .then(snapshot => snapshot.should.eql(new karma.Snapshot(42, 'bar')))
   });
 
   it('returns null if Snapshot does not exist', () => {

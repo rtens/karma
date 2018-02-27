@@ -1,41 +1,76 @@
 const karma = require('../../src/karma');
 
-class FakeEventBus extends karma.EventBus {
+class FakeEventStore extends karma.EventStore {
   constructor() {
     super();
-    this.published = [];
-    this.subscribed = [];
-    this.unsubscribed = [];
+    this.records = [];
+    this.recorded = [];
+    this.readers = [];
+    this.detached = [];
   }
 
-  publish(events, sequenceId, headSequence) {
-    this.published.push({events, sequenceId, headSequence});
-    return Promise.resolve();
+  record(events, aggregateId, onRevision, traceId) {
+    this.recorded.push({events, aggregateId, onRevision, traceId});
+    return Promise.resolve()
   }
 
-  subscribe(id, subscriber, filter) {
-    this.subscribed.push({id, filter});
-    this.published.forEach(({events}) => events.forEach(subscriber));
-    return Promise.resolve();
+  read(aggregateId, recordReader, filter) {
+    this.readers.push({aggregateId, filter});
+    this.records.forEach(r => recordReader(r));
+    return Promise.resolve()
   }
 
-  unsubscribe(id) {
-    this.unsubscribed.push({id});
+  detach(aggregateId) {
+    this.detached.push({aggregateId});
   }
 
   filter() {
-    return new EventFilter()
+    return new FakeRecordFilter()
   }
 }
 
-class EventFilter extends karma.EventFilter {
+class FakeRecordFilter extends karma.RecordFilter {
   nameIsIn(strings) {
     this.names = strings;
     return this
   }
 
-  after(sequence) {
-    this.sequence = sequence;
+  after(revision) {
+    this.revision = revision;
+    return this
+  }
+}
+
+class FakeEventBus extends karma.EventBus {
+  constructor() {
+    super();
+    this.published = [];
+  }
+
+  publish(event, domain) {
+    this.published.push({event, domain});
+    return Promise.resolve()
+  }
+
+  subscribe(subscriberId, messageSubscriber, messageFilter) {
+    return Promise.resolve()
+  }
+
+  unsubscribe(subscriberId) {
+    return Promise.resolve()
+  }
+
+  filter() {
+    return new MessageFilter();
+  }
+}
+
+class FakeMessageFilter extends karma.MessageFilter {
+  after(offset) {
+    return this
+  }
+
+  from(domain) {
     return this
   }
 }
@@ -66,7 +101,6 @@ class FakeSnapshotStore extends karma.SnapshotStore {
 
   store(id, version, snapshot) {
     this.stored.push({id, version, snapshot});
-    this.snapshots[id + version] = snapshot;
   }
 
   fetch(id, version) {
@@ -76,6 +110,7 @@ class FakeSnapshotStore extends karma.SnapshotStore {
 }
 
 module.exports = {
+  EventStore: FakeEventStore,
   EventBus: FakeEventBus,
   RepositoryStrategy: FakeRepositoryStrategy,
   SnapshotStore: FakeSnapshotStore

@@ -1,10 +1,13 @@
 const queue = require('queue');
 const crypto = require('crypto');
+const Promise = require("bluebird");
+
+//------ DOMAIN -------//
 
 class Domain {
-  constructor(eventBus, snapshotStore, repositoryStrategy) {
-    this._bus = eventBus;
-    this._aggregates = new AggregateRepository(eventBus, snapshotStore, repositoryStrategy)
+  constructor(name, eventStore, eventBus, snapshotStore, repositoryStrategy) {
+    this.name = name;
+    this._aggregates = new AggregateRepository(name, eventStore, eventBus, snapshotStore, repositoryStrategy)
   }
 
   add(unit) {
@@ -28,6 +31,91 @@ class Command {
     this.traceId = traceId;
   }
 }
+
+class Event {
+  constructor(name, payload, time = new Date()) {
+    this.name = name;
+    this.payload = payload;
+    this.time = time;
+  }
+}
+
+//---- EVENT STORE -----//
+
+class Record {
+  constructor(event, revision, traceId) {
+    this.event = event;
+    this.revision = revision;
+    this.traceId = traceId;
+  }
+}
+
+class EventStore {
+  record(events, aggregateId, onRevision, traceId) {
+    return Promise.resolve()
+  }
+
+  read(aggregateId, recordReader, filter) {
+    return Promise.resolve()
+  }
+
+  detach(aggregateId) {
+  }
+
+  filter() {
+    return new RecordFilter()
+  }
+}
+
+class RecordFilter {
+  nameIsIn(strings) {
+    return this
+  }
+
+  after(revision) {
+    return this
+  }
+}
+
+//----- EVENT BUS ------//
+
+class Message {
+  constructor(event, domain, offset) {
+    this.event = event;
+    this.domain = domain;
+    this.offset = offset;
+  }
+}
+
+class EventBus {
+  publish(event, domain) {
+    return Promise.resolve()
+  }
+
+  subscribe(subscriberId, messageSubscriber, messageFilter) {
+    return Promise.resolve()
+  }
+
+  unsubscribe(subscriberId) {
+    return Promise.resolve()
+  }
+
+  filter() {
+    return new MessageFilter();
+  }
+}
+
+class MessageFilter {
+  after(offset) {
+    return this
+  }
+
+  from(domain) {
+    return this
+  }
+}
+
+//------- UNIT ---------//
 
 class Unit {
   constructor(name) {
@@ -61,22 +149,24 @@ class Unit {
     return this
   }
 
-  applying(eventName, mapper, applier) {
-    (this._appliers[eventName] = this._appliers[eventName] || []).push({mapper, applier});
+  applying(domain, eventName, mapper, applier) {
+    (this._appliers[eventName] = this._appliers[eventName] || []).push({domain, mapper, applier});
     return this
   }
 }
 
 class UnitInstance {
-  constructor(definition, id, bus, snapshots) {
-    this.definition = definition;
+  constructor(id, definition, bus, snapshots) {
     this.id = id;
+
+    this._definition = definition;
     this._bus = bus;
     this._snapshots = snapshots;
-    this.sequence = 0;
-    this.state = {};
 
-    definition._initializers.forEach(i => i.call(this.state));
+    this._head = null;
+    this._state = {};
+
+    definition._initializers.forEach(i => i.call(this._state));
   }
 
   load() {
@@ -86,43 +176,59 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
-    if (process.env.DEBUG) console.log('fetch', {id: this.id, version: this.definition.version});
-    return this._snapshots.fetch(this.id, this.definition.version)
+    if (process.env.DEBUG) console.log('fetch', {id: this.id, version: this._definition.version});
+    return this._snapshots.fetch(this.id, this._definition.version)
       .then(snapshot => {
-        if (snapshot) {
-          if (process.env.DEBUG) console.log('fetched', {id: this.id, snapshot});
-          this.state = snapshot.state;
-          this.sequence = snapshot.sequence;
-        }
+        if (process.env.DEBUG) console.log('fetched', {id: this.id, snapshot});
+        this._state = snapshot.state;
+        this._head = snapshot.head;
       })
+      .catch(()=>null)
   }
 
   _subscribeToBus() {
-    let filter = this._bus.filter()
-      .nameIsIn(Object.keys(this.definition._appliers || {}))
-      .after(this.sequence);
+    return Promise.resolve();
+  }
 
-    if (process.env.DEBUG) console.log('subscribe', {filter, id: this.id});
-    return this._bus.subscribe(this.id, this.apply.bind(this), filter);
+  unload() {
+    this._bus.unsubscribe(this.id);
   }
 
   takeSnapshot() {
-    if (process.env.DEBUG) console.log('store', {id: this.id, version: this.definition.version});
-    this._snapshots.store(this.id, this.definition.version, new Snapshot(this.sequence, this.state));
+    if (process.env.DEBUG) console.log('store', {id: this.id, version: this._definition.version});
+    this._snapshots.store(this.id, this._definition.version, new Snapshot(this._head, this._state));
   }
 
-  apply(event) {
-    if (this.definition._appliers[event.name]) {
-      this.definition._appliers[event.name].forEach(a => {
-        if (a.mapper(event) == this.id) {
-          if (process.env.DEBUG) console.log('apply', {event, id: this.id});
-          a.applier.call(this.state, event);
-          this.sequence = event.sequence;
-        }
-      });
-    }
+  apply(message) {
+    (this._definition._appliers[message.event.name] || []).forEach(a => {
+      if (a.mapper(message.event) != this.id) return;
+
+      if (process.env.DEBUG) console.log('apply', {id: this.id, message});
+      a.applier.call(this._state, message.event);
+      this._head = message.offset;
+    });
   }
 }
+
+class UnitRepository {
+  add(unitClass) {
+  }
+
+  remove(unit) {
+  }
+}
+
+class RepositoryStrategy {
+  managing(unitRepository) {
+    this.repository = unitRepository;
+    return this
+  }
+
+  notifyAccess(unit) {
+  }
+}
+
+//------ AGGREGATE -----//
 
 class Aggregate extends Unit {
   constructor(name) {
@@ -152,8 +258,10 @@ class Aggregate extends Unit {
 }
 
 class AggregateInstance extends UnitInstance {
-  constructor(definition, id, bus, snapshots) {
-    super(definition, id, bus, snapshots);
+  constructor(domain, id, definition, store, bus, snapshots) {
+    super(id, definition, bus, snapshots);
+    this._domain = domain;
+    this._store = store;
     this._queue = queue({concurrency: 1, autostart: true})
   }
 
@@ -164,24 +272,44 @@ class AggregateInstance extends UnitInstance {
   }
 
   _execute(command, tries = 0) {
-    let events = this.definition._executers[command.name].call(this.state, command);
+    let events = this._definition._executers[command.name].call(this._state, command);
+
     if (!Array.isArray(events)) {
       return Promise.resolve();
     }
 
-    let fullEvents = events.map(e => new Event(e.name, e.payload, new Date(), command.traceId));
-
-    if (process.env.DEBUG) console.log('publish', {id: this.id, seq: this.sequence});
-    return this._bus.publish(fullEvents, this.id, this.sequence)
+    if (process.env.DEBUG) console.log('record', {id: this.id, revision: this._head, events});
+    return this._store.record(events, this.id, this._head, command.traceId)
       .catch(e => {
         if (tries > 3) throw e;
         return this._execute(command, tries + 1)
       })
+      .then(() => Promise.each(events, e => this._bus.publish(e, this._domain)))
+  }
+
+  _subscribeToBus() {
+    let filter = this._store.filter()
+      .nameIsIn(Object.keys(this._definition._appliers || {}))
+      .after(this._head);
+
+    if (process.env.DEBUG) console.log('read', {id: this.id, filter});
+    return this._store.read(this.id, this.apply.bind(this), filter);
+  }
+
+  apply(record) {
+    super.apply(new Message(record.event, this._domain, record.revision));
+  }
+
+  unload() {
+    this._store.detach(this.id);
   }
 }
 
-class AggregateRepository {
-  constructor(bus, snapshots, strategy) {
+class AggregateRepository extends UnitRepository {
+  constructor(domain, store, bus, snapshots, strategy) {
+    super();
+    this._domain = domain;
+    this._store = store;
     this._bus = bus;
     this._snapshots = snapshots;
     this._strategy = strategy.managing(this);
@@ -218,68 +346,19 @@ class AggregateRepository {
       return Promise.resolve(this._instances[aggregateId]);
     }
 
-    this._instances[aggregateId] = new AggregateInstance(definition, aggregateId, this._bus, this._snapshots);
+    this._instances[aggregateId] =
+      new AggregateInstance(this._domain, aggregateId, definition, this._store, this._bus, this._snapshots);
     return this._instances[aggregateId].load();
   }
 
-  unload(unit) {
+  remove(unit) {
     if (process.env.DEBUG) console.log('unload', {id: unit.id});
+    unit.unload();
     delete this._instances[unit.id];
-    this._bus.unsubscribe(unit.id);
   }
 }
 
-class RepositoryStrategy {
-  managing(repository) {
-    this.repository = repository;
-    return this
-  }
-
-  notifyAccess(unit) {
-  }
-}
-
-class EventBus {
-  publish(sequenceId, headSequence, events) {
-    return Promise.resolve(this)
-  }
-
-  subscribe(id, subscriber, filter) {
-    return Promise.resolve(this)
-  }
-
-  unsubscribe(id) {
-  }
-
-  filter() {
-    return new EventFilter()
-  }
-}
-
-class EventFilter {
-  nameIsIn(strings) {
-    return this
-  }
-
-  after(sequence) {
-    return this
-  }
-}
-
-class Event {
-  constructor(name, payload, timestamp, traceId, sequence = null) {
-    this.name = name;
-    this.payload = payload;
-    this.timestamp = timestamp;
-    this.traceId = traceId;
-    this.sequence = sequence;
-  }
-
-  withSequence(sequence) {
-    this.sequence = sequence;
-    return this
-  }
-}
+//------ SNAPSHOT -----//
 
 class SnapshotStore {
   store(id, version, snapshot) {
@@ -287,13 +366,13 @@ class SnapshotStore {
   }
 
   fetch(id, version) {
-    return Promise.resolve()
+    return Promise.reject()
   }
 }
 
 class Snapshot {
-  constructor(sequence, state) {
-    this.sequence = sequence;
+  constructor(head, state) {
+    this.head = head;
     this.state = state;
   }
 }
@@ -301,15 +380,24 @@ class Snapshot {
 module.exports = {
   Domain,
   Command,
+  Event,
+
+  Record,
+  EventStore,
+  RecordFilter,
+
+  Message,
+  EventBus,
+  MessageFilter,
+
   Unit,
   UnitInstance,
+  RepositoryStrategy,
+
   Aggregate,
   AggregateInstance,
   AggregateRepository,
-  RepositoryStrategy,
-  EventBus,
-  EventFilter,
-  Event,
+
   SnapshotStore,
   Snapshot
 };

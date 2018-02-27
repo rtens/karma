@@ -10,7 +10,7 @@ const karma = require('../karma');
 Promise.promisifyAll(fs);
 Promise.promisifyAll(lockFile);
 
-class FlatFileEventBus extends karma.EventBus {
+class FlatFileEventStore extends karma.EventStore {
   constructor(baseDir) {
     super();
     this._dir = baseDir;
@@ -18,8 +18,8 @@ class FlatFileEventBus extends karma.EventBus {
     this._notified = {};
     this._notificationQueue = queue({concurrency: 1, autostart: true});
 
-    FlatFileEventBus._mkdir(baseDir);
-    FlatFileEventBus._mkdir(baseDir + '/events');
+    FlatFileEventStore._mkdir(baseDir);
+    FlatFileEventStore._mkdir(baseDir + '/events');
 
     this._watcher = chokidar.watch(baseDir + '/events');
     this._watcher.on('add', (file) =>
@@ -70,7 +70,7 @@ class FlatFileEventBus extends karma.EventBus {
   _readWriteFile() {
     return fs.readFileAsync(this._dir + '/write')
       .then(writeContent => JSON.parse(writeContent))
-      .catch(() => ({sequence: 0, heads: {}}))
+      .catch(() => ({revision: 0, heads: {}}))
   }
 
   _guardHeads(write, sequenceId, headSequence) {
@@ -82,19 +82,19 @@ class FlatFileEventBus extends karma.EventBus {
 
   _writeEvents(write, events) {
     return Promise.each(events
-        .map((event, i) => event.withSequence(write.sequence + i + 1))
-        .map(event => ({event: JSON.stringify(event, null, 2), sequence: event.sequence})),
-      content => fs.writeFileAsync(this._dir + '/events/' + content.sequence, content.event)
+        .map((event, i) => event.withSequence(write.revision + i + 1))
+        .map(event => ({event: JSON.stringify(event, null, 2), revision: event.revision})),
+      content => fs.writeFileAsync(this._dir + '/events/' + content.revision, content.event)
     )
       .then(() => write)
   }
 
   _writeWriteFile(write, events, sequenceId) {
     write = {
-      sequence: write.sequence + events.length,
+      sequence: write.revision + events.length,
       heads: !sequenceId
         ? write.heads
-        : {...write.heads, [sequenceId]: write.sequence + events.length}
+        : {...write.heads, [sequenceId]: write.revision + events.length}
     };
 
     return fs.writeFileAsync(this._dir + '/write', JSON.stringify(write, null, 2));
@@ -135,7 +135,7 @@ class FlatFileEventBus extends karma.EventBus {
   }
 
   filter() {
-    return new EventFilter()
+    return new RecordFilter()
   }
 
   static _mkdir(dir) {
@@ -147,7 +147,7 @@ class FlatFileEventBus extends karma.EventBus {
   }
 }
 
-class EventFilter extends karma.EventFilter {
+class RecordFilter extends karma.RecordFilter {
   nameIsIn(strings) {
     this.names = strings;
     return this;
@@ -160,7 +160,7 @@ class EventFilter extends karma.EventFilter {
 
   matches(event) {
     return (!this.names || this.names.indexOf(event.name) > -1)
-      && (!this._after || event.sequence > this._after);
+      && (!this._after || event.revision > this._after);
   }
 }
 
@@ -208,4 +208,7 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
   }
 }
 
-module.exports = {EventBus:FlatFileEventBus, SnapshotStore:FlatFileSnapshotStore};
+module.exports = {
+  EventStore: FlatFileEventStore,
+  SnapshotStore: FlatFileSnapshotStore
+};
