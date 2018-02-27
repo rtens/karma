@@ -1,6 +1,6 @@
 const karma = require('../../src/karma');
 
-class EventBus extends karma.EventBus {
+class FakeEventBus extends karma.EventBus {
   constructor() {
     super();
     this.published = [];
@@ -40,7 +40,7 @@ class EventFilter extends karma.EventFilter {
   }
 }
 
-class RepositoryStrategy extends karma.RepositoryStrategy {
+class FakeRepositoryStrategy extends karma.RepositoryStrategy {
   constructor() {
     super();
     this._onAccess = ()=>null;
@@ -56,7 +56,7 @@ class RepositoryStrategy extends karma.RepositoryStrategy {
   }
 }
 
-class SnapshotStore extends karma.SnapshotStore {
+class FakeSnapshotStore extends karma.SnapshotStore {
   constructor() {
     super();
     this.snapshots = {};
@@ -76,8 +76,7 @@ class SnapshotStore extends karma.SnapshotStore {
 }
 
 module.exports = {
-  EventBus,
-  EventFilter,
-  RepositoryStrategy,
-  SnapshotStore
+  EventBus: FakeEventBus,
+  RepositoryStrategy: FakeRepositoryStrategy,
+  SnapshotStore: FakeSnapshotStore
 };

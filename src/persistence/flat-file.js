@@ -10,7 +10,7 @@ const karma = require('../karma');
 Promise.promisifyAll(fs);
 Promise.promisifyAll(lockFile);
 
-class EventBus extends karma.EventBus {
+class FlatFileEventBus extends karma.EventBus {
   constructor(baseDir) {
     super();
     this._dir = baseDir;
@@ -18,8 +18,8 @@ class EventBus extends karma.EventBus {
     this._notified = {};
     this._notificationQueue = queue({concurrency: 1, autostart: true});
 
-    EventBus._mkdir(baseDir);
-    EventBus._mkdir(baseDir + '/events');
+    FlatFileEventBus._mkdir(baseDir);
+    FlatFileEventBus._mkdir(baseDir + '/events');
 
     this._watcher = chokidar.watch(baseDir + '/events');
     this._watcher.on('add', (file) =>
@@ -164,18 +164,18 @@ class EventFilter extends karma.EventFilter {
   }
 }
 
-class SnapshotStore extends karma.SnapshotStore {
+class FlatFileSnapshotStore extends karma.SnapshotStore {
   constructor(baseDir) {
     super();
     this._dir = baseDir;
 
-    SnapshotStore._mkdir(baseDir);
-    SnapshotStore._mkdir(baseDir + '/snapshots');
+    FlatFileSnapshotStore._mkdir(baseDir);
+    FlatFileSnapshotStore._mkdir(baseDir + '/snapshots');
   }
 
   store(id, version, snapshot) {
     var path = this._dir + '/snapshots/' + id;
-    SnapshotStore._mkdir(path);
+    FlatFileSnapshotStore._mkdir(path);
 
     return fs.writeFileAsync(path + '/' + version, JSON.stringify(snapshot, null, 2))
   }
@@ -208,4 +208,4 @@ class SnapshotStore extends karma.SnapshotStore {
   }
 }
 
-module.exports = {EventBus, SnapshotStore};
+module.exports = {EventBus:FlatFileEventBus, SnapshotStore:FlatFileSnapshotStore};
