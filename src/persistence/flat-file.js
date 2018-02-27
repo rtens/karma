@@ -22,10 +22,8 @@ class EventBus extends karma.EventBus {
     EventBus._mkdir(baseDir + '/events');
 
     this._watcher = chokidar.watch(baseDir + '/events');
-    this._watcher.on('add', (file) => {
-      console.log('add', file);
-      return this._notificationQueue.push(() => this._notifyAllSubscribers(file))
-    })
+    this._watcher.on('add', (file) =>
+      this._notificationQueue.push(() => this._notifyAllSubscribers(file)))
   }
 
   _notifyAllSubscribers(file) {
