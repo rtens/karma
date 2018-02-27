@@ -120,10 +120,14 @@ class EventBus extends karma.EventBus {
   }
 
   close() {
+    return new Promise(y => setTimeout(() => this._close(y), 100));
+  }
+
+  _close(y) {
     if (this._notificationQueue.length == 0) {
-      return new Promise(y => setTimeout(() => y(this._watcher.close()), 100));
+      return y(this._watcher.close());
     }
-    return new Promise(y => setTimeout(() => y(this.close()), 100));
+    setTimeout(() => this._close(y), 100)
   }
 
   filter() {

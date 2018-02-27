@@ -318,7 +318,7 @@ describe('Flat file Event Bus', () => {
       }))
 
       .then(() => new Promise(y => {
-        fs.writeFile(directory + '/events/2', JSON.stringify('two'), y)
+        setTimeout(() => fs.writeFile(directory + '/events/2', JSON.stringify('two'), y), 100)
       }))
 
       .then(() => bus.close())
