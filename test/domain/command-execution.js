@@ -175,10 +175,10 @@ describe('Command execution', () => {
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
 
       .add(new Aggregate()
-        .init(function () {
+        .initializing(function () {
           this.bards = [];
         })
-        .applying('nothing')
+        .applying('nothing', ()=>null, ()=>null)
         .applying('bard', event=>event.payload.id, function (event) {
           this.bards.push(event.payload.baz);
         })
@@ -210,7 +210,7 @@ describe('Command execution', () => {
     return new Domain(bus, new SnapshotStore(), new RepositoryStrategy())
 
       .add(new Aggregate()
-        .init(function () {
+        .initializing(function () {
           this.bards = [];
         })
         .applying('bard', event=>event.payload.id, function (event) {
@@ -277,7 +277,7 @@ describe('Command execution', () => {
     return new Domain(bus, snapshots, new RepositoryStrategy())
 
       .add(new Aggregate()
-        .init(function () {
+        .initializing(function () {
           this.bards = [];
         })
         .applying('bard', ()=>'foo', function (event) {
@@ -320,7 +320,7 @@ describe('Command execution', () => {
     return new Domain(bus, snapshots, strategy)
 
       .add(new Aggregate()
-        .init(function () {
+        .initializing(function () {
           this.bards = [];
         })
         .withVersion('v1')
@@ -331,11 +331,71 @@ describe('Command execution', () => {
 
       .execute(new Command('Foo', 'foo'))
 
-      .then(domain => domain.execute(new Command('Foo')))
-
       .then(() => snapshots.stored.should.eql([
         {id: 'foo', version: 'v1', snapshot: {sequence: 21, state: {bards: ['one']}}},
-        {id: 'foo', version: 'v1', snapshot: {sequence: 21, state: {bards: ['one']}}},
+      ]))
+  });
+
+  it('infers Snapshot version from initializers and appliers', () => {
+    let bus = new fake.EventBus();
+
+    let snapshots = new fake.SnapshotStore();
+
+    let strategy = new fake.RepositoryStrategy()
+      .onAccess(unit => unit.takeSnapshot());
+
+    var domain = new Domain(bus, snapshots, strategy);
+    return domain
+
+      .add(new Aggregate()
+        .initializing(function () {
+          this.foo = 'one';
+        })
+        .applying('bard', ()=>'foo', function () {
+          this.foo = 'one'
+        })
+        .executing('Foo', ()=>'foo', ()=>null))
+
+      .add(new Aggregate()
+        .initializing(function () {
+          this.foo = 'one';
+        })
+        .applying('bard', ()=>'foo', function () {
+          this.foo = 'one'
+        })
+        .executing('Bar', ()=>'bar', ()=>null))
+
+      .add(new Aggregate()
+        .initializing(function () {
+          this.foo = 'two';
+        })
+        .applying('bard', ()=>'foo', function () {
+          this.foo = 'one'
+        })
+        .executing('Baz', ()=>'baz', ()=>null))
+
+      .add(new Aggregate()
+        .initializing(function () {
+          this.foo = 'two';
+        })
+        .applying('bard', ()=>'foo', function () {
+          this.foo = 'two'
+        })
+        .executing('Ban', ()=>'ban', ()=>null))
+
+      .execute(new Command('Foo'))
+
+      .then(() => domain.execute(new Command('Bar')))
+
+      .then(() => domain.execute(new Command('Baz')))
+
+      .then(() => domain.execute(new Command('Ban')))
+
+      .then(() => snapshots.stored.should.eql([
+        {id: 'foo', version: '4cb8fc76b08332e52b5a1755fc375cac', snapshot: {sequence: 0, state: {foo: 'one'}}},
+        {id: 'bar', version: '4cb8fc76b08332e52b5a1755fc375cac', snapshot: {sequence: 0, state: {foo: 'one'}}},
+        {id: 'baz', version: 'dd1e21624d6092437eaf422e748be7f5', snapshot: {sequence: 0, state: {foo: 'two'}}},
+        {id: 'ban', version: 'fd58504581d65f4fc63d85c9f2596c5a', snapshot: {sequence: 0, state: {foo: 'two'}}},
       ]))
   });
 
@@ -355,7 +415,7 @@ describe('Command execution', () => {
     return new Domain(bus, snapshots, strategy)
 
       .add(new Aggregate()
-        .init(function () {
+        .initializing(function () {
           this.bards = [];
         })
         .withVersion('v1')

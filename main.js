@@ -14,7 +14,7 @@ const domain = new karma.Domain(new flatFile.EventBus('./data'), new flatFile.Sn
 
   .add(new karma.Aggregate('Test')
 
-    .init(function () {
+    .initializing(function () {
       this.total = 0;
       this.limit = 3;
     })

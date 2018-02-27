@@ -1,4 +1,5 @@
 const queue = require('queue');
+const crypto = require('crypto');
 
 class Domain {
   constructor(eventBus, snapshotStore, repositoryStrategy) {
@@ -31,17 +32,31 @@ class Command {
 class Unit {
   constructor(name) {
     this.name = name;
-    this.version = null;
+    this._version = null;
     this._initializers = [];
     this._appliers = {};
   }
 
   withVersion(version) {
-    this.version = version;
+    this._version = version;
     return this
   }
 
-  init(initializer) {
+  get version() {
+    return this._version = this._version || this._inferVersion();
+  }
+
+  _inferVersion() {
+    var fingerprint = JSON.stringify([
+      Object.values(this._appliers).map(as => as.map(a =>
+        [a.mapper.toString(), a.applier.toString()])),
+      Object.values(this._initializers).map(i => i.toString())
+    ]);
+
+    return crypto.createHash('md5').update(fingerprint).digest('hex');
+  }
+
+  initializing(initializer) {
     this._initializers.push(initializer);
     return this
   }
