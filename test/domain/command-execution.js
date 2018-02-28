@@ -122,6 +122,37 @@ describe('Command execution', () => {
       }]));
   });
 
+  it('does not record no Events', () => {
+    let store = new fake.EventStore();
+
+    return Domain('Test', {store})
+
+      .add(new k.Aggregate()
+        .executing('Foo', ()=>'id', ()=>null))
+
+      .execute(new k.Command('Foo'))
+
+      .then(() => store.recorded.should.eql([]));
+  });
+
+  it('records zero Events', () => {
+    let store = new fake.EventStore();
+
+    return Domain('Test', {store})
+
+      .add(new k.Aggregate()
+        .executing('Foo', ()=>'id', () => []))
+
+      .execute(new k.Command('Foo', null, 'trace'))
+
+      .then(() => store.recorded.should.eql([{
+        events: [],
+        aggregateId: 'id',
+        onRevision: null,
+        traceId: 'trace'
+      }]));
+  });
+
   it('fails if Events cannot be recorded', () => {
     let store = new fake.EventStore();
     store.record = () => {
