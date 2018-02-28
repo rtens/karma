@@ -20,7 +20,7 @@ describe('Flat file Event Store', () => {
   });
 
   it('stores Events in files', () => {
-    return new flatFile.EventStore(directory)
+    return new flatFile.EventStore('Test', directory)
 
       .record([
         new karma.Event('One', 'foo', new Date('2011-12-13')),
@@ -65,7 +65,7 @@ describe('Flat file Event Store', () => {
   });
 
   it('keeps Events in sequence', () => {
-    return new flatFile.EventStore(directory)
+    return new flatFile.EventStore('Test', directory)
 
       .record([
         new karma.Event()
@@ -99,7 +99,7 @@ describe('Flat file Event Store', () => {
   });
 
   it('protects Aggregate head', () => {
-    var store = new flatFile.EventStore(directory);
+    var store = new flatFile.EventStore('Test', directory);
 
     return store
 
@@ -135,7 +135,7 @@ describe('Flat file Event Store', () => {
       fs.writeFile = _writeFile;
     };
 
-    return new flatFile.EventStore(directory)
+    return new flatFile.EventStore('Test', directory)
 
       .record([new karma.Event()])
 
@@ -161,7 +161,7 @@ describe('Flat file Event Store', () => {
   });
 
   it('unlocks after collision', () => {
-    var store = new flatFile.EventStore(directory);
+    var store = new flatFile.EventStore('Test', directory);
 
     return store
 
@@ -189,8 +189,8 @@ describe('Flat file Event Store', () => {
   });
 
   it('reads Events from files', () => {
-    let records = [];
-    let store = new flatFile.EventStore(directory);
+    let messages = [];
+    let store = new flatFile.EventStore('Test', directory);
 
     return Promise.all([
       new Promise(y => {
@@ -207,24 +207,26 @@ describe('Flat file Event Store', () => {
       }),
     ])
 
-      .then(() => store.attach({id: 'foo', apply: r => records.push(r)}))
+      .then(() => store.attach({id: 'foo', apply: m => messages.push(m)}))
 
       .then(() => store.close())
 
-      .then(() => records.should.eql([
+      .then(() => messages.should.eql([
         {
           event: 'Three',
-          revision: 3
+          domain: 'Test',
+          offset: 3
         }, {
           event: 'Ten',
-          revision: 10
+          domain: 'Test',
+          offset: 10
         }
       ]))
   });
 
   it('filters Records by revision', () => {
-    let records = [];
-    let store = new flatFile.EventStore(directory);
+    let messages = [];
+    let store = new flatFile.EventStore('Test', directory);
 
     return Promise.all([
       new Promise(y => {
@@ -247,63 +249,65 @@ describe('Flat file Event Store', () => {
       }),
     ])
 
-      .then(() => store.attach({id: 'foo', _head: 11, apply: r => records.push(r)}))
+      .then(() => store.attach({id: 'foo', _head: 11, apply: m => messages.push(m)}))
 
       .then(() => store.close())
 
-      .then(() => records.should.eql([
+      .then(() => messages.should.eql([
         {
           event: "Two",
-          revision: 12
+          domain: 'Test',
+          offset: 12
         }, {
           event: "Three",
-          revision: 3
+          domain: 'Test',
+          offset: 3
         }
       ]))
   });
 
   it('notifies about recorded Events', () => {
-    let records = [];
-    let store = new flatFile.EventStore(directory);
+    let messages = [];
+    let store = new flatFile.EventStore('Test', directory);
 
     return store
 
-      .attach({id: 'foo', apply: r => records.push(r)})
+      .attach({id: 'foo', apply: m => messages.push(m.event)})
 
       .then(() => new Promise(y => {
-        fs.writeFile(directory + '/events/42', JSON.stringify('one'), y)
+        fs.writeFile(directory + '/events/42', JSON.stringify({event:'one'}), y)
       }))
 
       .then(() => store.close())
 
-      .then(() => records.should.eql(['one']))
+      .then(() => messages.should.eql(['one']))
   });
 
   it('de-duplicates notifications', () => {
-    let records = [];
-    let store = new flatFile.EventStore(directory);
+    let messages = [];
+    let store = new flatFile.EventStore('Test', directory);
 
     return store
 
-      .attach({id: 'foo', apply: r => records.push('foo ' + r)})
+      .attach({id: 'foo', apply: m => messages.push('foo ' + m.event)})
 
       .then(() => new Promise(y => {
-        fs.writeFile(directory + '/events/42', JSON.stringify('one'), y)
+        fs.writeFile(directory + '/events/42', JSON.stringify({event:'one'}), y)
       }))
 
       .then(() => new Promise(y => {
         setTimeout(() => fs.unlink(directory + '/events/42', y), 100)
       }))
 
-      .then(() => store.attach({id: 'bar', apply: r => records.push('bar ' + r)}))
+      .then(() => store.attach({id: 'bar', apply: m => messages.push('bar ' + m.event)}))
 
       .then(() => new Promise(y => {
-        setTimeout(() => fs.writeFile(directory + '/events/42', JSON.stringify('two'), y), 100)
+        setTimeout(() => fs.writeFile(directory + '/events/42', JSON.stringify({event: 'two'}), y), 100)
       }))
 
       .then(() => store.close())
 
-      .then(() => records.should.eql(['foo one', 'bar two']))
+      .then(() => messages.should.eql(['foo one', 'bar two']))
   });
 
   it('keeps order of recorded Events', () => {
@@ -313,29 +317,29 @@ describe('Flat file Event Store', () => {
       fs.readFile = _readFile
     };
 
-    let records = [];
-    let store = new flatFile.EventStore(directory);
+    let messages = [];
+    let store = new flatFile.EventStore('Test', directory);
 
     return store
 
-      .attach({id: 'foo', apply: r => records.push(r)})
+      .attach({id: 'foo', apply: m => messages.push(m.event)})
 
       .then(() => new Promise(y => {
-        fs.writeFile(directory + '/events/1', JSON.stringify('one'), y)
+        fs.writeFile(directory + '/events/1', JSON.stringify({event: 'one'}), y)
       }))
 
       .then(() => new Promise(y => {
-        setTimeout(() => fs.writeFile(directory + '/events/2', JSON.stringify('two'), y), 10)
+        setTimeout(() => fs.writeFile(directory + '/events/2', JSON.stringify({event: 'two'}), y), 10)
       }))
 
       .then(() => store.close())
 
-      .then(() => records.should.eql(['one', 'two']))
+      .then(() => messages.should.eql(['one', 'two']))
   });
 
   it('stops notifying about Events', () => {
     let records = [];
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventStore('Test', directory);
 
     return store
 
@@ -356,19 +360,19 @@ describe('Flat file Event Store', () => {
   });
 
   it('resets de-duplication on detachment', () => {
-    let records = [];
-    let store = new flatFile.EventStore(directory);
+    let messages = [];
+    let store = new flatFile.EventStore('Test', directory);
 
-    return new Promise(y => fs.writeFile(directory + '/events/42', JSON.stringify('one'), y))
+    return new Promise(y => fs.writeFile(directory + '/events/42', JSON.stringify({event: 'one'}), y))
 
-      .then(() => store.attach({id: 'foo', apply: r => records.push('a ' + r)}))
+      .then(() => store.attach({id: 'foo', apply: m => messages.push('a ' + m.event)}))
 
       .then(() => store.detach({id: 'foo'}))
 
-      .then(() => store.attach({id: 'foo', apply: r => records.push('b ' + r)}))
+      .then(() => store.attach({id: 'foo', apply: m => messages.push('b ' + m.event)}))
 
       .then(() => store.close())
 
-      .then(() => records.should.eql(['a one', 'b one']))
+      .then(() => messages.should.eql(['a one', 'b one']))
   });
 });

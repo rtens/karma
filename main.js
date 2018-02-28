@@ -6,11 +6,11 @@ const flatFile = require('./src/persistence/flat-file');
 class RepositoryStrategy extends karma.RepositoryStrategy {
   notifyAccess(unit) {
     unit.takeSnapshot();
-    this.repository.unload(unit);
+    this.repository.remove(unit);
   }
 }
 
-const domain = new karma.Domain(new flatFile.EventBus('./data'), new flatFile.SnapshotStore('./data'), new RepositoryStrategy())
+const domain = new karma.Domain('Test', new flatFile.EventStore('Test', './data'), new flatFile.SnapshotStore('./data'), new RepositoryStrategy())
 
   .add(new karma.Aggregate('Test')
 
@@ -26,7 +26,7 @@ const domain = new karma.Domain(new flatFile.EventBus('./data'), new flatFile.Sn
       return [new karma.Event('food', {to: target, total: this.total + count})]
     })
 
-    .applying('food', e=>e.payload.to, function ({payload:{total}}) {
+    .applying('Test', 'food', e=>e.payload.to, function ({payload:{total}}) {
       this.total = total;
     })
 
@@ -34,7 +34,7 @@ const domain = new karma.Domain(new flatFile.EventBus('./data'), new flatFile.Sn
       return [new karma.Event('incd', {in: where, by})];
     })
 
-    .applying('incd', e=>e.payload.in, function ({payload:{by}}) {
+    .applying('Test', 'incd', e=>e.payload.in, function ({payload:{by}}) {
       this.limit += by;
     }));
 

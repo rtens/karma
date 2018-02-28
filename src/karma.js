@@ -172,7 +172,7 @@ class UnitInstance {
   }
 
   takeSnapshot() {
-    if (process.env.DEBUG) console.log('store', {id: this.id, version: this._definition.version});
+    if (process.env.DEBUG) console.log('store', {id: this.id, version: this._definition.version, head: this._head});
     this._snapshots.store(this.id, this._definition.version, new Snapshot(this._head, this._state));
   }
 

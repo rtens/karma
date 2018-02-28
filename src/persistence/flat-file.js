@@ -11,8 +11,9 @@ Promise.promisifyAll(fs);
 Promise.promisifyAll(lockFile);
 
 class FlatFileEventStore extends karma.EventStore {
-  constructor(baseDir) {
+  constructor(domain, baseDir) {
     super();
+    this._domain = domain;
     this._dir = baseDir;
     this._attached = {};
     this._notified = {};
@@ -41,7 +42,7 @@ class FlatFileEventStore extends karma.EventStore {
 
       .then(content => JSON.parse(content))
 
-      .then(record => unit.apply(record));
+      .then(record => unit.apply(new karma.Message(record.event, this._domain, record.revision)));
   }
 
   record(events, aggregateId, onRevision, traceId) {
