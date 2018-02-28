@@ -24,7 +24,6 @@ describe('Command execution', () => {
   let Domain = (name, deps = {}) =>
     new k.Domain(name,
       deps.store || new k.EventStore(),
-      deps.bus || new k.EventBus(),
       deps.snapshots || new k.SnapshotStore,
       deps.strategy || new k.RepositoryStrategy);
 

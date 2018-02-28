@@ -4,7 +4,7 @@ const crypto = require('crypto');
 //------ DOMAIN -------//
 
 class Domain {
-  constructor(name, eventStore, eventBus, snapshotStore, repositoryStrategy) {
+  constructor(name, eventStore, snapshotStore, repositoryStrategy) {
     this.name = name;
     this._aggregates = new AggregateRepository(name, eventStore, snapshotStore, repositoryStrategy)
   }
