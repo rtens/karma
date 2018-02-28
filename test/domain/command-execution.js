@@ -32,7 +32,7 @@ describe('Command execution', () => {
 
       .execute(new k.Command('Foo')))
 
-      .should.throw(Error, 'Cannot execute [Foo]')
+      .should.throw(Error, 'Cannot handle [Foo]')
   });
 
   it('fails if an executer is defined twice in the same Aggregate', () => {
@@ -51,12 +51,12 @@ describe('Command execution', () => {
       .add(new k.Aggregate('One')
         .executing('Foo'))
 
-      .add(new k.Aggregate()
+      .add(new k.Aggregate('Two')
         .executing('Foo'))
 
       .execute(new k.Command('Foo')))
 
-      .should.throw(Error, '[One] is already executing [Foo]')
+      .should.throw(Error, 'Too many handlers for [Foo]: [One, Two]')
   });
 
   it('fails if the Command cannot be mapped to an Aggregate', () => {

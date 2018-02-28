@@ -23,10 +23,16 @@ class Domain {
   }
 }
 
-class Command {
-  constructor(name, payload, traceId) {
+class Request {
+  constructor(name, payload) {
     this.name = name;
     this.payload = payload;
+  }
+}
+
+class Command extends Request {
+  constructor(name, payload, traceId) {
+    super(name, payload);
     this.traceId = traceId;
   }
 }
@@ -88,6 +94,12 @@ class Unit {
     this._version = null;
     this._initializers = [];
     this._appliers = {};
+  }
+
+  canHandle(request) {
+  }
+
+  mapToId(request) {
   }
 
   withVersion(version) {
@@ -179,10 +191,57 @@ class UnitInstance {
 }
 
 class UnitRepository {
-  add(unitClass) {
+  constructor(snapshots, strategy) {
+    this._snapshots = snapshots;
+    this._strategy = strategy.managing(this);
+    this._definitions = [];
+    this._instances = {};
+  }
+
+  add(definition) {
+    this._definitions.push(definition);
+  }
+
+  getInstance(request) {
+    let handlers = this._definitions.filter(d => d.canHandle(request));
+
+    if (handlers.length == 0) {
+      throw new Error(`Cannot handle [${request.name}]`)
+    } else if (handlers.length > 1) {
+      throw new Error(`Too many handlers for [${request.name}]: [${handlers.map(u => u.name).join(', ')}]`)
+    }
+
+    var unitDefinition = handlers[0];
+    var unitId = unitDefinition.mapToId(request);
+
+    if (!unitId) {
+      throw new Error(`Cannot map [${request.name}]`)
+    }
+
+    return this._getOrLoad(unitDefinition, unitId)
+      .then(instance => {
+        this._strategy.notifyAccess(instance);
+        return instance
+      });
+  }
+
+  _getOrLoad(definition, unitId) {
+    if (this._instances[unitId]) {
+      return Promise.resolve(this._instances[unitId]);
+    }
+
+    if (process.env.DEBUG) console.log('load', {id: unitId});
+    this._instances[unitId] = this._createInstance(definition, unitId);
+    return this._instances[unitId].load();
   }
 
   remove(unit) {
+    if (process.env.DEBUG) console.log('unload', {id: unit.id});
+    unit.unload();
+    delete this._instances[unit.id];
+  }
+
+  _createInstance(definition, unitId) {
   }
 }
 
@@ -205,13 +264,12 @@ class Aggregate extends Unit {
     this._mappers = {};
   }
 
-  mapToId(command) {
-    var aggregateId = this._mappers[command.name](command);
-    if (!aggregateId) {
-      throw new Error(`Cannot map [${command.name}]`)
-    }
+  canHandle(command) {
+    return command.name in this._executers;
+  }
 
-    return aggregateId;
+  mapToId(command) {
+    return this._mappers[command.name](command);
   }
 
   executing(commandName, mapper, executer) {
@@ -226,7 +284,7 @@ class Aggregate extends Unit {
 }
 
 class AggregateInstance extends UnitInstance {
-  constructor(domain, id, definition, store, snapshots) {
+  constructor(definition, id, store, snapshots, domain) {
     super(id, definition, store, snapshots);
     this._domain = domain;
     this._store = store;
@@ -257,53 +315,13 @@ class AggregateInstance extends UnitInstance {
 
 class AggregateRepository extends UnitRepository {
   constructor(domain, store, snapshots, strategy) {
-    super();
+    super(snapshots, strategy);
     this._domain = domain;
     this._store = store;
-    this._snapshots = snapshots;
-    this._strategy = strategy.managing(this);
-    this._definitions = {};
-    this._instances = {};
   }
 
-  add(aggregateClass) {
-    Object.keys(aggregateClass._executers).forEach(cn => {
-      if (cn in this._definitions) {
-        throw new Error(`[${this._definitions[cn].name}] is already executing [${cn}]`)
-      }
-
-      this._definitions[cn] = aggregateClass;
-    });
-  }
-
-  getInstance(command) {
-    let definition = this._definitions[command.name];
-    if (!definition) {
-      throw new Error(`Cannot execute [${command.name}]`)
-    }
-
-    return this._getOrLoad(definition, command)
-      .then(instance => {
-        this._strategy.notifyAccess(instance);
-        return instance
-      });
-  }
-
-  _getOrLoad(definition, command) {
-    let aggregateId = definition.mapToId(command);
-    if (this._instances[aggregateId]) {
-      return Promise.resolve(this._instances[aggregateId]);
-    }
-
-    this._instances[aggregateId] =
-      new AggregateInstance(this._domain, aggregateId, definition, this._store, this._snapshots);
-    return this._instances[aggregateId].load();
-  }
-
-  remove(unit) {
-    if (process.env.DEBUG) console.log('unload', {id: unit.id});
-    unit.unload();
-    delete this._instances[unit.id];
+  _createInstance(definition, aggregateId) {
+    return new AggregateInstance(definition, aggregateId, this._store, this._snapshots, this._domain);
   }
 }
 
