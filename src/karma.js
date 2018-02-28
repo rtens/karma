@@ -4,13 +4,21 @@ const crypto = require('crypto');
 //------ DOMAIN -------//
 
 class Domain {
-  constructor(name, eventStore, snapshotStore, repositoryStrategy) {
+  constructor(name, eventStore, eventBus, snapshotStore, repositoryStrategy) {
     this.name = name;
-    this._aggregates = new AggregateRepository(name, eventStore, snapshotStore, repositoryStrategy)
+    this._aggregates = new AggregateRepository(name, eventStore, snapshotStore, repositoryStrategy);
+    this._projections = new ProjectionRepository(eventBus, snapshotStore, repositoryStrategy);
   }
 
   add(unit) {
-    this._aggregates.add(unit);
+    switch(unit.constructor.name) {
+      case Aggregate.name:
+        this._aggregates.add(unit);
+        break;
+      case Projection.name:
+        this._projections.add(unit);
+        break;
+    }
     return this
   }
 
@@ -20,6 +28,13 @@ class Domain {
       .then(instance =>
         instance.execute(command))
       .then(() => this)
+  }
+
+  respondTo(query) {
+    return this._projections
+      .getInstance(query)
+      .then(instance =>
+        instance.respondTo(query))
   }
 }
 
@@ -35,6 +50,9 @@ class Command extends Request {
     super(name, payload);
     this.traceId = traceId;
   }
+}
+
+class Query extends Request {
 }
 
 class Event extends Request {
@@ -93,12 +111,14 @@ class Unit {
     this._version = null;
     this._initializers = [];
     this._appliers = {};
+    this._mappers = {};
   }
 
   canHandle(request) {
   }
 
   mapToId(request) {
+    return this._mappers[request.name](request);
   }
 
   withVersion(version) {
@@ -181,6 +201,7 @@ class UnitInstance {
 
     (this._definition._appliers[message.event.name] || []).forEach(a => {
       if (a.mapper(message.event) != this.id) return;
+      if (a.domain != message.domain) return;
 
       if (process.env.DEBUG) console.log('apply', {id: this.id, message});
       a.applier.call(this._state, message.event);
@@ -190,9 +211,10 @@ class UnitInstance {
 }
 
 class UnitRepository {
-  constructor(snapshots, strategy) {
+  constructor(bus, snapshots, strategy) {
+    this._bus = bus;
     this._snapshots = snapshots;
-    this._strategy = strategy.managing(this);
+    this._strategy = strategy;
     this._definitions = [];
     this._instances = {};
   }
@@ -219,7 +241,7 @@ class UnitRepository {
 
     return this._getOrLoad(unitDefinition, unitId)
       .then(instance => {
-        this._strategy.notifyAccess(instance);
+        this._strategy.onAccess(this, instance);
         return instance
       });
   }
@@ -234,23 +256,18 @@ class UnitRepository {
     return this._instances[unitId].load();
   }
 
+  _createInstance(definition, unitId) {
+  }
+
   remove(unit) {
     if (process.env.DEBUG) console.log('unload', {id: unit.id});
     unit.unload();
     delete this._instances[unit.id];
   }
-
-  _createInstance(definition, unitId) {
-  }
 }
 
 class RepositoryStrategy {
-  managing(unitRepository) {
-    this.repository = unitRepository;
-    return this
-  }
-
-  notifyAccess(unit) {
+  onAccess(repository, unit) {
   }
 }
 
@@ -260,15 +277,10 @@ class Aggregate extends Unit {
   constructor(name) {
     super(name);
     this._executers = {};
-    this._mappers = {};
   }
 
   canHandle(command) {
     return command.name in this._executers;
-  }
-
-  mapToId(command) {
-    return this._mappers[command.name](command);
   }
 
   executing(commandName, mapper, executer) {
@@ -283,7 +295,7 @@ class Aggregate extends Unit {
 }
 
 class AggregateInstance extends UnitInstance {
-  constructor(definition, id, store, snapshots, domain) {
+  constructor(id, definition, store, snapshots, domain) {
     super(id, definition, store, snapshots);
     this._domain = domain;
     this._store = store;
@@ -314,13 +326,47 @@ class AggregateInstance extends UnitInstance {
 
 class AggregateRepository extends UnitRepository {
   constructor(domain, store, snapshots, strategy) {
-    super(snapshots, strategy);
+    super(store, snapshots, strategy);
     this._domain = domain;
     this._store = store;
   }
 
   _createInstance(definition, aggregateId) {
-    return new AggregateInstance(definition, aggregateId, this._store, this._snapshots, this._domain);
+    return new AggregateInstance(aggregateId, definition, this._store, this._snapshots, this._domain);
+  }
+}
+
+//----- PROJECTION ----//
+
+class Projection extends Unit {
+  constructor(name) {
+    super(name);
+    this._responders = {};
+  }
+
+  canHandle(query) {
+    return query.name in this._responders;
+  }
+
+  respondingTo(queryName, mapper, responder) {
+    if (queryName in this._responders) {
+      throw new Error(`[${this.name}] is already responding to [${queryName}]`);
+    }
+    this._mappers[queryName] = mapper;
+    this._responders[queryName] = responder;
+    return this;
+  }
+}
+
+class ProjectionInstance extends UnitInstance {
+  respondTo(query) {
+    return this._definition._responders[query.name].call(this._state, query);
+  }
+}
+
+class ProjectionRepository extends UnitRepository {
+  _createInstance(definition, projectionId) {
+    return new ProjectionInstance(projectionId, definition, this._bus, this._snapshots);
   }
 }
 
@@ -346,6 +392,7 @@ class Snapshot {
 module.exports = {
   Domain,
   Command,
+  Query,
   Event,
 
   Record,
@@ -361,6 +408,8 @@ module.exports = {
   Aggregate,
   AggregateInstance,
   AggregateRepository,
+
+  Projection,
 
   SnapshotStore,
   Snapshot

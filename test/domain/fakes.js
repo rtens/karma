@@ -3,7 +3,7 @@ const karma = require('../../src/karma');
 class FakeEventStore extends karma.EventStore {
   constructor(domain) {
     super(domain);
-    this.records = [];
+    this.messages = [];
     this.recorded = [];
     this.attached = [];
     this.detached = [];
@@ -14,33 +14,34 @@ class FakeEventStore extends karma.EventStore {
     return Promise.resolve()
   }
 
-  attach(aggregate) {
-    this.attached.push({aggregateId: aggregate.id});
-    this.records.forEach(r => aggregate.apply(new karma.Message(r.event, this._domain, r.revision)));
+  attach(unit) {
+    this.attached.push({unitId: unit.id});
+    this.messages.forEach(m => unit.apply(m));
     return Promise.resolve()
   }
 
-  detach(aggregate) {
-    this.detached.push({aggregateId: aggregate.id});
+  detach(unit) {
+    this.detached.push({unitId: unit.id});
   }
 }
 
 class FakeEventBus extends karma.EventBus {
-}
-
-class FakeRepositoryStrategy extends karma.RepositoryStrategy {
-  constructor() {
-    super();
-    this._onAccess = ()=>null;
+  constructor(domain) {
+    super(domain);
+    this.messages = [];
+    this.recorded = [];
+    this.attached = [];
+    this.detached = [];
   }
 
-  onAccess(callback) {
-    this._onAccess = callback;
-    return this
+  attach(unit) {
+    this.attached.push({unitId: unit.id});
+    this.messages.forEach(m => unit.apply(m));
+    return Promise.resolve()
   }
 
-  notifyAccess(unit) {
-    this._onAccess(unit)
+  detach(unit) {
+    this.detached.push({unitId: unit.id});
   }
 }
 
@@ -65,6 +66,5 @@ class FakeSnapshotStore extends karma.SnapshotStore {
 module.exports = {
   EventStore: FakeEventStore,
   EventBus: FakeEventBus,
-  RepositoryStrategy: FakeRepositoryStrategy,
   SnapshotStore: FakeSnapshotStore
 };
