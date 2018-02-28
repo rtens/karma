@@ -14,7 +14,7 @@ class FlatFileEventStore extends karma.EventStore {
   constructor(baseDir) {
     super();
     this._dir = baseDir;
-    this._subscriptions = {};
+    this._attached = {};
     this._notified = {};
     this._notificationQueue = queue({concurrency: 1, autostart: true});
 
@@ -23,42 +23,40 @@ class FlatFileEventStore extends karma.EventStore {
 
     this._watcher = chokidar.watch(baseDir + '/events');
     this._watcher.on('add', (file) =>
-      this._notificationQueue.push(() => this._notifyAllSubscribers(file)))
+      this._notificationQueue.push(() => this._notifyAllUnits(file)))
   }
 
-  _notifyAllSubscribers(file) {
-    return Promise.all(Object.keys(this._subscriptions)
-      .map(id => this._notifySubscribers(file, id, this._subscriptions[id])))
+  _notifyAllUnits(file) {
+    return Promise.all(Object.values(this._attached)
+      .map(unit => this._notifyUnit(file, unit)))
   }
 
-  _notifySubscribers(file, subscriptionId, subscriptions) {
-    if (file in this._notified[subscriptionId]) {
+  _notifyUnit(file, unit) {
+    if (file in this._notified[unit.id]) {
       return Promise.resolve();
     }
-    this._notified[subscriptionId][file] = true;
+    this._notified[unit.id][file] = true;
 
     return fs.readFileAsync(file)
 
       .then(content => JSON.parse(content))
 
-      .then(event => subscriptions
-        .filter(subscription => !subscription.filter || subscription.filter.matches(event))
-        .forEach(subscription => subscription.subscriber(event)));
+      .then(record => unit.apply(record));
   }
 
-  publish(events, sequenceId, headSequence) {
+  record(events, aggregateId, onRevision, traceId) {
     return Promise.resolve()
-      .then(() => this._aquireLock())
+      .then(() => this._acquireLock())
       .then(() => this._readWriteFile())
-      .then(write => this._guardHeads(write, sequenceId, headSequence))
-      .then(write => this._writeEvents(write, events))
-      .then(write => this._writeWriteFile(write, events, sequenceId))
+      .then(write => this._guardHeads(write, aggregateId, onRevision))
+      .then(write => this._writeEvents(write, events, traceId))
+      .then(write => this._writeWriteFile(write, events, aggregateId))
       .then(() => this._releaseLock())
       .catch(e => this._releaseLock().then(() => Promise.reject(e)))
       .then(() => this)
   }
 
-  _aquireLock() {
+  _acquireLock() {
     return lockFile.lockAsync(this._dir + '/write.lock', {wait: 100, pollPeriod: 10})
       .catch(e => Promise.reject(new Error('Locked')))
   }
@@ -80,18 +78,18 @@ class FlatFileEventStore extends karma.EventStore {
     return write;
   }
 
-  _writeEvents(write, events) {
-    return Promise.each(events
-        .map((event, i) => event.withSequence(write.revision + i + 1))
-        .map(event => ({event: JSON.stringify(event, null, 2), revision: event.revision})),
-      content => fs.writeFileAsync(this._dir + '/events/' + content.revision, content.event)
-    )
+  _writeEvents(write, events, traceId) {
+    var contents = events
+      .map((event, i) => new karma.Record(event, write.revision + i + 1, traceId))
+      .map(record => ({record: JSON.stringify(record, null, 2), revision: record.revision}));
+
+    return Promise.each(contents, content => fs.writeFileAsync(this._dir + '/events/' + content.revision, content.record))
       .then(() => write)
   }
 
   _writeWriteFile(write, events, sequenceId) {
     write = {
-      sequence: write.revision + events.length,
+      revision: write.revision + events.length,
       heads: !sequenceId
         ? write.heads
         : {...write.heads, [sequenceId]: write.revision + events.length}
@@ -100,26 +98,25 @@ class FlatFileEventStore extends karma.EventStore {
     return fs.writeFileAsync(this._dir + '/write', JSON.stringify(write, null, 2));
   }
 
-  subscribe(id, subscriber, filter) {
-    this._notified[id] = this._notified[id] || {};
+  attach(aggregate) {
+    this._notified[aggregate.id] = this._notified[aggregate.id] || {};
 
     return fs.readdirAsync(this._dir + '/events')
 
       .then(files => files.sort((a, b) => parseInt(a) - parseInt(b)))
 
-      .then(files => Promise.each(files, file =>
-          this._notifySubscribers(this._dir + '/events/' + file, id, [{filter, subscriber}]),
-        {concurrency: 1}))
+      .then(files => aggregate._head ? files.filter(f => parseInt(f) > aggregate._head) : files)
 
-      .then(() => (this._subscriptions[id] = this._subscriptions[id] || [])
-        .push({filter, subscriber}))
+      .then(files => Promise.each(files, file => this._notifyUnit(this._dir + '/events/' + file, aggregate), {concurrency: 1}))
+
+      .then(() => this._attached[aggregate.id] = aggregate)
 
       .then(() => this)
   }
 
-  unsubscribe(id) {
-    delete this._notified[id];
-    delete this._subscriptions[id];
+  detach(aggreagte) {
+    delete this._notified[aggreagte.id];
+    delete this._attached[aggreagte.id];
     return Promise.resolve(this);
   }
 
@@ -134,33 +131,12 @@ class FlatFileEventStore extends karma.EventStore {
     setTimeout(() => this._close(y), 100)
   }
 
-  filter() {
-    return new RecordFilter()
-  }
-
   static _mkdir(dir) {
     try {
       fs.mkdirSync(dir)
     } catch (err) {
       if (err.code !== 'EEXIST') throw err
     }
-  }
-}
-
-class RecordFilter {
-  nameIsIn(strings) {
-    this.names = strings;
-    return this;
-  }
-
-  after(sequence) {
-    this._after = sequence;
-    return this;
-  }
-
-  matches(event) {
-    return (!this.names || this.names.indexOf(event.name) > -1)
-      && (!this._after || event.revision > this._after);
   }
 }
 
