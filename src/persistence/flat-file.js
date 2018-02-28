@@ -14,15 +14,19 @@ class FlatFileEventStore extends karma.EventStore {
   constructor(domain, baseDir) {
     super();
     this._domain = domain;
-    this._dir = baseDir;
     this._attached = {};
     this._notified = {};
     this._notificationQueue = queue({concurrency: 1, autostart: true});
 
-    FlatFileEventStore._mkdir(baseDir);
-    FlatFileEventStore._mkdir(baseDir + '/events');
+    this._paths = {base: baseDir};
+    this._paths.domain = this._paths.base + '/' + domain;
+    this._paths.write = this._paths.domain + '/write';
+    this._paths.lock = this._paths.domain + '/write.lock';
+    this._paths.records = this._paths.domain + '/records';
 
-    this._watcher = chokidar.watch(baseDir + '/events');
+    ['base', 'domain', 'records'].forEach(path => FlatFileEventStore._mkdir(this._paths[path]));
+
+    this._watcher = chokidar.watch(this._paths.records);
     this._watcher.on('add', (file) =>
       this._notificationQueue.push(() => this._notifyAllUnits(file)))
   }
@@ -58,16 +62,16 @@ class FlatFileEventStore extends karma.EventStore {
   }
 
   _acquireLock() {
-    return lockFile.lockAsync(this._dir + '/write.lock', {wait: 100, pollPeriod: 10})
+    return lockFile.lockAsync(this._paths.lock, {wait: 100, pollPeriod: 10})
       .catch(e => Promise.reject(new Error('Locked')))
   }
 
   _releaseLock() {
-    return lockFile.unlockAsync(this._dir + '/write.lock')
+    return lockFile.unlockAsync(this._paths.lock)
   }
 
   _readWriteFile() {
-    return fs.readFileAsync(this._dir + '/write')
+    return fs.readFileAsync(this._paths.write)
       .then(writeContent => JSON.parse(writeContent))
       .catch(() => ({revision: 0, heads: {}}))
   }
@@ -84,7 +88,7 @@ class FlatFileEventStore extends karma.EventStore {
       .map((event, i) => new karma.Record(event, write.revision + i + 1, traceId))
       .map(record => ({record: JSON.stringify(record, null, 2), revision: record.revision}));
 
-    return Promise.each(contents, content => fs.writeFileAsync(this._dir + '/events/' + content.revision, content.record))
+    return Promise.each(contents, content => fs.writeFileAsync(this._paths.records + '/' + content.revision, content.record))
       .then(() => write)
   }
 
@@ -96,19 +100,19 @@ class FlatFileEventStore extends karma.EventStore {
         : {...write.heads, [sequenceId]: write.revision + events.length}
     };
 
-    return fs.writeFileAsync(this._dir + '/write', JSON.stringify(write, null, 2));
+    return fs.writeFileAsync(this._paths.write, JSON.stringify(write, null, 2));
   }
 
   attach(aggregate) {
     this._notified[aggregate.id] = this._notified[aggregate.id] || {};
 
-    return fs.readdirAsync(this._dir + '/events')
+    return fs.readdirAsync(this._paths.records)
 
       .then(files => files.sort((a, b) => parseInt(a) - parseInt(b)))
 
       .then(files => aggregate._head ? files.filter(f => parseInt(f) > aggregate._head) : files)
 
-      .then(files => Promise.each(files, file => this._notifyUnit(this._dir + '/events/' + file, aggregate), {concurrency: 1}))
+      .then(files => Promise.each(files, file => this._notifyUnit(this._paths.records + '/' + file, aggregate), {concurrency: 1}))
 
       .then(() => this._attached[aggregate.id] = aggregate)
 
@@ -144,21 +148,21 @@ class FlatFileEventStore extends karma.EventStore {
 class FlatFileSnapshotStore extends karma.SnapshotStore {
   constructor(baseDir) {
     super();
-    this._dir = baseDir;
+    this._dir = baseDir + '/snapshots';
 
     FlatFileSnapshotStore._mkdir(baseDir);
-    FlatFileSnapshotStore._mkdir(baseDir + '/snapshots');
+    FlatFileSnapshotStore._mkdir(this._dir);
   }
 
   store(id, version, snapshot) {
-    var path = this._dir + '/snapshots/' + id;
+    var path = this._dir + '/' + id;
     FlatFileSnapshotStore._mkdir(path);
 
     return fs.writeFileAsync(path + '/' + version, JSON.stringify(snapshot, null, 2))
   }
 
   fetch(id, version) {
-    var path = this._dir + '/snapshots/' + id;
+    var path = this._dir + '/' + id;
     var file = path + '/' + version;
 
     if (fs.existsSync(path) && !fs.existsSync(file)) {
