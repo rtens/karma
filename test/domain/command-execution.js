@@ -232,6 +232,7 @@ describe('Command execution', () => {
   it('reconstitutes an Aggregate from a Snapshot and Events', () => {
     let store = new fake.EventStore();
     store.records = [
+      new k.Record(new k.Event('bard', 'not'), 21),
       new k.Record(new k.Event('bard', 'one'), 42)
     ];
 
@@ -245,7 +246,7 @@ describe('Command execution', () => {
       .add(new k.Aggregate()
         .withVersion('v1')
         .initializing(function () {
-          this.bards = ['not'];
+          this.bards = ['gone'];
         })
         .applying('Test', 'bard', ()=>'foo', function (event) {
           this.bards.push(event.payload)

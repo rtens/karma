@@ -166,6 +166,8 @@ class UnitInstance {
   }
 
   apply(message) {
+    if (message.offset <= this._head) return;
+
     (this._definition._appliers[message.event.name] || []).forEach(a => {
       if (a.mapper(message.event) != this.id) return;
 
