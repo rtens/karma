@@ -130,10 +130,9 @@ describe('Flat file Event Store', () => {
 
   it('avoids write collisions', () => {
     let _writeFile = fs.writeFile;
-    let wait = 10;
     fs.writeFile = (f, c, cb) => {
-      setTimeout(() => _writeFile(f, c, cb), wait);
-      wait = 0;
+      setTimeout(() => _writeFile(f, c, cb), 10);
+      fs.writeFile = _writeFile;
     };
 
     return new flatFile.EventStore(directory)
@@ -307,7 +306,13 @@ describe('Flat file Event Store', () => {
       .then(() => records.should.eql(['foo one', 'bar two']))
   });
 
-  it('keeps sequence of recorded Events', () => {
+  it('keeps order of recorded Events', () => {
+    let _readFile = fs.readFile;
+    fs.readFile = (f, cb) => {
+      setTimeout(() => _readFile(f, cb), 100);
+      fs.readFile = _readFile
+    };
+
     let records = [];
     let store = new flatFile.EventStore(directory);
 
@@ -320,7 +325,7 @@ describe('Flat file Event Store', () => {
       }))
 
       .then(() => new Promise(y => {
-        setTimeout(() => fs.writeFile(directory + '/events/2', JSON.stringify('two'), y), 100)
+        setTimeout(() => fs.writeFile(directory + '/events/2', JSON.stringify('two'), y), 10)
       }))
 
       .then(() => store.close())
