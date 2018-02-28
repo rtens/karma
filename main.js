@@ -4,18 +4,19 @@ const karma = require('./src/karma');
 const flatFile = require('./src/persistence/flat-file');
 
 class RepositoryStrategy extends karma.RepositoryStrategy {
-  notifyAccess(unit) {
+  onAccess(repository, unit) {
     unit.takeSnapshot();
-    this.repository.remove(unit);
+    repository.remove(unit);
   }
 }
 
 const domain = new karma.Domain('Test',
+  new flatFile.EventBus('Test', './data'),
   new flatFile.EventStore('Test', './data'),
   new flatFile.SnapshotStore('Test', './data'),
   new RepositoryStrategy())
 
-  .add(new karma.Aggregate('Test')
+  .add(new karma.Aggregate('MyAggregate')
 
     .initializing(function () {
       this.total = 0;
@@ -26,7 +27,7 @@ const domain = new karma.Domain('Test',
       if (this.total + count > this.limit) {
         throw new Error('Too much');
       }
-      return [new karma.Event('food', {to: target, total: this.total + count})]
+      return [new karma.Event('food', {to: target, count, total: this.total + count})]
     })
 
     .applying('Test', 'food', e=>e.payload.to, function ({payload:{total}}) {
@@ -39,6 +40,20 @@ const domain = new karma.Domain('Test',
 
     .applying('Test', 'incd', e=>e.payload.in, function ({payload:{by}}) {
       this.limit += by;
+    }))
+
+  .add(new karma.Projection('MyProjection')
+
+    .initializing(function () {
+      this.total = 0;
+    })
+
+    .applying('Test', 'food', e=>e.payload.to, function ({payload:{count}}) {
+      this.total += count;
+    })
+
+    .respondingTo('Food', q=>q.payload.of, function () {
+      return this.total
     }));
 
 
@@ -48,6 +63,12 @@ app.use(bodyParser.json());
 app.post('/:command', (req, res) => {
   domain.execute(new karma.Command(req.params.command, req.body, Math.round(Math.random() * 1000000)))
     .then(() => res.send({success: true}))
+    .catch(e => res.send({error: e.message}))
+});
+
+app.get('/:query', (req, res) => {
+  domain.respondTo(new karma.Query(req.params.query, req.query))
+    .then(response => res.send({data: response}))
     .catch(e => res.send({error: e.message}))
 });
 
