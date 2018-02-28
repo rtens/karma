@@ -1,13 +1,12 @@
 const queue = require('queue');
 const crypto = require('crypto');
-const Promise = require("bluebird");
 
 //------ DOMAIN -------//
 
 class Domain {
   constructor(name, eventStore, eventBus, snapshotStore, repositoryStrategy) {
     this.name = name;
-    this._aggregates = new AggregateRepository(name, eventStore, eventBus, snapshotStore, repositoryStrategy)
+    this._aggregates = new AggregateRepository(name, eventStore, snapshotStore, repositoryStrategy)
   }
 
   add(unit) {
@@ -40,43 +39,6 @@ class Event {
   }
 }
 
-//---- EVENT STORE -----//
-
-class Record {
-  constructor(event, revision, traceId) {
-    this.event = event;
-    this.revision = revision;
-    this.traceId = traceId;
-  }
-}
-
-class EventStore {
-  record(events, aggregateId, onRevision, traceId) {
-    return Promise.resolve()
-  }
-
-  read(aggregateId, recordReader, filter) {
-    return Promise.resolve()
-  }
-
-  detach(aggregateId) {
-  }
-
-  filter() {
-    return new RecordFilter()
-  }
-}
-
-class RecordFilter {
-  nameIsIn(strings) {
-    return this
-  }
-
-  after(revision) {
-    return this
-  }
-}
-
 //----- EVENT BUS ------//
 
 class Message {
@@ -88,30 +50,33 @@ class Message {
 }
 
 class EventBus {
-  publish(event, domain) {
+  attach(unit) {
     return Promise.resolve()
   }
 
-  subscribe(subscriberId, messageSubscriber, messageFilter) {
+  detach(unit) {
     return Promise.resolve()
-  }
-
-  unsubscribe(subscriberId) {
-    return Promise.resolve()
-  }
-
-  filter() {
-    return new MessageFilter();
   }
 }
 
-class MessageFilter {
-  after(offset) {
-    return this
+//---- EVENT STORE -----//
+
+class Record {
+  constructor(event, revision, traceId) {
+    this.event = event;
+    this.revision = revision;
+    this.traceId = traceId;
+  }
+}
+
+class EventStore extends EventBus {
+  constructor(domain) {
+    super();
+    this._domain = domain;
   }
 
-  from(domain) {
-    return this
+  record(events, aggregateId, onRevision, traceId) {
+    return Promise.resolve()
   }
 }
 
@@ -171,7 +136,7 @@ class UnitInstance {
 
   load() {
     return this._loadSnapshot()
-      .then(() => this._subscribeToBus())
+      .then(() => this._attachToBus())
       .then(() => this);
   }
 
@@ -186,12 +151,13 @@ class UnitInstance {
       .catch(()=>null)
   }
 
-  _subscribeToBus() {
-    return Promise.resolve();
+  _attachToBus() {
+    if (process.env.DEBUG) console.log('attach', {id: this.id, head: this._head});
+    return this._bus.attach(this);
   }
 
   unload() {
-    this._bus.unsubscribe(this.id);
+    this._bus.detach(this);
   }
 
   takeSnapshot() {
@@ -258,8 +224,8 @@ class Aggregate extends Unit {
 }
 
 class AggregateInstance extends UnitInstance {
-  constructor(domain, id, definition, store, bus, snapshots) {
-    super(id, definition, bus, snapshots);
+  constructor(domain, id, definition, store, snapshots) {
+    super(id, definition, store, snapshots);
     this._domain = domain;
     this._store = store;
     this._queue = queue({concurrency: 1, autostart: true})
@@ -284,33 +250,14 @@ class AggregateInstance extends UnitInstance {
         if (tries > 3) throw e;
         return this._execute(command, tries + 1)
       })
-      .then(() => Promise.each(events, e => this._bus.publish(e, this._domain)))
-  }
-
-  _subscribeToBus() {
-    let filter = this._store.filter()
-      .nameIsIn(Object.keys(this._definition._appliers || {}))
-      .after(this._head);
-
-    if (process.env.DEBUG) console.log('read', {id: this.id, filter});
-    return this._store.read(this.id, this.apply.bind(this), filter);
-  }
-
-  apply(record) {
-    super.apply(new Message(record.event, this._domain, record.revision));
-  }
-
-  unload() {
-    this._store.detach(this.id);
   }
 }
 
 class AggregateRepository extends UnitRepository {
-  constructor(domain, store, bus, snapshots, strategy) {
+  constructor(domain, store, snapshots, strategy) {
     super();
     this._domain = domain;
     this._store = store;
-    this._bus = bus;
     this._snapshots = snapshots;
     this._strategy = strategy.managing(this);
     this._definitions = {};
@@ -347,7 +294,7 @@ class AggregateRepository extends UnitRepository {
     }
 
     this._instances[aggregateId] =
-      new AggregateInstance(this._domain, aggregateId, definition, this._store, this._bus, this._snapshots);
+      new AggregateInstance(this._domain, aggregateId, definition, this._store, this._snapshots);
     return this._instances[aggregateId].load();
   }
 
@@ -384,11 +331,9 @@ module.exports = {
 
   Record,
   EventStore,
-  RecordFilter,
 
   Message,
   EventBus,
-  MessageFilter,
 
   Unit,
   UnitInstance,

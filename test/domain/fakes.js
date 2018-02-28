@@ -1,11 +1,11 @@
 const karma = require('../../src/karma');
 
 class FakeEventStore extends karma.EventStore {
-  constructor() {
-    super();
+  constructor(domain) {
+    super(domain);
     this.records = [];
     this.recorded = [];
-    this.readers = [];
+    this.attached = [];
     this.detached = [];
   }
 
@@ -14,65 +14,18 @@ class FakeEventStore extends karma.EventStore {
     return Promise.resolve()
   }
 
-  read(aggregateId, recordReader, filter) {
-    this.readers.push({aggregateId, filter});
-    this.records.forEach(r => recordReader(r));
+  attach(aggregate) {
+    this.attached.push({aggregateId: aggregate.id});
+    this.records.forEach(r => aggregate.apply(new karma.Message(r.event, this._domain, r.revision)));
     return Promise.resolve()
   }
 
-  detach(aggregateId) {
-    this.detached.push({aggregateId});
-  }
-
-  filter() {
-    return new FakeRecordFilter()
-  }
-}
-
-class FakeRecordFilter extends karma.RecordFilter {
-  nameIsIn(strings) {
-    this.names = strings;
-    return this
-  }
-
-  after(revision) {
-    this.revision = revision;
-    return this
+  detach(aggregate) {
+    this.detached.push({aggregateId: aggregate.id});
   }
 }
 
 class FakeEventBus extends karma.EventBus {
-  constructor() {
-    super();
-    this.published = [];
-  }
-
-  publish(event, domain) {
-    this.published.push({event, domain});
-    return Promise.resolve()
-  }
-
-  subscribe(subscriberId, messageSubscriber, messageFilter) {
-    return Promise.resolve()
-  }
-
-  unsubscribe(subscriberId) {
-    return Promise.resolve()
-  }
-
-  filter() {
-    return new MessageFilter();
-  }
-}
-
-class FakeMessageFilter extends karma.MessageFilter {
-  after(offset) {
-    return this
-  }
-
-  from(domain) {
-    return this
-  }
 }
 
 class FakeRepositoryStrategy extends karma.RepositoryStrategy {

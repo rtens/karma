@@ -159,47 +159,6 @@ describe('Command execution', () => {
       .should.not.be.rejected
   });
 
-  it('publishes recorded Events', () => {
-    let bus = new fake.EventBus();
-
-    return Domain('Test', {bus})
-
-      .add(new k.Aggregate()
-        .executing('Foo', ()=>'id', command => [
-          new k.Event('food', command.payload),
-          new k.Event('bard', 'two')
-        ]))
-
-      .execute(new k.Command('Foo', 'one'))
-
-      .then(() => bus.published.should.eql([
-        {
-          event: {name: 'food', payload: 'one', time: new Date()},
-          domain: 'Test'
-        }, {
-          event: {name: 'bard', payload: 'two', time: new Date()},
-          domain: 'Test'
-        }
-      ]));
-  });
-
-  it('published recorded Events in order', () => {
-    let bus = new (class extends fake.EventBus {
-      publish(event, domain) {
-        return new Promise(y => setTimeout(() => y(super.publish(event, domain)), event == 'uno' ? 10 : 0));
-      }
-    })();
-
-    return Domain('Test', {bus})
-
-      .add(new k.Aggregate()
-        .executing('Foo', ()=>'id', command => ['uno', 'dos']))
-
-      .execute(new k.Command('Foo'))
-
-      .then(() => bus.published.map(p => p.event).should.eql(['uno', 'dos']));
-  });
-
   it('reconstitutes an Aggregate from Events', () => {
     let store = new fake.EventStore();
     store.records = [
@@ -224,9 +183,8 @@ describe('Command execution', () => {
 
       .execute(new k.Command('Foo', 'foo'))
 
-      .then(() => store.readers.should.eql([{
+      .then(() => store.attached.should.eql([{
         aggregateId: 'foo',
-        filter: {names: ['nothing', 'bard'], revision: null}
       }]))
 
       .then(() => store.recorded.should.eql([{
@@ -259,9 +217,8 @@ describe('Command execution', () => {
 
       .execute(new k.Command('Foo', 'foo'))
 
-      .then(() => store.readers.should.eql([{
+      .then(() => store.attached.should.eql([{
         aggregateId: 'foo',
-        filter: {names: ['bard'], revision: null}
       }]))
 
       .then(() => store.recorded.should.eql([{
@@ -304,9 +261,8 @@ describe('Command execution', () => {
         version: 'v1'
       }]))
 
-      .then(() => store.readers.should.eql([{
+      .then(() => store.attached.should.eql([{
         aggregateId: 'foo',
-        filter: {names: ['bard'], revision: 21}
       }]))
 
       .then(() => store.recorded.should.eql([{
@@ -357,7 +313,7 @@ describe('Command execution', () => {
 
       .then(() => snapshots.fetched.length.should.equal(1))
 
-      .then(() => store.readers.length.should.equal(1))
+      .then(() => store.attached.length.should.equal(1))
 
       .then(() => store.recorded.map(r => r.events[0].payload).should.eql(['a one', 'a two']))
   });
@@ -487,7 +443,7 @@ describe('Command execution', () => {
 
       .then(() => snapshots.fetched.length.should.equal(2))
 
-      .then(() => store.readers.length.should.equal(2))
+      .then(() => store.attached.length.should.equal(2))
 
       .then(() => store.detached.should.eql([
         {aggregateId: 'foo'},

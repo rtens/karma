@@ -147,7 +147,7 @@ class FlatFileEventStore extends karma.EventStore {
   }
 }
 
-class RecordFilter extends karma.RecordFilter {
+class RecordFilter {
   nameIsIn(strings) {
     this.names = strings;
     return this;
