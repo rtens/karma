@@ -37,10 +37,9 @@ class Command extends Request {
   }
 }
 
-class Event {
+class Event extends Request {
   constructor(name, payload, time = new Date()) {
-    this.name = name;
-    this.payload = payload;
+    super(name, payload);
     this.time = time;
   }
 }
