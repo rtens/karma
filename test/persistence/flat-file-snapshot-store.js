@@ -18,12 +18,12 @@ describe('Flat file Snapshot store', () => {
   });
 
   it('stores Snapshots in files', () => {
-    return new flatFile.SnapshotStore(directory)
+    return new flatFile.SnapshotStore('Test', directory)
 
       .store('foo', 'v1', new karma.Snapshot(42, 'bar'))
 
       .then(() => new Promise(y => {
-        fs.readFile(directory + '/snapshots/foo/v1', (e, c) =>
+        fs.readFile(directory + '/Test/snapshots/foo/v1', (e, c) =>
           y(JSON.parse(c).should.eql({
             head: 42,
             state: 'bar'
@@ -34,15 +34,16 @@ describe('Flat file Snapshot store', () => {
   it('fetches Snapshots from files', () => {
     return new Promise(y => {
       fs.mkdirSync(directory);
-      fs.mkdirSync(directory + '/snapshots');
-      fs.mkdirSync(directory + '/snapshots/foo');
-      fs.writeFile(directory + '/snapshots/foo/v1', JSON.stringify({
+      fs.mkdirSync(directory + '/Test');
+      fs.mkdirSync(directory + '/Test/snapshots');
+      fs.mkdirSync(directory + '/Test/snapshots/foo');
+      fs.writeFile(directory + '/Test/snapshots/foo/v1', JSON.stringify({
         head: 42,
         state: 'bar'
       }), y)
     })
 
-      .then(() => new flatFile.SnapshotStore(directory)
+      .then(() => new flatFile.SnapshotStore('Test', directory)
 
         .fetch('foo', 'v1'))
 
@@ -50,7 +51,7 @@ describe('Flat file Snapshot store', () => {
   });
 
   it('returns null if Snapshot does not exist', () => {
-    return new flatFile.SnapshotStore(directory)
+    return new flatFile.SnapshotStore('Test', directory)
 
       .fetch('foo', 'v1')
 
@@ -60,17 +61,18 @@ describe('Flat file Snapshot store', () => {
   it('return null and deletes existing Snapshots if the version does not match', () => {
     return new Promise(y => {
       fs.mkdirSync(directory);
-      fs.mkdirSync(directory + '/snapshots');
-      fs.mkdirSync(directory + '/snapshots/foo');
-      fs.writeFile(directory + '/snapshots/foo/v1', 'old version', y)
+      fs.mkdirSync(directory + '/Test');
+      fs.mkdirSync(directory + '/Test/snapshots');
+      fs.mkdirSync(directory + '/Test/snapshots/foo');
+      fs.writeFile(directory + '/Test/snapshots/foo/v1', 'old version', y)
     })
 
-      .then(() => new flatFile.SnapshotStore(directory)
+      .then(() => new flatFile.SnapshotStore('Test', directory)
 
         .fetch('foo', 'v2'))
 
       .then(snapshot => should.not.exist(snapshot))
 
-      .then(() => fs.existsSync(directory + '/snapshots/foo/v1').should.be.false)
+      .then(() => fs.existsSync(directory + '/Test/snapshots/foo/v1').should.be.false)
   });
 });

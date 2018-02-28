@@ -146,11 +146,12 @@ class FlatFileEventStore extends karma.EventStore {
 }
 
 class FlatFileSnapshotStore extends karma.SnapshotStore {
-  constructor(baseDir) {
+  constructor(domain, baseDir) {
     super();
-    this._dir = baseDir + '/snapshots';
+    this._dir = baseDir + '/' + domain + '/snapshots';
 
     FlatFileSnapshotStore._mkdir(baseDir);
+    FlatFileSnapshotStore._mkdir(baseDir + '/' + domain);
     FlatFileSnapshotStore._mkdir(this._dir);
   }
 
