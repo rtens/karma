@@ -20,7 +20,7 @@ describe('Flat file Snapshot store', () => {
   it('stores Snapshots in files', () => {
     return new flatFile.SnapshotStore('Test', directory)
 
-      .store('foo', 'v1', new karma.Snapshot(42, 'bar'))
+      .store({a:'foo'}, 'v1', new karma.Snapshot(42, 'bar'))
 
       .then(() => new Promise(y => {
         fs.readFile(directory + '/Test/snapshots/foo/v1', (e, c) =>
@@ -45,7 +45,7 @@ describe('Flat file Snapshot store', () => {
 
       .then(() => new flatFile.SnapshotStore('Test', directory)
 
-        .fetch('foo', 'v1'))
+        .fetch({a:'foo'}, 'v1'))
 
       .then(snapshot => snapshot.should.eql(new karma.Snapshot(42, 'bar')))
   });
@@ -53,7 +53,7 @@ describe('Flat file Snapshot store', () => {
   it('returns null if Snapshot does not exist', () => {
     return new flatFile.SnapshotStore('Test', directory)
 
-      .fetch('foo', 'v1')
+      .fetch({a:'foo'}, 'v1')
 
       .then(snapshot => should.not.exist(snapshot))
   });
@@ -69,7 +69,7 @@ describe('Flat file Snapshot store', () => {
 
       .then(() => new flatFile.SnapshotStore('Test', directory)
 
-        .fetch('foo', 'v2'))
+        .fetch({a:'foo'}, 'v2'))
 
       .then(snapshot => should.not.exist(snapshot))
 

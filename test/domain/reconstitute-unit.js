@@ -121,13 +121,15 @@ describe('Reconstituting a/an', () => {
         ];
 
         let snapshots = new fake.SnapshotStore();
-        snapshots.snapshots = {
-          foov1: new k.Snapshot(21, {bards: ['snap']})
-        };
+        snapshots.snapshots = [{
+          key: {type: unit.unitClass.name, name: 'One', id: 'foo'},
+          version: 'v1',
+          snapshot: new k.Snapshot(21, {bards: ['snap']})
+        }];
 
         return Domain('Test', {bus, snapshots})
 
-          .add(new unit.unitClass()
+          .add(new unit.unitClass('One')
             .withVersion('v1')
             .initializing(function () {
               this.bards = ['gone'];
@@ -144,8 +146,12 @@ describe('Reconstituting a/an', () => {
           .then(unit.resultChecker(['snap', 'one']))
 
           .then(() => snapshots.fetched.should.eql([{
-            id: 'foo',
-            version: 'v1'
+            key: {
+              type: unit.unitClass.name,
+              name: 'One',
+              id: 'foo'
+            },
+            version: 'v1',
           }]))
 
           .then(() => bus.attached.should.eql([{
@@ -178,7 +184,7 @@ describe('Reconstituting a/an', () => {
 
         return domain
 
-          .add(new unit.unitClass()
+          .add(new unit.unitClass('One')
             .initializing(function () {
               this.bards = [];
             })
@@ -218,7 +224,7 @@ describe('Reconstituting a/an', () => {
 
         return Domain('Test', {bus, snapshots, strategy})
 
-          .add(new unit.unitClass()
+          .add(new unit.unitClass('One')
             .initializing(function () {
               this.bards = [];
             })
@@ -230,9 +236,15 @@ describe('Reconstituting a/an', () => {
 
           [unit.requestMethod](new unit.requestClass('Foo', 'foo'))
 
-          .then(() => snapshots.stored.should.eql([
-            {id: 'foo', version: 'v1', snapshot: {head: 21, state: {bards: ['one']}}},
-          ]))
+          .then(() => snapshots.stored.should.eql([{
+            key: {
+              type: unit.unitClass.name,
+              name: 'One',
+              id: 'foo'
+            },
+            version: 'v1',
+            snapshot: {head: 21, state: {bards: ['one']}}
+          }]))
       });
 
       it('infers Snapshot version from initializers and appliers', () => {
@@ -250,7 +262,7 @@ describe('Reconstituting a/an', () => {
 
         return domain
 
-          .add(new unit.unitClass()
+          .add(new unit.unitClass('One')
             .initializing(function () {
               this.foo = 'one';
             })
@@ -259,7 +271,7 @@ describe('Reconstituting a/an', () => {
             })
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
 
-          .add(new unit.unitClass()
+          .add(new unit.unitClass('Two')
             .initializing(function () {
               this.foo = 'one';
             })
@@ -268,7 +280,7 @@ describe('Reconstituting a/an', () => {
             })
             [unit.handleMethod]('Bar', ()=>'bar', ()=>null))
 
-          .add(new unit.unitClass()
+          .add(new unit.unitClass('Three')
             .initializing(function () {
               this.foo = 'two';
             })
@@ -277,7 +289,7 @@ describe('Reconstituting a/an', () => {
             })
             [unit.handleMethod]('Baz', ()=>'baz', ()=>null))
 
-          .add(new unit.unitClass()
+          .add(new unit.unitClass('Four')
             .initializing(function () {
               this.foo = 'two';
             })
@@ -295,10 +307,42 @@ describe('Reconstituting a/an', () => {
           .then(() => domain[unit.requestMethod](new unit.requestClass('Ban')))
 
           .then(() => snapshots.stored.should.eql([
-            {id: 'foo', version: '18f683c52e2da204494f4272c1b24de9', snapshot: {head: null, state: {foo: 'one'}}},
-            {id: 'bar', version: '18f683c52e2da204494f4272c1b24de9', snapshot: {head: null, state: {foo: 'one'}}},
-            {id: 'baz', version: 'd44d45fe37a446ced971a8601ccd5f9c', snapshot: {head: null, state: {foo: 'two'}}},
-            {id: 'ban', version: 'ccbf5d96f1b468a25e5bfdb2ed835204', snapshot: {head: null, state: {foo: 'two'}}},
+            {
+              key: {
+                type: unit.unitClass.name,
+                name: 'One',
+                id: 'foo'
+              },
+              version: '18f683c52e2da204494f4272c1b24de9',
+              snapshot: {head: null, state: {foo: 'one'}}
+            },
+            {
+              key: {
+                type: unit.unitClass.name,
+                name: 'Two',
+                id: 'bar'
+              },
+              version: '18f683c52e2da204494f4272c1b24de9',
+              snapshot: {head: null, state: {foo: 'one'}}
+            },
+            {
+              key: {
+                type: unit.unitClass.name,
+                name: 'Three',
+                id: 'baz'
+              },
+              version: 'd44d45fe37a446ced971a8601ccd5f9c',
+              snapshot: {head: null, state: {foo: 'two'}}
+            },
+            {
+              key: {
+                type: unit.unitClass.name,
+                name: 'Four',
+                id: 'ban'
+              },
+              version: 'ccbf5d96f1b468a25e5bfdb2ed835204',
+              snapshot: {head: null, state: {foo: 'two'}}
+            },
           ]))
       });
 

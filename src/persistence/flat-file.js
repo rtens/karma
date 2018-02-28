@@ -155,15 +155,15 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
     FlatFileSnapshotStore._mkdir(this._dir);
   }
 
-  store(id, version, snapshot) {
-    var path = this._dir + '/' + id;
+  store(key, version, snapshot) {
+    var path = this._dir + '/' + Object.values(key).join('-');
     FlatFileSnapshotStore._mkdir(path);
 
     return fs.writeFileAsync(path + '/' + version, JSON.stringify(snapshot, null, 2))
   }
 
-  fetch(id, version) {
-    var path = this._dir + '/' + id;
+  fetch(key, version) {
+    var path = this._dir + '/' + Object.values(key).join('-');
     var file = path + '/' + version;
 
     if (fs.existsSync(path) && !fs.existsSync(file)) {

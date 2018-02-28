@@ -11,7 +11,7 @@ class Domain {
   }
 
   add(unit) {
-    switch(unit.constructor.name) {
+    switch (unit.constructor.name) {
       case Aggregate.name:
         this._aggregates.add(unit);
         break;
@@ -165,6 +165,14 @@ class UnitInstance {
     definition._initializers.forEach(i => i.call(this._state));
   }
 
+  get _key() {
+    return {
+      type: this._definition.constructor.name,
+      name: this._definition.name,
+      id: this.id
+    }
+  }
+
   load() {
     return this._loadSnapshot()
       .then(() => this._attachToBus())
@@ -172,8 +180,8 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
-    if (process.env.DEBUG) console.log('fetch', {id: this.id, version: this._definition.version});
-    return this._snapshots.fetch(this.id, this._definition.version)
+    if (process.env.DEBUG) console.log('fetch', {key: this._key, version: this._definition.version});
+    return this._snapshots.fetch(this._key, this._definition.version)
       .then(snapshot => {
         if (process.env.DEBUG) console.log('fetched', {id: this.id, snapshot});
         this._state = snapshot.state;
@@ -192,8 +200,8 @@ class UnitInstance {
   }
 
   takeSnapshot() {
-    if (process.env.DEBUG) console.log('store', {id: this.id, version: this._definition.version, head: this._head});
-    this._snapshots.store(this.id, this._definition.version, new Snapshot(this._head, this._state));
+    if (process.env.DEBUG) console.log('store', {key: this._key, version: this._definition.version, head: this._head});
+    this._snapshots.store(this._key, this._definition.version, new Snapshot(this._head, this._state));
   }
 
   apply(message) {
@@ -373,11 +381,11 @@ class ProjectionRepository extends UnitRepository {
 //------ SNAPSHOT -----//
 
 class SnapshotStore {
-  store(id, version, snapshot) {
+  store(key, version, snapshot) {
     return Promise.resolve()
   }
 
-  fetch(id, version) {
+  fetch(key, version) {
     return Promise.reject()
   }
 }

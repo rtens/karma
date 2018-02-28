@@ -48,18 +48,20 @@ class FakeEventBus extends karma.EventBus {
 class FakeSnapshotStore extends karma.SnapshotStore {
   constructor() {
     super();
-    this.snapshots = {};
+    this.snapshots = [];
     this.fetched = [];
     this.stored = [];
   }
 
-  store(id, version, snapshot) {
-    this.stored.push({id, version, snapshot});
+  store(key, version, snapshot) {
+    this.stored.push({key, version, snapshot});
   }
 
-  fetch(id, version) {
-    this.fetched.push({id, version});
-    return Promise.resolve(this.snapshots[id + version])
+  fetch(key, version) {
+    this.fetched.push({key, version});
+    var found = this.snapshots.find(s =>
+      JSON.stringify(s.key) == JSON.stringify(key) && s.version == version);
+    return found ? Promise.resolve(found.snapshot) : Promise.reject()
   }
 }
 
