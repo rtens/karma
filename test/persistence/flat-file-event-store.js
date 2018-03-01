@@ -228,26 +228,28 @@ describe('Flat file Event Store', () => {
     let messages = [];
     let store = new flatFile.EventStore('Test', directory);
 
-    return Promise.all([
-      new Promise(y => {
+    return Promise.resolve()
+
+      .then(() => new Promise(y => {
         fs.writeFile(directory + '/Test/records/11', JSON.stringify({
           event: "One",
           revision: 11
         }), y)
-      }),
-      new Promise(y => {
+      }))
+
+      .then(() => new Promise(y => {
         fs.writeFile(directory + '/Test/records/12', JSON.stringify({
           event: "Two",
           revision: 12
         }), y)
-      }),
-      new Promise(y => {
+      }))
+
+      .then(() => new Promise(y => {
         fs.writeFile(directory + '/Test/records/13', JSON.stringify({
           event: "Three",
           revision: 3
         }), y)
-      }),
-    ])
+      }))
 
       .then(() => store.attach({id: 'foo', _head: 11, apply: m => messages.push(m)}))
 
@@ -275,7 +277,7 @@ describe('Flat file Event Store', () => {
       .attach({id: 'foo', apply: m => messages.push(m.event)})
 
       .then(() => new Promise(y => {
-        fs.writeFile(directory + '/Test/records/42', JSON.stringify({event:'one'}), y)
+        fs.writeFile(directory + '/Test/records/42', JSON.stringify({event: 'one'}), y)
       }))
 
       .then(() => store.close())
@@ -292,7 +294,7 @@ describe('Flat file Event Store', () => {
       .attach({id: 'foo', apply: m => messages.push('foo ' + m.event)})
 
       .then(() => new Promise(y => {
-        fs.writeFile(directory + '/Test/records/42', JSON.stringify({event:'one'}), y)
+        fs.writeFile(directory + '/Test/records/42', JSON.stringify({event: 'one'}), y)
       }))
 
       .then(() => new Promise(y => {
