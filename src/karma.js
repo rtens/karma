@@ -132,8 +132,7 @@ class Unit {
 
   _inferVersion() {
     var fingerprint = JSON.stringify([
-      Object.values(this._appliers).map(as => as.map(a =>
-        [a.mapper.toString(), a.applier.toString()])),
+      Object.values(this._appliers).map(as => as.map(a => Object.values(a).join('//'))),
       Object.values(this._initializers).map(i => i.toString())
     ]);
 
@@ -145,8 +144,8 @@ class Unit {
     return this
   }
 
-  applying(domain, eventName, mapper, applier) {
-    (this._appliers[eventName] = this._appliers[eventName] || []).push({domain, mapper, applier});
+  applying(domain, eventName, applier) {
+    (this._appliers[eventName] = this._appliers[eventName] || []).push({domain, eventName, applier});
     return this
   }
 }
@@ -208,7 +207,6 @@ class UnitInstance {
     if (message.offset <= this._head) return;
 
     (this._definition._appliers[message.event.name] || []).forEach(a => {
-      if (a.mapper(message.event) != this.id) return;
       if (a.domain != message.domain) return;
 
       if (process.env.DEBUG) console.log('apply', {id: this.id, message});

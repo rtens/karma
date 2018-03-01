@@ -52,12 +52,12 @@ describe('Reconstituting a/an', () => {
   [aggregate(), repository()].forEach(unit => {
     describe(unit.unitClass.name, () => {
 
-      it('uses Events from the Bus', () => {
+      it('applies Events from the Bus', () => {
         let bus = new unit.busClass();
         bus.messages = [
-          new k.Message(new k.Event('bard', {id: 'foo', baz: 'one'}), 'Test', 21),
-          new k.Message(new k.Event('bard', {id: 'foo', baz: 'two'}), 'Test', 22),
-          new k.Message(new k.Event('nope', {id: 'foo', baz: 'not'}), 'Test', 23)
+          new k.Message(new k.Event('bard', 'one'), 'Test', 21),
+          new k.Message(new k.Event('bard', 'two'), 'Test', 22),
+          new k.Message(new k.Event('nope', 'not'), 'Test', 23)
         ];
 
         return Domain('Test', {bus})
@@ -66,9 +66,9 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.bards = [];
             })
-            .applying('Test', 'nothing', ()=>null, ()=>null)
-            .applying('Test', 'bard', event=>event.payload.id, function (event) {
-              this.bards.push(event.payload.baz);
+            .applying('Test', 'nothing', ()=>null)
+            .applying('Test', 'bard', function (event) {
+              this.bards.push(event.payload);
             })
             [unit.handleMethod]('Foo', request=>request.payload,
             function () {
@@ -84,11 +84,12 @@ describe('Reconstituting a/an', () => {
           }]))
       });
 
-      it('uses only Events mapped to Unit', () => {
+      it('applies only Events from same Domain', () => {
         let bus = new unit.busClass();
         bus.messages = [
-          new k.Message(new k.Event('bard', {id: 'foo', baz: 'one'}), 'Test', 21),
-          new k.Message(new k.Event('bard', {id: 'bar', baz: 'not'}), 'Test', 22),
+          new k.Message(new k.Event('bard', 'one'), 'One', 21),
+          new k.Message(new k.Event('bard', 'not'), 'Not', 22),
+          new k.Message(new k.Event('bard', 'two'), 'Two', 23),
         ];
 
         return Domain('Test', {bus})
@@ -97,8 +98,11 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.bards = [];
             })
-            .applying('Test', 'bard', event=>event.payload.id, function (event) {
-              this.bards.push(event.payload.baz);
+            .applying('One', 'bard', function (event) {
+              this.bards.push('One ' + event.payload);
+            })
+            .applying('Two', 'bard', function (event) {
+              this.bards.push('Two ' + event.payload);
             })
             [unit.handleMethod]('Foo', request=>request.payload, function () {
             return unit.requestHandler(this.bards)
@@ -106,7 +110,7 @@ describe('Reconstituting a/an', () => {
 
           [unit.requestMethod](new unit.requestClass('Foo', 'foo'))
 
-          .then(unit.resultChecker(['one']))
+          .then(unit.resultChecker(['One one', 'Two two']))
 
           .then(() => bus.attached.should.eql([{
             unitId: 'foo',
@@ -134,7 +138,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.bards = ['gone'];
             })
-            .applying('Test', 'bard', ()=>'foo', function (event) {
+            .applying('Test', 'bard', function (event) {
               this.bards.push(event.payload)
             })
             [unit.handleMethod]('Foo', ()=>'foo', function () {
@@ -166,7 +170,6 @@ describe('Reconstituting a/an', () => {
         return Domain('Test', {snapshots})
 
           .add(new unit.unitClass()
-            .applying('Test', 'bard', ()=>'foo', ()=>null)
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
 
           [unit.requestMethod](new unit.requestClass('Foo'))
@@ -188,7 +191,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.bards = [];
             })
-            .applying('Test', 'bard', ()=>'foo', function (event) {
+            .applying('Test', 'bard', function (event) {
               this.bards.push(event.payload);
             })
             [unit.handleMethod]('Foo', ()=>'foo', function (request) {
@@ -229,7 +232,7 @@ describe('Reconstituting a/an', () => {
               this.bards = [];
             })
             .withVersion('v1')
-            .applying('Test', 'bard', ()=>'foo', function (event) {
+            .applying('Test', 'bard', function (event) {
               this.bards.push(event.payload);
             })
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
@@ -266,7 +269,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'one';
             })
-            .applying('Test', 'bard', ()=>'foo', function () {
+            .applying('Test', 'bard', function () {
               this.foo = 'one'
             })
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
@@ -275,7 +278,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'one';
             })
-            .applying('Test', 'bard', ()=>'foo', function () {
+            .applying('Test', 'bard', function () {
               this.foo = 'one'
             })
             [unit.handleMethod]('Bar', ()=>'bar', ()=>null))
@@ -284,7 +287,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'two';
             })
-            .applying('Test', 'bard', ()=>'foo', function () {
+            .applying('Test', 'bard', function () {
               this.foo = 'one'
             })
             [unit.handleMethod]('Baz', ()=>'baz', ()=>null))
@@ -293,7 +296,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'two';
             })
-            .applying('Test', 'bard', ()=>'foo', function () {
+            .applying('Test', 'bard', function () {
               this.foo = 'two'
             })
             [unit.handleMethod]('Ban', ()=>'ban', ()=>null))
@@ -313,7 +316,7 @@ describe('Reconstituting a/an', () => {
                 name: 'One',
                 id: 'foo'
               },
-              version: '18f683c52e2da204494f4272c1b24de9',
+              version: 'caaefb1eccef435364bce4ef5206276c',
               snapshot: {head: null, state: {foo: 'one'}}
             },
             {
@@ -322,7 +325,7 @@ describe('Reconstituting a/an', () => {
                 name: 'Two',
                 id: 'bar'
               },
-              version: '18f683c52e2da204494f4272c1b24de9',
+              version: 'caaefb1eccef435364bce4ef5206276c',
               snapshot: {head: null, state: {foo: 'one'}}
             },
             {
@@ -331,7 +334,7 @@ describe('Reconstituting a/an', () => {
                 name: 'Three',
                 id: 'baz'
               },
-              version: 'd44d45fe37a446ced971a8601ccd5f9c',
+              version: 'f74656f7cb944deaafa123216a7ad067',
               snapshot: {head: null, state: {foo: 'two'}}
             },
             {
@@ -340,7 +343,7 @@ describe('Reconstituting a/an', () => {
                 name: 'Four',
                 id: 'ban'
               },
-              version: 'ccbf5d96f1b468a25e5bfdb2ed835204',
+              version: 'b96ee939834cc89c5b5f1518ddbd3650',
               snapshot: {head: null, state: {foo: 'two'}}
             },
           ]))
@@ -369,7 +372,7 @@ describe('Reconstituting a/an', () => {
               this.bards = [];
             })
             .withVersion('v1')
-            .applying('Test', 'bard', ()=>'foo', function (event) {
+            .applying('Test', 'bard', function (event) {
               this.bards.push(event.payload);
             })
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
