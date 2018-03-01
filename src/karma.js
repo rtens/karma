@@ -144,7 +144,7 @@ class Unit {
     return this
   }
 
-  applying(domain, eventName, applier) {
+  applying(eventName, domain, applier) {
     (this._appliers[eventName] = this._appliers[eventName] || []).push({domain, eventName, applier});
     return this
   }
@@ -206,13 +206,15 @@ class UnitInstance {
   apply(message) {
     if (message.offset <= this._head) return;
 
-    (this._definition._appliers[message.event.name] || []).forEach(a => {
-      if (a.domain != message.domain) return;
+    (this._definition._appliers[message.event.name] || []).forEach(a => this._invoke(a, message));
+  }
 
-      if (process.env.DEBUG) console.log('apply', {id: this.id, message});
-      a.applier.call(this._state, message.event);
-      this._head = message.offset;
-    });
+  _invoke(applier, message) {
+    if (applier.domain != message.domain) return;
+
+    if (process.env.DEBUG) console.log('apply', {id: this.id, message});
+    applier.applier.call(this._state, message.event);
+    this._head = message.offset;
   }
 }
 
@@ -289,6 +291,10 @@ class Aggregate extends Unit {
     return command.name in this._executers;
   }
 
+  applying(eventName, mapper, applier) {
+    return super.applying(eventName, mapper, applier);
+  }
+
   executing(commandName, mapper, executer) {
     if (commandName in this._executers) {
       throw new Error(`[${this.name}] is already executing [${commandName}]`)
@@ -306,6 +312,11 @@ class AggregateInstance extends UnitInstance {
     this._domain = domain;
     this._store = store;
     this._queue = queue({concurrency: 1, autostart: true})
+  }
+
+  _invoke(applier, message) {
+    if (applier.domain(message.event) != this.id) return;
+    return super._invoke({...applier, domain: this._domain}, message);
   }
 
   execute(command) {

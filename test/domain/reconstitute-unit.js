@@ -34,30 +34,42 @@ describe('Reconstituting a/an', () => {
     handleMethod: 'executing',
     requestClass: k.Command,
     requestMethod: 'execute',
+    applyFilter: event => event.payload.bla,
     requestHandler: result => [new k.Event('food', result)],
     resultChecker: expected => result => result._aggregates._store.recorded.slice(-1)
-      .map(r=>r.events[0].payload).should.eql([expected])
+      .map(r=>r.events[0].payload).should.eql([expected]),
+    fingerprint: {
+      One: '95b95b780c7c562ea759817e0944ad4c',
+      Three: '811b88b6d7a4f91306b19567e2b8da2e',
+      Four: '615aef31d65f92763ac69ea26bb93ae0'
+    }
   });
 
-  let repository = () => ({
+  let projection = () => ({
     unitClass: k.Projection,
     busClass: fake.EventBus,
     handleMethod: 'respondingTo',
     requestClass: k.Query,
     requestMethod: 'respondTo',
+    applyFilter: 'Test',
     requestHandler: result => result,
-    resultChecker: expected => result => result.should.eql(expected)
+    resultChecker: expected => result => result.should.eql(expected),
+    fingerprint: {
+      One: 'caaefb1eccef435364bce4ef5206276c',
+      Three: 'f74656f7cb944deaafa123216a7ad067',
+      Four: 'b96ee939834cc89c5b5f1518ddbd3650'
+    }
   });
 
-  [aggregate(), repository()].forEach(unit => {
+  [aggregate(), projection()].forEach(unit => {
     describe(unit.unitClass.name, () => {
 
       it('applies Events from the Bus', () => {
         let bus = new unit.busClass();
         bus.messages = [
-          new k.Message(new k.Event('bard', 'one'), 'Test', 21),
-          new k.Message(new k.Event('bard', 'two'), 'Test', 22),
-          new k.Message(new k.Event('nope', 'not'), 'Test', 23)
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'one'}), 'Test', 21),
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'two'}), 'Test', 22),
+          new k.Message(new k.Event('nope', {bla: 'foo', blu: 'not'}), 'Test', 23)
         ];
 
         return Domain('Test', {bus})
@@ -66,14 +78,51 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.bards = [];
             })
-            .applying('Test', 'nothing', ()=>null)
-            .applying('Test', 'bard', function (event) {
-              this.bards.push(event.payload);
+            .applying('nothing', unit.applyFilter, function () {
+              this.bards.push('never');
+            })
+            .applying('bard', unit.applyFilter, function (event) {
+              this.bards.push('a ' + event.payload.blu);
+            })
+            .applying('bard', unit.applyFilter, function (event) {
+              this.bards.push('b ' + event.payload.blu);
             })
             [unit.handleMethod]('Foo', request=>request.payload,
             function () {
               return unit.requestHandler(this.bards)
             }))
+
+          [unit.requestMethod](new unit.requestClass('Foo', 'foo'))
+
+          .then(unit.resultChecker(['a one', 'b one', 'a two', 'b two']))
+
+          .then(() => bus.attached.should.eql([{
+            unitId: 'foo',
+          }]))
+      });
+
+      it('applies only matching Events', () => {
+        let bus = new unit.busClass();
+        bus.messages = [
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'one'}), 'Test', 21),
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'not'}), 'Not', 22),
+          new k.Message(new k.Event('bard', {bla: 'not', blu: 'not'}), 'Test', 23),
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'two'}), 'Test', 24),
+        ];
+
+        return Domain('Test', {bus})
+
+          .add(new unit.unitClass()
+            .initializing(function () {
+              this.bards = [];
+            })
+            .applying('bard', unit.applyFilter, function (event) {
+              if (unit.unitClass.name == k.Projection.name && event.payload.bla == 'not') return;
+              this.bards.push(event.payload.blu);
+            })
+            [unit.handleMethod]('Foo', request=>request.payload, function () {
+            return unit.requestHandler(this.bards)
+          }))
 
           [unit.requestMethod](new unit.requestClass('Foo', 'foo'))
 
@@ -84,44 +133,11 @@ describe('Reconstituting a/an', () => {
           }]))
       });
 
-      it('applies only Events from same Domain', () => {
-        let bus = new unit.busClass();
-        bus.messages = [
-          new k.Message(new k.Event('bard', 'one'), 'One', 21),
-          new k.Message(new k.Event('bard', 'not'), 'Not', 22),
-          new k.Message(new k.Event('bard', 'two'), 'Two', 23),
-        ];
-
-        return Domain('Test', {bus})
-
-          .add(new unit.unitClass()
-            .initializing(function () {
-              this.bards = [];
-            })
-            .applying('One', 'bard', function (event) {
-              this.bards.push('One ' + event.payload);
-            })
-            .applying('Two', 'bard', function (event) {
-              this.bards.push('Two ' + event.payload);
-            })
-            [unit.handleMethod]('Foo', request=>request.payload, function () {
-            return unit.requestHandler(this.bards)
-          }))
-
-          [unit.requestMethod](new unit.requestClass('Foo', 'foo'))
-
-          .then(unit.resultChecker(['One one', 'Two two']))
-
-          .then(() => bus.attached.should.eql([{
-            unitId: 'foo',
-          }]))
-      });
-
       it('uses a Snapshot and Events', () => {
         let bus = new unit.busClass();
         bus.messages = [
-          new k.Message(new k.Event('bard', 'not'), 'Test', 21),
-          new k.Message(new k.Event('bard', 'one'), 'Test', 42)
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'not'}), 'Test', 21),
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'one'}), 'Test', 42)
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -138,8 +154,8 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.bards = ['gone'];
             })
-            .applying('Test', 'bard', function (event) {
-              this.bards.push(event.payload)
+            .applying('bard', unit.applyFilter, function (event) {
+              this.bards.push(event.payload.blu)
             })
             [unit.handleMethod]('Foo', ()=>'foo', function () {
             return unit.requestHandler(this.bards)
@@ -178,7 +194,7 @@ describe('Reconstituting a/an', () => {
       it('keeps the reconstituted Unit', () => {
         let bus = new unit.busClass();
         bus.messages = [
-          new k.Message(new k.Event('bard', 'a '), 'Test', 21)
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'a '}), 'Test', 21)
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -191,8 +207,8 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.bards = [];
             })
-            .applying('Test', 'bard', function (event) {
-              this.bards.push(event.payload);
+            .applying('bard', unit.applyFilter, function (event) {
+              this.bards.push(event.payload.blu);
             })
             [unit.handleMethod]('Foo', ()=>'foo', function (request) {
             return unit.requestHandler(this.bards + request.payload)
@@ -214,7 +230,7 @@ describe('Reconstituting a/an', () => {
       it('can take a Snapshot of the Unit', () => {
         let bus = new unit.busClass();
         bus.messages = [
-          new k.Message(new k.Event('bard', 'one'), 'Test', 21)
+          new k.Message(new k.Event('bard', {bla: 'foo', blu: 'one'}), 'Test', 21)
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -232,8 +248,8 @@ describe('Reconstituting a/an', () => {
               this.bards = [];
             })
             .withVersion('v1')
-            .applying('Test', 'bard', function (event) {
-              this.bards.push(event.payload);
+            .applying('bard', unit.applyFilter, function (event) {
+              this.bards.push(event.payload.blu);
             })
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
 
@@ -269,7 +285,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'one';
             })
-            .applying('Test', 'bard', function () {
+            .applying('bard', unit.applyFilter, function () {
               this.foo = 'one'
             })
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
@@ -278,7 +294,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'one';
             })
-            .applying('Test', 'bard', function () {
+            .applying('bard', unit.applyFilter, function () {
               this.foo = 'one'
             })
             [unit.handleMethod]('Bar', ()=>'bar', ()=>null))
@@ -287,7 +303,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'two';
             })
-            .applying('Test', 'bard', function () {
+            .applying('bard', unit.applyFilter, function () {
               this.foo = 'one'
             })
             [unit.handleMethod]('Baz', ()=>'baz', ()=>null))
@@ -296,7 +312,7 @@ describe('Reconstituting a/an', () => {
             .initializing(function () {
               this.foo = 'two';
             })
-            .applying('Test', 'bard', function () {
+            .applying('bard', unit.applyFilter, function () {
               this.foo = 'two'
             })
             [unit.handleMethod]('Ban', ()=>'ban', ()=>null))
@@ -316,7 +332,7 @@ describe('Reconstituting a/an', () => {
                 name: 'One',
                 id: 'foo'
               },
-              version: 'caaefb1eccef435364bce4ef5206276c',
+              version: unit.fingerprint.One,
               snapshot: {head: null, state: {foo: 'one'}}
             },
             {
@@ -325,7 +341,7 @@ describe('Reconstituting a/an', () => {
                 name: 'Two',
                 id: 'bar'
               },
-              version: 'caaefb1eccef435364bce4ef5206276c',
+              version: unit.fingerprint.One,
               snapshot: {head: null, state: {foo: 'one'}}
             },
             {
@@ -334,7 +350,7 @@ describe('Reconstituting a/an', () => {
                 name: 'Three',
                 id: 'baz'
               },
-              version: 'f74656f7cb944deaafa123216a7ad067',
+              version: unit.fingerprint.Three,
               snapshot: {head: null, state: {foo: 'two'}}
             },
             {
@@ -343,7 +359,7 @@ describe('Reconstituting a/an', () => {
                 name: 'Four',
                 id: 'ban'
               },
-              version: 'b96ee939834cc89c5b5f1518ddbd3650',
+              version: unit.fingerprint.Four,
               snapshot: {head: null, state: {foo: 'two'}}
             },
           ]))
@@ -352,7 +368,7 @@ describe('Reconstituting a/an', () => {
       it('can unload a Unit', () => {
         let bus = new unit.busClass();
         bus.messages = [
-          new k.Message(new k.Event('bard', 'one'), 21)
+          new k.Message('foo')
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -368,13 +384,7 @@ describe('Reconstituting a/an', () => {
         return domain
 
           .add(new unit.unitClass()
-            .initializing(function () {
-              this.bards = [];
-            })
             .withVersion('v1')
-            .applying('Test', 'bard', function (event) {
-              this.bards.push(event.payload);
-            })
             [unit.handleMethod]('Foo', ()=>'foo', ()=>null))
 
           [unit.requestMethod](new unit.requestClass('Foo', 'foo'))
