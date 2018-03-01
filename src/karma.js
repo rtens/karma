@@ -179,10 +179,10 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
-    if (process.env.DEBUG) console.log('fetch', {key: this._key, version: this._definition.version});
+    debug('fetch', {key: this._key, version: this._definition.version});
     return this._snapshots.fetch(this._key, this._definition.version)
       .then(snapshot => {
-        if (process.env.DEBUG) console.log('fetched', {id: this.id, snapshot});
+        debug('fetched', {id: this.id, snapshot});
         this._state = snapshot.state;
         this._head = snapshot.head;
       })
@@ -190,7 +190,7 @@ class UnitInstance {
   }
 
   _attachToBus() {
-    if (process.env.DEBUG) console.log('attach', {id: this.id, head: this._head});
+    debug('attach', {id: this.id, head: this._head});
     return this._bus.attach(this);
   }
 
@@ -199,7 +199,7 @@ class UnitInstance {
   }
 
   takeSnapshot() {
-    if (process.env.DEBUG) console.log('store', {key: this._key, version: this._definition.version, head: this._head});
+    debug('store', {key: this._key, version: this._definition.version, head: this._head});
     this._snapshots.store(this._key, this._definition.version, new Snapshot(this._head, this._state));
   }
 
@@ -212,7 +212,7 @@ class UnitInstance {
   _invoke(applier, message) {
     if (applier.domain != message.domain) return;
 
-    if (process.env.DEBUG) console.log('apply', {id: this.id, message});
+    debug('apply', {id: this.id, message});
     applier.applier.call(this._state, message.event);
     this._head = message.offset;
   }
@@ -259,7 +259,7 @@ class UnitRepository {
       return Promise.resolve(this._instances[unitId]);
     }
 
-    if (process.env.DEBUG) console.log('load', {id: unitId});
+    debug('load', {id: unitId});
     this._instances[unitId] = this._createInstance(definition, unitId);
     return this._instances[unitId].load();
   }
@@ -268,7 +268,7 @@ class UnitRepository {
   }
 
   remove(unit) {
-    if (process.env.DEBUG) console.log('unload', {id: unit.id});
+    debug('unload', {id: unit.id});
     unit.unload();
     delete this._instances[unit.id];
   }
@@ -320,7 +320,7 @@ class AggregateInstance extends UnitInstance {
   }
 
   execute(command) {
-    if (process.env.DEBUG) console.log('execute', {command, id: this.id});
+    debug('execute', {command, id: this.id});
     return new Promise((y, n) =>
       this._queue.push(() => this._execute(command).then(y).catch(n)));
   }
@@ -332,7 +332,7 @@ class AggregateInstance extends UnitInstance {
       return Promise.resolve();
     }
 
-    if (process.env.DEBUG) console.log('record', {id: this.id, revision: this._head, events});
+    debug('record', {id: this.id, revision: this._head, events});
     return this._store.record(events, this.id, this._head, command.traceId)
       .catch(e => {
         if (tries > 3) throw e;
@@ -431,3 +431,7 @@ module.exports = {
   SnapshotStore,
   Snapshot
 };
+
+function debug(tag, message) {
+  if (process.env.DEBUG) console.log(tag, JSON.stringify(message));
+}

@@ -20,7 +20,7 @@ const domain = new karma.Domain('Test',
 
     .initializing(function () {
       this.total = 0;
-      this.limit = 3;
+      this.limit = 5;
     })
 
     .executing('Foo', e=>e.payload.target, function ({payload:{target, count}}) {
@@ -30,7 +30,7 @@ const domain = new karma.Domain('Test',
       return [new karma.Event('food', {to: target, count, total: this.total + count})]
     })
 
-    .applying('Test', 'food', e=>e.payload.to, function ({payload:{total}}) {
+    .applying('food', e=>e.payload.to, function ({payload:{total}}) {
       this.total = total;
     })
 
@@ -38,7 +38,7 @@ const domain = new karma.Domain('Test',
       return [new karma.Event('incd', {in: where, by})];
     })
 
-    .applying('Test', 'incd', e=>e.payload.in, function ({payload:{by}}) {
+    .applying('incd', e=>e.payload.in, function ({payload:{by}}) {
       this.limit += by;
     }))
 
@@ -48,7 +48,7 @@ const domain = new karma.Domain('Test',
       this.total = 0;
     })
 
-    .applying('Test', 'food', e=>e.payload.to, function ({payload:{count}}) {
+    .applying('food', 'Test', function ({payload:{count}}) {
       this.total += count;
     })
 
