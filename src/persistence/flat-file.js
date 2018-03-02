@@ -92,14 +92,16 @@ class FlatFileEventLog extends karma.EventLog {
     this._subscribers = {};
     this._notified = {};
     this._notificationQueue = queue({concurrency: 1, autostart: true});
-
-    this._watcher = chokidar.watch(this._paths.records);
-    this._watcher.on('add', (file) =>
-      this._notificationQueue.push(() => this._notifySubscribers(file, this._subscribers)))
   }
 
   subscribe(subscriptionId, streamHeads, subscriber) {
     this._notified[subscriptionId] = this._notified[subscriptionId] || {};
+
+    if (!this._watcher) {
+      this._watcher = chokidar.watch(this._paths.records);
+      this._watcher.on('add', (file) =>
+        this._notificationQueue.push(() => this._notifySubscribers(file, this._subscribers)))
+    }
 
     return fs.readdirAsync(this._paths.records)
 
@@ -148,7 +150,9 @@ class FlatFileEventLog extends karma.EventLog {
 
   _close() {
     if (this._notificationQueue.length == 0) {
-      return Promise.resolve(this._watcher.close());
+      this._watcher.close();
+      this._watcher = null;
+      return Promise.resolve();
     }
     return new Promise(y => setTimeout(() => this._close().then(y)), 100)
   }

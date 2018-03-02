@@ -173,4 +173,25 @@ describe('Flat file Event Log', () => {
 
       .then(() => records.should.eql([]))
   });
+
+  it('restarts notifying about Events', () => {
+    let records = [];
+    let log = new flatFile.EventLog(directory);
+
+    return log
+
+      .subscribe('foo', {}, record => records.push(record.event.name))
+
+      .then(() => log.cancel('foo'))
+
+      .then(() => log.subscribe('foo', {}, record => records.push(record.event.name)))
+
+      .then(() => fs.writeFileAsync(directory + '/records/one-42', JSON.stringify({event: {name: 'One'}})))
+
+      .then(() => new Promise(y => setTimeout(y, 200)))
+
+      .then(() => log.cancel('foo'))
+
+      .then(() => records.should.eql(['One']))
+  });
 });
