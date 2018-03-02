@@ -3,6 +3,7 @@ const path = require('path');
 const lockFile = require('lockfile');
 const chokidar = require('chokidar');
 const Promise = require("bluebird");
+const queue = require('queue');
 
 const karma = require('../karma');
 

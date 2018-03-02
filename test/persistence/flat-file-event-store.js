@@ -58,27 +58,27 @@ describe('Flat file Event Store', () => {
   });
 
   it('keeps Events in sequence', () => {
-    fs.mkdirSync(directory);
-    return fs.writeFileAsync(directory + '/one.write', JSON.stringify({
-      sequence: 42
-    }))
+    let store = new flatFile.EventStore(directory);
+    return Promise.resolve()
 
-      .then(() => new flatFile.EventStore(directory))
+      .then(() => fs.writeFileAsync(directory + '/one.write', JSON.stringify({
+        sequence: 42
+      })))
 
-      .then(store => store.record([new karma.Event()], 'one', 41))
+      .then(() => store.record([new karma.Event()], 'one', 41))
 
       .should.be.rejectedWith(Error, 'Out of sequence')
   });
 
   it('avoids gaps in sequence', () => {
-    fs.mkdirSync(directory);
-    return fs.writeFileAsync(directory + '/one.write', JSON.stringify({
-      sequence: 42
-    }))
+    let store = new flatFile.EventStore(directory);
+    return Promise.resolve()
 
-      .then(() => new flatFile.EventStore(directory))
+      .then(() => fs.writeFileAsync(directory + '/one.write', JSON.stringify({
+        sequence: 42
+      })))
 
-      .then(store => store.record([new karma.Event()], 'one', 43))
+      .then(() => store.record([new karma.Event()], 'one', 43))
 
       .should.be.rejectedWith(Error, 'Out of sequence')
   });

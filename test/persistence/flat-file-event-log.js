@@ -20,8 +20,8 @@ describe('Flat file Event Log', () => {
   });
 
   it.skip('reads Events from files', () => {
-    let messages = [];
-    let store = new flatFile.EventStore(directory);
+    let records = [];
+    let store = new flatFile.EventLog(directory);
 
     return Promise.all([
       new Promise(y => {
@@ -38,11 +38,11 @@ describe('Flat file Event Log', () => {
       }),
     ])
 
-      .then(() => store.attach({id: 'foo', apply: m => messages.push(m)}))
+      .then(() => store.attach({id: 'foo', apply: m => records.push(m)}))
 
       .then(() => store.close())
 
-      .then(() => messages.should.eql([
+      .then(() => records.should.eql([
         {
           event: 'Three',
           domain: 'Test',
@@ -57,7 +57,7 @@ describe('Flat file Event Log', () => {
 
   it.skip('filters Records by revision', () => {
     let messages = [];
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventLog(directory);
 
     return Promise.resolve()
 
@@ -101,7 +101,7 @@ describe('Flat file Event Log', () => {
 
   it.skip('notifies about recorded Events', () => {
     let messages = [];
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventLog(directory);
 
     return store
 
@@ -118,7 +118,7 @@ describe('Flat file Event Log', () => {
 
   it.skip('de-duplicates notifications', () => {
     let messages = [];
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventLog(directory);
 
     return store
 
@@ -151,7 +151,7 @@ describe('Flat file Event Log', () => {
     };
 
     let messages = [];
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventLog(directory);
 
     return store
 
@@ -172,7 +172,7 @@ describe('Flat file Event Log', () => {
 
   it.skip('stops notifying about Events', () => {
     let records = [];
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventLog(directory);
 
     return store
 
@@ -194,7 +194,7 @@ describe('Flat file Event Log', () => {
 
   it.skip('resets de-duplication on detachment', () => {
     let messages = [];
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventLog(directory);
 
     return new Promise(y => fs.writeFile(directory + '/Test/records/42', JSON.stringify({event: 'one'}), y))
 
