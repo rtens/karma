@@ -146,24 +146,23 @@ class FlatFileEventStore extends karma.EventStore {
 }
 
 class FlatFileSnapshotStore extends karma.SnapshotStore {
-  constructor(domain, baseDir) {
+  constructor(baseDir) {
     super();
-    this._dir = baseDir + '/' + domain + '/snapshots';
+    this._dir = baseDir + '/snapshots';
 
     FlatFileSnapshotStore._mkdir(baseDir);
-    FlatFileSnapshotStore._mkdir(baseDir + '/' + domain);
     FlatFileSnapshotStore._mkdir(this._dir);
   }
 
   store(key, version, snapshot) {
-    var path = this._dir + '/' + Object.values(key).join('-');
+    var path = this._dir + '/' + key;
     FlatFileSnapshotStore._mkdir(path);
 
     return fs.writeFileAsync(path + '/' + version, JSON.stringify(snapshot, null, 2))
   }
 
   fetch(key, version) {
-    var path = this._dir + '/' + Object.values(key).join('-');
+    var path = this._dir + '/' + key;
     var file = path + '/' + version;
 
     if (fs.existsSync(path) && !fs.existsSync(file)) {
@@ -172,7 +171,6 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
 
     return fs.readFileAsync(file)
       .then(content => JSON.parse(content))
-      .catch(() => null)
   }
 
   static _mkdir(dir) {
