@@ -4,55 +4,58 @@ const karma = require('./src/karma');
 const flatFile = require('./src/persistence/flat-file');
 
 class RepositoryStrategy extends karma.RepositoryStrategy {
-  onAccess(repository, unit) {
+  onAccess(unit, repository) {
     unit.takeSnapshot();
     repository.remove(unit);
   }
 }
 
-const domain = new karma.Module('Test',
-  new flatFile.EventLog('Test', './data'),
-  new flatFile.EventStore('Test', './data'),
-  new flatFile.SnapshotStore('Test', './data'),
-  new RepositoryStrategy())
+const domain = new karma.Module(
+  new flatFile.EventLog('./data'),
+  new flatFile.SnapshotStore('./data'),
+  new RepositoryStrategy(),
+  new flatFile.EventStore('./data'))
 
-  .add(new karma.Aggregate('MyAggregate')
+  .add(new karma.Aggregate('Bob')
 
     .initializing(function () {
       this.total = 0;
       this.limit = 5;
     })
 
-    .executing('Foo', e=>e.payload.target, function ({payload:{target, count}}) {
+    .executing('Foo', $=>$.target, function ({count}) {
       if (this.total + count > this.limit) {
         throw new Error('Too much');
       }
-      return [new karma.Event('food', {to: target, count, total: this.total + count})]
+      return [
+        new karma.Event('food', {count}),
+        new karma.Event('bard', {total: this.total + count}),
+      ]
     })
 
-    .applying('food', e=>e.payload.to, function ({payload:{total}}) {
+    .applying('food', function ({total}) {
       this.total = total;
     })
 
-    .executing('Inc', e=>e.payload.where, function ({payload:{where, by}}) {
-      return [new karma.Event('incd', {in: where, by})];
+    .executing('Inc', $=>$.where, function ({by}) {
+      return [new karma.Event('incd', {by})];
     })
 
-    .applying('incd', e=>e.payload.in, function ({payload:{by}}) {
+    .applying('incd', function ({by}) {
       this.limit += by;
     }))
 
-  .add(new karma.Projection('MyProjection')
+  .add(new karma.Projection('Alice')
 
     .initializing(function () {
       this.total = 0;
     })
 
-    .applying('food', 'Test', function ({payload:{count}}) {
+    .applying('food', function ({count}) {
       this.total += count;
     })
 
-    .respondingTo('Food', q=>q.payload.of, function () {
+    .respondingTo('Food', $=>$.of, function () {
       return this.total
     }));
 
