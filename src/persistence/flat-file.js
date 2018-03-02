@@ -79,76 +79,79 @@ class FlatFileEventStore extends karma.EventStore {
 }
 
 class FlatFileEventLog extends karma.EventLog {
-  // constructor(domain, baseDir) {
-  //   super();
-  //   this._domain = domain;
-  //   this._attached = {};
-  //   this._notified = {};
-  //   this._notificationQueue = queue({concurrency: 1, autostart: true});
-  //
-  //   this._paths = {base: baseDir};
-  //   this._paths.domain = this._paths.base + '/' + domain;
-  //   this._paths.write = this._paths.domain + '/write';
-  //   this._paths.lock = this._paths.domain + '/write.lock';
-  //   this._paths.records = this._paths.domain + '/records';
-  //
-  //   ['base', 'domain', 'records'].forEach(path => FlatFileEventStore._mkdir(this._paths[path]));
-  //
-  //   this._watcher = chokidar.watch(this._paths.records);
-  //   this._watcher.on('add', (file) =>
-  //     this._notificationQueue.push(() => this._notifyAllUnits(file)))
-  // }
-  //
-  // _notifyAllUnits(file) {
-  //   return Promise.all(Object.values(this._attached)
-  //     .map(unit => this._notifyUnit(file, unit)))
-  // }
-  //
-  // _notifyUnit(file, unit) {
-  //   if (file in this._notified[unit.id]) {
-  //     return Promise.resolve();
-  //   }
-  //   this._notified[unit.id][file] = true;
-  //
-  //   return fs.readFileAsync(file)
-  //
-  //     .then(content => JSON.parse(content))
-  //
-  //     .then(record => unit.apply(new karma.Message(record.event, this._domain, record.revision)));
-  // }
-  //
-  // attach(aggregate) {
-  //   this._notified[aggregate.id] = this._notified[aggregate.id] || {};
-  //
-  //   return fs.readdirAsync(this._paths.records)
-  //
-  //     .then(files => files.sort((a, b) => parseInt(a) - parseInt(b)))
-  //
-  //     .then(files => aggregate._head ? files.filter(f => parseInt(f) > aggregate._head) : files)
-  //
-  //     .then(files => Promise.each(files, file => this._notifyUnit(this._paths.records + '/' + file, aggregate), {concurrency: 1}))
-  //
-  //     .then(() => this._attached[aggregate.id] = aggregate)
-  //
-  //     .then(() => this)
-  // }
-  //
-  // detach(aggreagte) {
-  //   delete this._notified[aggreagte.id];
-  //   delete this._attached[aggreagte.id];
-  //   return Promise.resolve(this);
-  // }
-  //
-  // close() {
-  //   return new Promise(y => setTimeout(() => this._close(y), 100));
-  // }
-  //
-  // _close(y) {
-  //   if (this._notificationQueue.length == 0) {
-  //     return y(this._watcher.close());
-  //   }
-  //   setTimeout(() => this._close(y), 100)
-  // }
+  constructor(baseDir) {
+    super();
+    this._paths = {
+      base: baseDir + '/',
+      records: baseDir + '/records/'
+    };
+
+    _mkdir(baseDir);
+    _mkdir(this._paths.records);
+
+    this._subscribers = {};
+    this._notified = {};
+    this._notificationQueue = queue({concurrency: 1, autostart: true});
+
+    this._watcher = chokidar.watch(this._paths.records);
+    this._watcher.on('add', (file) =>
+      this._notificationQueue.push(() => this._notifySubscribers(file, this._subscribers)))
+  }
+
+  subscribe(subscriptionId, streamHeads, subscriber) {
+    this._notified[subscriptionId] = this._notified[subscriptionId] || {};
+
+    return fs.readdirAsync(this._paths.records)
+
+      .then(files => files.map(f => ({
+        name: f,
+        streamId: path.basename(f, path.extname(f)),
+        sequence: parseInt(path.extname(f).substr(1))
+      })))
+
+      .then(files => files.sort((a, b) => a.sequence - b.sequence))
+
+      .then(files => files.filter(f => !streamHeads[f.streamId] || f.sequence > streamHeads[f.streamId]))
+
+      .then(files => files.map(file => this._paths.records + file.name))
+
+      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, {[subscriptionId]: subscriber})))
+
+      .then(() => this._subscribers[subscriptionId] = subscriber)
+
+      .then(() => this)
+  }
+
+  _notifySubscribers(path, subscribers) {
+    return fs.readFileAsync(path).then(JSON.parse)
+
+      .then(record => ({...record, event: new Proxy(record.event, {
+        get: (target, name) => name == 'time' ? new Date(target[name]) : target[name]
+      })}))
+
+      .then(record => Object.keys(subscribers).forEach(id => {
+        if (path in this._notified[id]) return;
+        this._notified[id][path] = true;
+
+        subscribers[id](record)
+      }));
+  }
+
+  cancel(subscriptionId) {
+    delete this._subscribers[subscriptionId];
+    delete this._notified[subscriptionId];
+    if (Object.keys(this._subscribers).length == 0) {
+      return this._close();
+    }
+    return Promise.resolve();
+  }
+
+  _close() {
+    if (this._notificationQueue.length == 0) {
+      return Promise.resolve(this._watcher.close());
+    }
+    return new Promise(y => setTimeout(() => this._close().then(y)), 100)
+  }
 }
 
 class FlatFileSnapshotStore extends karma.SnapshotStore {
