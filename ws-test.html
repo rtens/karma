@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+<script>
+    var ws = new WebSocket('ws://localhost:3000/Food?of=bla');
+
+    ws.onopen = function () {
+        console.log('websocket is connected ...');
+    };
+
+    ws.onmessage = function (ev) {
+        console.log(ev.data);
+    };
+</script>
+</body>
+</html>
