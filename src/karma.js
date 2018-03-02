@@ -215,7 +215,7 @@ class UnitInstance {
 
     debug('apply', {key: this._key, record});
     (this._definition._appliers[record.event.name] || []).forEach(applier =>
-      applier.call(this._state, record.event.payload, record.event));
+      applier.call(this._state, record.event.payload, record));
 
     this._heads[record.streamId] = record.sequence;
   }

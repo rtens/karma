@@ -113,8 +113,8 @@ describe('Responding to a Query', () => {
         .applying('bard', function (payload) {
           this.bards.push('a ' + payload);
         })
-        .applying('bard', function (payload, event) {
-          this.bards.push('b ' + event.payload);
+        .applying('bard', function (payload, record) {
+          this.bards.push('b ' + record.event.payload);
         })
         .respondingTo('Foo', $=>$, function () {
           return this.bards

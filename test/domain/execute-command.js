@@ -220,8 +220,8 @@ describe('Executing a Command', () => {
         .applying('bard', function (payload) {
           this.bards.push('a ' + payload);
         })
-        .applying('bard', function (payload, event) {
-          this.bards.push('b ' + event.payload);
+        .applying('bard', function (payload, record) {
+          this.bards.push('b ' + record.event.payload);
         })
         .executing('Foo', $=>$, function () {
           return [new k.Event('food', this.bards)]
