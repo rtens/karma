@@ -10,8 +10,8 @@ class RepositoryStrategy extends karma.RepositoryStrategy {
   }
 }
 
-const domain = new karma.Domain('Test',
-  new flatFile.EventBus('Test', './data'),
+const domain = new karma.Module('Test',
+  new flatFile.EventLog('Test', './data'),
   new flatFile.EventStore('Test', './data'),
   new flatFile.SnapshotStore('Test', './data'),
   new RepositoryStrategy())

@@ -1,13 +1,11 @@
-const queue = require('queue');
 const crypto = require('crypto');
 
 //------ DOMAIN -------//
 
-class Domain {
-  constructor(name, eventStore, eventBus, snapshotStore, repositoryStrategy) {
-    this.name = name;
-    this._aggregates = new AggregateRepository(name, eventStore, snapshotStore, repositoryStrategy);
-    this._projections = new ProjectionRepository(eventBus, snapshotStore, repositoryStrategy);
+class Module {
+  constructor(eventLog, snapshotStore, repositoryStrategy, eventStore) {
+    this._aggregates = new AggregateRepository(eventLog, snapshotStore, repositoryStrategy, eventStore);
+    this._projections = new ProjectionRepository(eventLog, snapshotStore, repositoryStrategy);
   }
 
   add(unit) {
@@ -38,67 +36,56 @@ class Domain {
   }
 }
 
-class Request {
+class Message {
   constructor(name, payload) {
     this.name = name;
     this.payload = payload;
   }
 }
 
-class Command extends Request {
+class Command extends Message {
   constructor(name, payload, traceId) {
     super(name, payload);
     this.traceId = traceId;
   }
 }
 
-class Query extends Request {
+class Query extends Message {
 }
 
-class Event extends Request {
+//----- EVENTS ------//
+
+class Event extends Message {
   constructor(name, payload, time = new Date()) {
     super(name, payload);
     this.time = time;
   }
 }
 
-//----- EVENT BUS ------//
-
-class Message {
-  constructor(event, domain, offset) {
-    this.event = event;
-    this.domain = domain;
-    this.offset = offset;
-  }
-}
-
-class EventBus {
-  attach(unit) {
-    return Promise.resolve()
-  }
-
-  detach(unit) {
-    return Promise.resolve()
-  }
-}
-
-//---- EVENT STORE -----//
-
 class Record {
-  constructor(event, revision, traceId) {
+  constructor(event, streamId, sequence, traceId) {
     this.event = event;
-    this.revision = revision;
+    this.streamId = streamId;
+    this.sequence = sequence;
     this.traceId = traceId;
   }
 }
 
-class EventStore extends EventBus {
-  constructor(domain) {
-    super();
-    this._domain = domain;
+class EventLog {
+  //noinspection JSUnusedLocalSymbols
+  subscribe(subscriptionId, streamHeads, subscriber) {
+    return Promise.resolve()
   }
 
-  record(events, aggregateId, onRevision, traceId) {
+  //noinspection JSUnusedLocalSymbols
+  cancel(subscriptionId) {
+    return Promise.resolve()
+  }
+}
+
+class EventStore {
+  //noinspection JSUnusedLocalSymbols
+  record(events, streamId, onSequence, traceId) {
     return Promise.resolve()
   }
 }
@@ -107,6 +94,10 @@ class EventStore extends EventBus {
 
 class Unit {
   constructor(name) {
+    if (!name) {
+      throw new Error('Please provide a name.');
+    }
+
     this.name = name;
     this._version = null;
     this._initializers = [];
@@ -114,11 +105,11 @@ class Unit {
     this._mappers = {};
   }
 
-  canHandle(request) {
+  canHandle(message) {
   }
 
-  mapToId(request) {
-    return this._mappers[request.name](request);
+  mapToId(message) {
+    return this._mappers[message.name](message.payload);
   }
 
   withVersion(version) {
@@ -132,7 +123,7 @@ class Unit {
 
   _inferVersion() {
     var fingerprint = JSON.stringify([
-      Object.values(this._appliers).map(as => as.map(a => Object.values(a).join('//'))),
+      Object.values(this._appliers).map(as => as.map(a => a.toString())),
       Object.values(this._initializers).map(i => i.toString())
     ]);
 
@@ -144,8 +135,8 @@ class Unit {
     return this
   }
 
-  applying(eventName, domain, applier) {
-    (this._appliers[eventName] = this._appliers[eventName] || []).push({domain, eventName, applier});
+  applying(eventName, applier) {
+    (this._appliers[eventName] = this._appliers[eventName] || []).push(applier);
     return this
   }
 }
@@ -155,26 +146,36 @@ class UnitInstance {
     this.id = id;
 
     this._definition = definition;
-    this._bus = bus;
+    this._log = bus;
     this._snapshots = snapshots;
 
-    this._head = null;
+    this._heads = {};
     this._state = {};
+
+    this._loading = false;
+    this._loaded = false;
+    this._onLoad = [];
 
     definition._initializers.forEach(i => i.call(this._state));
   }
 
   get _key() {
-    return {
-      type: this._definition.constructor.name,
-      name: this._definition.name,
-      id: this.id
-    }
+    return [
+      this._definition.constructor.name,
+      this._definition.name,
+      this.id
+    ].join('-')
   }
 
   load() {
-    return this._loadSnapshot()
-      .then(() => this._attachToBus())
+    if (this._loaded) return Promise.resolve(this);
+    if (this._loading) return new Promise(y => this._onLoad.push(() => y(this)));
+    this._loading = true;
+
+    return Promise.resolve()
+      .then(() => this._loadSnapshot())
+      .then(() => this._subscribeToLog())
+      .then(() => this._loadingFinished())
       .then(() => this);
   }
 
@@ -184,45 +185,48 @@ class UnitInstance {
       .then(snapshot => {
         debug('fetched', {id: this.id, snapshot});
         this._state = snapshot.state;
-        this._head = snapshot.head;
+        this._heads = snapshot.heads;
       })
       .catch(()=>null)
   }
 
-  _attachToBus() {
-    debug('attach', {id: this.id, head: this._head});
-    return this._bus.attach(this);
+  _subscribeToLog() {
+    debug('subscribe', {key: this._key, heads: this._heads});
+    return this._log.subscribe(this._key, this._heads, record => this.apply(record));
+  }
+
+  _loadingFinished() {
+    this._loaded = true;
+    this._onLoad.forEach(l => l());
   }
 
   unload() {
-    this._bus.detach(this);
+    this._loaded = false;
+    this._log.cancel(this._key);
   }
 
   takeSnapshot() {
-    debug('store', {key: this._key, version: this._definition.version, head: this._head});
-    this._snapshots.store(this._key, this._definition.version, new Snapshot(this._head, this._state));
+    debug('store', {key: this._key, version: this._definition.version, heads: this._heads});
+    this._snapshots.store(this._key, this._definition.version, new Snapshot(this._heads, this._state));
   }
 
-  apply(message) {
-    if (message.offset <= this._head) return;
+  apply(record) {
+    if (record.sequence <= this._heads[record.streamId]) return;
 
-    (this._definition._appliers[message.event.name] || []).forEach(a => this._invoke(a, message));
-  }
+    debug('apply', {key: this._key, record});
+    (this._definition._appliers[record.event.name] || []).forEach(applier =>
+      applier.call(this._state, record.event.payload, record.event));
 
-  _invoke(applier, message) {
-    if (applier.domain != message.domain) return;
-
-    debug('apply', {id: this.id, message});
-    applier.applier.call(this._state, message.event);
-    this._head = message.offset;
+    this._heads[record.streamId] = record.sequence;
   }
 }
 
 class UnitRepository {
-  constructor(bus, snapshots, strategy) {
-    this._bus = bus;
+  constructor(log, snapshots, strategy) {
+    this._log = log;
     this._snapshots = snapshots;
     this._strategy = strategy;
+
     this._definitions = [];
     this._instances = {};
   }
@@ -231,32 +235,32 @@ class UnitRepository {
     this._definitions.push(definition);
   }
 
-  getInstance(request) {
-    let handlers = this._definitions.filter(d => d.canHandle(request));
+  getInstance(message) {
+    let handlers = this._definitions.filter(d => d.canHandle(message));
 
     if (handlers.length == 0) {
-      throw new Error(`Cannot handle [${request.name}]`)
+      throw new Error(`Cannot handle [${message.name}]`)
     } else if (handlers.length > 1) {
-      throw new Error(`Too many handlers for [${request.name}]: [${handlers.map(u => u.name).join(', ')}]`)
+      throw new Error(`Too many handlers for [${message.name}]: [${handlers.map(u => u.name).join(', ')}]`)
     }
 
     var unitDefinition = handlers[0];
-    var unitId = unitDefinition.mapToId(request);
+    var unitId = unitDefinition.mapToId(message);
 
     if (!unitId) {
-      throw new Error(`Cannot map [${request.name}]`)
+      throw new Error(`Cannot map [${message.name}]`)
     }
 
     return this._getOrLoad(unitDefinition, unitId)
       .then(instance => {
-        this._strategy.onAccess(this, instance);
+        this._strategy.onAccess(instance, this);
         return instance
       });
   }
 
   _getOrLoad(definition, unitId) {
     if (this._instances[unitId]) {
-      return Promise.resolve(this._instances[unitId]);
+      return this._instances[unitId].load();
     }
 
     debug('load', {id: unitId});
@@ -269,13 +273,13 @@ class UnitRepository {
 
   remove(unit) {
     debug('unload', {id: unit.id});
-    unit.unload();
     delete this._instances[unit.id];
+    unit.unload();
   }
 }
 
 class RepositoryStrategy {
-  onAccess(repository, unit) {
+  onAccess(unit, repository) {
   }
 }
 
@@ -307,33 +311,28 @@ class Aggregate extends Unit {
 }
 
 class AggregateInstance extends UnitInstance {
-  constructor(id, definition, store, snapshots, domain) {
-    super(id, definition, store, snapshots);
-    this._domain = domain;
+  constructor(id, definition, log, snapshots, store) {
+    super(id, definition, log, snapshots);
     this._store = store;
-    this._queue = queue({concurrency: 1, autostart: true})
   }
 
-  _invoke(applier, message) {
-    if (applier.domain(message.event) != this.id) return;
-    return super._invoke({...applier, domain: this._domain}, message);
+  apply(record) {
+    if (record.streamId != this.id) return;
+    return super.apply(record);
   }
 
   execute(command) {
     debug('execute', {command, id: this.id});
-    return new Promise((y, n) =>
-      this._queue.push(() => this._execute(command).then(y).catch(n)));
+    return this._execute(command);
   }
 
   _execute(command, tries = 0) {
-    let events = this._definition._executers[command.name].call(this._state, command);
+    let events = this._definition._executers[command.name].call(this._state, command.payload);
 
-    if (!Array.isArray(events)) {
-      return Promise.resolve();
-    }
+    if (!Array.isArray(events)) return Promise.resolve();
 
-    debug('record', {id: this.id, revision: this._head, events});
-    return this._store.record(events, this.id, this._head, command.traceId)
+    debug('record', {id: this.id, sequence: this._heads[this.id], events});
+    return this._store.record(events, this.id, this._heads[this.id], command.traceId)
       .catch(e => {
         if (tries > 3) throw e;
         return this._execute(command, tries + 1)
@@ -342,14 +341,13 @@ class AggregateInstance extends UnitInstance {
 }
 
 class AggregateRepository extends UnitRepository {
-  constructor(domain, store, snapshots, strategy) {
-    super(store, snapshots, strategy);
-    this._domain = domain;
+  constructor(log, snapshots, strategy, store) {
+    super(log, snapshots, strategy);
     this._store = store;
   }
 
   _createInstance(definition, aggregateId) {
-    return new AggregateInstance(aggregateId, definition, this._store, this._snapshots, this._domain);
+    return new AggregateInstance(aggregateId, definition, this._log, this._snapshots, this._store);
   }
 }
 
@@ -377,37 +375,39 @@ class Projection extends Unit {
 
 class ProjectionInstance extends UnitInstance {
   respondTo(query) {
-    return this._definition._responders[query.name].call(this._state, query);
+    return this._definition._responders[query.name].call(this._state, query.payload);
   }
 }
 
 class ProjectionRepository extends UnitRepository {
   _createInstance(definition, projectionId) {
-    return new ProjectionInstance(projectionId, definition, this._bus, this._snapshots);
+    return new ProjectionInstance(projectionId, definition, this._log, this._snapshots);
   }
 }
 
 //------ SNAPSHOT -----//
 
 class SnapshotStore {
+  //noinspection JSUnusedLocalSymbols
   store(key, version, snapshot) {
     return Promise.resolve()
   }
 
+  //noinspection JSUnusedLocalSymbols
   fetch(key, version) {
     return Promise.reject()
   }
 }
 
 class Snapshot {
-  constructor(head, state) {
-    this.head = head;
+  constructor(heads, state) {
+    this.heads = heads;
     this.state = state;
   }
 }
 
 module.exports = {
-  Domain,
+  Module,
   Command,
   Query,
   Event,
@@ -416,7 +416,7 @@ module.exports = {
   EventStore,
 
   Message,
-  EventBus,
+  EventLog,
 
   Unit,
   UnitInstance,

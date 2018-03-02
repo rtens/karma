@@ -192,6 +192,6 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
 
 module.exports = {
   EventStore: FlatFileEventStore,
-  EventBus: FlatFileEventStore,
+  EventLog: FlatFileEventStore,
   SnapshotStore: FlatFileSnapshotStore
 };

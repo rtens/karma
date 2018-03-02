@@ -1,47 +1,34 @@
 const karma = require('../../src/karma');
 
 class FakeEventStore extends karma.EventStore {
-  constructor(domain) {
-    super(domain);
-    this.messages = [];
+  constructor() {
+    super();
     this.recorded = [];
-    this.attached = [];
-    this.detached = [];
   }
 
-  record(events, aggregateId, onRevision, traceId) {
-    this.recorded.push({events, aggregateId, onRevision, traceId});
+  record(events, streamId, onSequence, traceId) {
+    this.recorded.push({events, streamId, onSequence, traceId});
     return Promise.resolve()
-  }
-
-  attach(unit) {
-    this.attached.push({unitId: unit.id});
-    this.messages.forEach(m => unit.apply(m));
-    return Promise.resolve()
-  }
-
-  detach(unit) {
-    this.detached.push({unitId: unit.id});
   }
 }
 
-class FakeEventBus extends karma.EventBus {
-  constructor(domain) {
-    super(domain);
-    this.messages = [];
-    this.recorded = [];
-    this.attached = [];
-    this.detached = [];
+class FakeEventLog extends karma.EventLog {
+  constructor() {
+    super();
+    this.records = [];
+    this.subscribed = [];
+    this.cancelled = [];
   }
 
-  attach(unit) {
-    this.attached.push({unitId: unit.id});
-    this.messages.forEach(m => unit.apply(m));
-    return Promise.resolve()
+  subscribe(subscriptionId, streamHeads, subscriber) {
+    this.subscribed.push({subscriptionId, streamHeads: Object.assign({}, streamHeads)});
+    this.records.forEach(m => subscriber(m));
+    return Promise.resolve();
   }
 
-  detach(unit) {
-    this.detached.push({unitId: unit.id});
+  cancel(subscriptionId) {
+    this.cancelled.push({subscriptionId});
+    return Promise.resolve();
   }
 }
 
@@ -67,6 +54,6 @@ class FakeSnapshotStore extends karma.SnapshotStore {
 
 module.exports = {
   EventStore: FakeEventStore,
-  EventBus: FakeEventBus,
+  EventLog: FakeEventLog,
   SnapshotStore: FakeSnapshotStore
 };
