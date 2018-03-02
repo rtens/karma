@@ -3,146 +3,151 @@ const path = require('path');
 const lockFile = require('lockfile');
 const chokidar = require('chokidar');
 const Promise = require("bluebird");
-const queue = require('queue');
 
 const karma = require('../karma');
 
 Promise.promisifyAll(fs);
 Promise.promisifyAll(lockFile);
 
+function _mkdir(dir) {
+  try {
+    fs.mkdirSync(dir)
+  } catch (err) {
+    if (err.code !== 'EEXIST') throw err
+  }
+}
+
 class FlatFileEventStore extends karma.EventStore {
-  constructor(domain, baseDir) {
+  constructor(baseDir) {
     super();
-    this._domain = domain;
-    this._attached = {};
-    this._notified = {};
-    this._notificationQueue = queue({concurrency: 1, autostart: true});
+    this._paths = {
+      base: baseDir + '/',
+      records: baseDir + '/records/',
+      write: streamId => baseDir + '/' + streamId + '.write',
+      lock: streamId => baseDir + '/' + streamId + '.lock',
+    };
 
-    this._paths = {base: baseDir};
-    this._paths.domain = this._paths.base + '/' + domain;
-    this._paths.write = this._paths.domain + '/write';
-    this._paths.lock = this._paths.domain + '/write.lock';
-    this._paths.records = this._paths.domain + '/records';
-
-    ['base', 'domain', 'records'].forEach(path => FlatFileEventStore._mkdir(this._paths[path]));
-
-    this._watcher = chokidar.watch(this._paths.records);
-    this._watcher.on('add', (file) =>
-      this._notificationQueue.push(() => this._notifyAllUnits(file)))
+    _mkdir(baseDir);
+    _mkdir(this._paths.records);
   }
 
-  _notifyAllUnits(file) {
-    return Promise.all(Object.values(this._attached)
-      .map(unit => this._notifyUnit(file, unit)))
-  }
+  record(events, streamId, onSequence, traceId) {
+    onSequence = onSequence || 0;
 
-  _notifyUnit(file, unit) {
-    if (file in this._notified[unit.id]) {
-      return Promise.resolve();
-    }
-    this._notified[unit.id][file] = true;
-
-    return fs.readFileAsync(file)
-
-      .then(content => JSON.parse(content))
-
-      .then(record => unit.apply(new karma.Message(record.event, this._domain, record.revision)));
-  }
-
-  record(events, aggregateId, onRevision, traceId) {
     return Promise.resolve()
-      .then(() => this._acquireLock())
-      .then(() => this._readWriteFile())
-      .then(write => this._guardHeads(write, aggregateId, onRevision))
-      .then(write => this._writeEvents(write, events, traceId))
-      .then(write => this._writeWriteFile(write, events, aggregateId))
-      .then(() => this._releaseLock())
-      .catch(e => this._releaseLock().then(() => Promise.reject(e)))
+      .then(() => this._acquireLock(streamId))
+      .then(() => this._guardSequence(streamId, onSequence))
+      .then(() => this._writeRecords(events, streamId, onSequence, traceId))
+      .then(() => this._writeWriteFile(streamId, onSequence + events.length))
+      .then(() => this._releaseLock(streamId))
+      .catch(e => this._releaseLock(streamId).then(() => Promise.reject(e)))
       .then(() => this)
   }
 
-  _acquireLock() {
-    return lockFile.lockAsync(this._paths.lock, {wait: 100, pollPeriod: 10})
+  _acquireLock(streamId) {
+    return lockFile.lockAsync(this._paths.lock(streamId), {wait: 100, pollPeriod: 10})
       .catch(e => Promise.reject(new Error('Locked')))
   }
 
-  _releaseLock() {
-    return lockFile.unlockAsync(this._paths.lock)
+  _releaseLock(streamId) {
+    return lockFile.unlockAsync(this._paths.lock(streamId))
   }
 
-  _readWriteFile() {
-    return fs.readFileAsync(this._paths.write)
-      .then(writeContent => JSON.parse(writeContent))
-      .catch(() => ({revision: 0, heads: {}}))
+  _guardSequence(streamId, expectedSequence) {
+    return fs.readFileAsync(this._paths.write(streamId)).then(JSON.parse)
+      .catch(() => ({sequence: 0}))
+      .then(({sequence}) => sequence != expectedSequence
+        ? Promise.reject(new Error('Out of sequence'))
+        : Promise.resolve())
   }
 
-  _guardHeads(write, sequenceId, headSequence) {
-    if (sequenceId && sequenceId in write.heads && write.heads[sequenceId] != headSequence) {
-      throw new Error('Head occupied.');
-    }
-    return write;
+  _writeRecords(events, streamId, onSequence, traceId) {
+    var files = events
+      .map((event, i) => new karma.Record(event, streamId, onSequence + 1 + i, traceId))
+      .map(record => ({
+        path: this._paths.records + streamId + '-' + record.sequence,
+        content: JSON.stringify(record, null, 2)
+      }));
+
+    return Promise.each(files, file => fs.writeFileAsync(file.path, file.content))
   }
 
-  _writeEvents(write, events, traceId) {
-    var contents = events
-      .map((event, i) => new karma.Record(event, write.revision + i + 1, traceId))
-      .map(record => ({record: JSON.stringify(record, null, 2), revision: record.revision}));
-
-    return Promise.each(contents, content => fs.writeFileAsync(this._paths.records + '/' + content.revision, content.record))
-      .then(() => write)
+  _writeWriteFile(streamId, sequence) {
+    return fs.writeFileAsync(this._paths.write(streamId), JSON.stringify({sequence}, null, 2));
   }
+}
 
-  _writeWriteFile(write, events, sequenceId) {
-    write = {
-      revision: write.revision + events.length,
-      heads: !sequenceId
-        ? write.heads
-        : {...write.heads, [sequenceId]: write.revision + events.length}
-    };
-
-    return fs.writeFileAsync(this._paths.write, JSON.stringify(write, null, 2));
-  }
-
-  attach(aggregate) {
-    this._notified[aggregate.id] = this._notified[aggregate.id] || {};
-
-    return fs.readdirAsync(this._paths.records)
-
-      .then(files => files.sort((a, b) => parseInt(a) - parseInt(b)))
-
-      .then(files => aggregate._head ? files.filter(f => parseInt(f) > aggregate._head) : files)
-
-      .then(files => Promise.each(files, file => this._notifyUnit(this._paths.records + '/' + file, aggregate), {concurrency: 1}))
-
-      .then(() => this._attached[aggregate.id] = aggregate)
-
-      .then(() => this)
-  }
-
-  detach(aggreagte) {
-    delete this._notified[aggreagte.id];
-    delete this._attached[aggreagte.id];
-    return Promise.resolve(this);
-  }
-
-  close() {
-    return new Promise(y => setTimeout(() => this._close(y), 100));
-  }
-
-  _close(y) {
-    if (this._notificationQueue.length == 0) {
-      return y(this._watcher.close());
-    }
-    setTimeout(() => this._close(y), 100)
-  }
-
-  static _mkdir(dir) {
-    try {
-      fs.mkdirSync(dir)
-    } catch (err) {
-      if (err.code !== 'EEXIST') throw err
-    }
-  }
+class FlatFileEventLog extends karma.EventLog {
+  // constructor(domain, baseDir) {
+  //   super();
+  //   this._domain = domain;
+  //   this._attached = {};
+  //   this._notified = {};
+  //   this._notificationQueue = queue({concurrency: 1, autostart: true});
+  //
+  //   this._paths = {base: baseDir};
+  //   this._paths.domain = this._paths.base + '/' + domain;
+  //   this._paths.write = this._paths.domain + '/write';
+  //   this._paths.lock = this._paths.domain + '/write.lock';
+  //   this._paths.records = this._paths.domain + '/records';
+  //
+  //   ['base', 'domain', 'records'].forEach(path => FlatFileEventStore._mkdir(this._paths[path]));
+  //
+  //   this._watcher = chokidar.watch(this._paths.records);
+  //   this._watcher.on('add', (file) =>
+  //     this._notificationQueue.push(() => this._notifyAllUnits(file)))
+  // }
+  //
+  // _notifyAllUnits(file) {
+  //   return Promise.all(Object.values(this._attached)
+  //     .map(unit => this._notifyUnit(file, unit)))
+  // }
+  //
+  // _notifyUnit(file, unit) {
+  //   if (file in this._notified[unit.id]) {
+  //     return Promise.resolve();
+  //   }
+  //   this._notified[unit.id][file] = true;
+  //
+  //   return fs.readFileAsync(file)
+  //
+  //     .then(content => JSON.parse(content))
+  //
+  //     .then(record => unit.apply(new karma.Message(record.event, this._domain, record.revision)));
+  // }
+  //
+  // attach(aggregate) {
+  //   this._notified[aggregate.id] = this._notified[aggregate.id] || {};
+  //
+  //   return fs.readdirAsync(this._paths.records)
+  //
+  //     .then(files => files.sort((a, b) => parseInt(a) - parseInt(b)))
+  //
+  //     .then(files => aggregate._head ? files.filter(f => parseInt(f) > aggregate._head) : files)
+  //
+  //     .then(files => Promise.each(files, file => this._notifyUnit(this._paths.records + '/' + file, aggregate), {concurrency: 1}))
+  //
+  //     .then(() => this._attached[aggregate.id] = aggregate)
+  //
+  //     .then(() => this)
+  // }
+  //
+  // detach(aggreagte) {
+  //   delete this._notified[aggreagte.id];
+  //   delete this._attached[aggreagte.id];
+  //   return Promise.resolve(this);
+  // }
+  //
+  // close() {
+  //   return new Promise(y => setTimeout(() => this._close(y), 100));
+  // }
+  //
+  // _close(y) {
+  //   if (this._notificationQueue.length == 0) {
+  //     return y(this._watcher.close());
+  //   }
+  //   setTimeout(() => this._close(y), 100)
+  // }
 }
 
 class FlatFileSnapshotStore extends karma.SnapshotStore {
@@ -189,7 +194,7 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
 }
 
 module.exports = {
-  EventStore: FlatFileEventStore,
-  EventLog: FlatFileEventStore,
-  SnapshotStore: FlatFileSnapshotStore
+  EventLog: FlatFileEventLog,
+  SnapshotStore: FlatFileSnapshotStore,
+  EventStore: FlatFileEventStore
 };
