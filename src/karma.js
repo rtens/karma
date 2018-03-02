@@ -4,6 +4,7 @@ const crypto = require('crypto');
 
 class Module {
   constructor(eventLog, snapshotStore, repositoryStrategy, eventStore) {
+    this._strategy = repositoryStrategy;
     this._aggregates = new AggregateRepository(eventLog, snapshotStore, repositoryStrategy, eventStore);
     this._projections = new ProjectionRepository(eventLog, snapshotStore, repositoryStrategy);
   }
@@ -24,7 +25,8 @@ class Module {
     return this._aggregates
       .getInstance(command)
       .then(instance =>
-        instance.execute(command))
+        instance.execute(command)
+          .then(() => this._strategy.onAccess(instance, this._aggregates)))
       .then(() => this)
   }
 
@@ -32,7 +34,22 @@ class Module {
     return this._projections
       .getInstance(query)
       .then(instance =>
-        instance.respondTo(query))
+        instance.respondTo(query)
+          .then(response => {
+            this._strategy.onAccess(instance, this._projections);
+            return response
+          }))
+  }
+
+  subscribeTo(query, subscriber) {
+    return this._projections
+      .getInstance(query)
+      .then(instance =>
+        instance.subscribeTo(query, subscriber)
+          .then(subscription => {
+            this._strategy.onAccess(instance, this._aggregates);
+            return subscription;
+          }))
   }
 }
 
@@ -142,11 +159,11 @@ class Unit {
 }
 
 class UnitInstance {
-  constructor(id, definition, bus, snapshots) {
+  constructor(id, definition, log, snapshots) {
     this.id = id;
 
     this._definition = definition;
-    this._log = bus;
+    this._log = log;
     this._snapshots = snapshots;
 
     this._heads = {};
@@ -222,10 +239,9 @@ class UnitInstance {
 }
 
 class UnitRepository {
-  constructor(log, snapshots, strategy) {
+  constructor(log, snapshots) {
     this._log = log;
     this._snapshots = snapshots;
-    this._strategy = strategy;
 
     this._definitions = [];
     this._instances = {};
@@ -251,11 +267,7 @@ class UnitRepository {
       throw new Error(`Cannot map [${message.name}]`)
     }
 
-    return this._getOrLoad(unitDefinition, unitId)
-      .then(instance => {
-        this._strategy.onAccess(instance, this);
-        return instance
-      });
+    return this._getOrLoad(unitDefinition, unitId);
   }
 
   _getOrLoad(definition, unitId) {
@@ -374,8 +386,35 @@ class Projection extends Unit {
 }
 
 class ProjectionInstance extends UnitInstance {
+  constructor(id, definition, log, snapshots) {
+    super(id, definition, log, snapshots);
+    this._subscriptions = [];
+    this._state = new Proxy(this._state, {
+      ['set']: (target, name, value) => {
+        target[name] = value;
+        this._subscriptions
+          .filter((subscription) => subscription.active)
+          .forEach(({query, subscriber}) => this.respondTo(query).then(subscriber));
+      }
+    })
+  }
+
   respondTo(query) {
-    return this._definition._responders[query.name].call(this._state, query.payload);
+    return Promise.resolve(this._definition._responders[query.name].call(this._state, query.payload));
+  }
+
+  subscribeTo(query, subscriber) {
+    var subscription = {query, subscriber, active: true};
+    this._subscriptions.push(subscription);
+    return this.respondTo(query).then(subscriber).then(() => ({
+      cancel: () => subscription.active = false
+    }));
+  }
+
+  unload() {
+    if (this._subscriptions.filter((subscription) => subscription.active).length == 0) {
+      super.unload()
+    }
   }
 }
 

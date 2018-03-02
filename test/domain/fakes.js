@@ -18,16 +18,23 @@ class FakeEventLog extends karma.EventLog {
     this.records = [];
     this.subscribed = [];
     this.cancelled = [];
+    this._subscriptions = {};
+  }
+
+  publish(record) {
+    Object.values(this._subscriptions).forEach(subscriber => subscriber(record));
   }
 
   subscribe(subscriptionId, streamHeads, subscriber) {
     this.subscribed.push({subscriptionId, streamHeads: Object.assign({}, streamHeads)});
     this.records.forEach(m => subscriber(m));
+    this._subscriptions[subscriptionId] = subscriber;
     return Promise.resolve();
   }
 
   cancel(subscriptionId) {
     this.cancelled.push({subscriptionId});
+    delete this._subscriptions[subscriptionId];
     return Promise.resolve();
   }
 }
