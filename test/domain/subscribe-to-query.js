@@ -41,9 +41,17 @@ describe('Subscribing to a Query', () => {
 
     let log = new fake.EventLog();
 
-    return Module({log})
+    let snapshots = new fake.SnapshotStore();
+    snapshots.snapshots = [{
+      key: 'Projection-One-foo',
+      version: 'v1',
+      snapshot: new k.Snapshot({}, {foods: 'snap '})
+    }];
+
+    return Module({log, snapshots})
 
       .add(new k.Projection('One')
+        .withVersion('v1')
         .initializing(function () {
           this.foods = ''
         })
@@ -58,7 +66,7 @@ describe('Subscribing to a Query', () => {
 
       .then(() => log.publish(new k.Record(new k.Event('food', 'one'))))
 
-      .then(() => responses.should.eql(['', 'one']))
+      .then(() => responses.should.eql(['snap ', 'snap one']))
   });
 
   it('does not send value if state has not changed', () => {

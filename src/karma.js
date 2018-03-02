@@ -389,14 +389,24 @@ class ProjectionInstance extends UnitInstance {
   constructor(id, definition, log, snapshots) {
     super(id, definition, log, snapshots);
     this._subscriptions = [];
-    this._state = new Proxy(this._state, {
+  }
+
+  _loadSnapshot() {
+    super._loadSnapshot()
+      .then(() => this._state = this._proxyState())
+      .then(() => this)
+  }
+
+  _proxyState() {
+    return new Proxy(this._state, {
       ['set']: (target, name, value) => {
+        console.log('set', name, value);
         target[name] = value;
         this._subscriptions
           .filter((subscription) => subscription.active)
           .forEach(({query, subscriber}) => this.respondTo(query).then(subscriber));
       }
-    })
+    });
   }
 
   respondTo(query) {
