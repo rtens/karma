@@ -93,7 +93,18 @@ class FlatFileEventLog extends karma.EventLog {
     this._notificationQueue = queue({concurrency: 1, autostart: true});
   }
 
-  replay(streamHeads, reader) {
+  subscribe(streamHeads, subscriber) {
+    if (!this._watcher) {
+      this._watcher = chokidar.watch(this._paths.records);
+      this._watcher.on('add', (file) =>
+      {
+        return this._notificationQueue.push(() =>
+          this._notifySubscribers(file, this._subscriptions.filter(s => s.active)))
+      })
+    }
+
+    let subscription = {subscriber, active: true, heads: {}};
+
     return fs.readdirAsync(this._paths.records)
 
       .then(files => files.map(f => ({
@@ -108,37 +119,22 @@ class FlatFileEventLog extends karma.EventLog {
 
       .then(files => files.map(file => this._paths.records + file.name))
 
-      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, [reader])))
+      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, [subscription])))
 
-      .then(() => this)
+      .then(() => this._subscriptions.push(subscription))
+
+      .then(() => ({
+          cancel: () => {
+            subscription.active = false;
+            if (this._subscriptions.filter(s => s.active).length == 0) {
+              return this._close();
+            }
+          }
+        })
+      )
   }
 
-  subscribe(subscriber) {
-    if (!this._watcher) {
-      this._watcher = chokidar.watch(this._paths.records);
-      this._watcher.on('add', (file) =>
-        this._notificationQueue.push(() =>
-          this._notifySubscribers(file, this._activeSubscriptions()
-            .map(s => s.subscriber))))
-    }
-
-    var subscription = {subscriber, active: true};
-    this._subscriptions.push(subscription);
-
-    return {cancel: () => {
-      subscription.active = false;
-      if (this._activeSubscriptions().length == 0) {
-        return this._close();
-      }
-    }}
-  }
-
-  _activeSubscriptions() {
-    return this._subscriptions
-      .filter(s => s.active);
-  }
-
-  _notifySubscribers(path, subscribers) {
+  _notifySubscribers(path, subscriptions) {
     return fs.readFileAsync(path).then(JSON.parse)
 
       .then(record => ({
@@ -147,7 +143,14 @@ class FlatFileEventLog extends karma.EventLog {
         })
       }))
 
-      .then(record => subscribers.forEach(subscriber => subscriber(record)));
+      .then(record => Promise.all(subscriptions.map(subscription => {
+        if (record.sequence <= subscription.heads[record.streamId]) {
+          return Promise.resolve()
+        }
+        subscription.heads[record.streamId] = record.sequence;
+
+        return subscription.subscriber(record)
+      })));
   }
 
   _close() {
