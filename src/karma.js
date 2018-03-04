@@ -248,6 +248,7 @@ class UnitInstance {
   }
 
   unload() {
+    debug('unload', {key: this._key});
     this._loaded = false;
     this._subscription.cancel();
   }
@@ -258,7 +259,7 @@ class UnitInstance {
   }
 
   apply(record) {
-    debug('apply', {key: this._key, record, heads: this._heads});
+    debug('apply', {key: this._key, heads: this._heads, record});
     if (record.sequence <= this._heads[record.streamId]) return;
 
     (this._definition._appliers[record.event.name] || []).forEach(applier =>
@@ -311,7 +312,6 @@ class UnitRepository {
   }
 
   remove(unit) {
-    debug('unload', {name: unit._definition.name, id: unit.id});
     if (this._instances[unit._definition.name]) {
       delete this._instances[unit._definition.name][unit.id];
     }

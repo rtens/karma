@@ -66,7 +66,7 @@ class FlatFileEventStore extends karma.EventStore {
     var files = events
       .map((event, i) => new karma.Record(event, streamId, onSequence + 1 + i, traceId))
       .map(record => ({
-        path: this._paths.records + streamId + '-' + record.sequence,
+        path: this._paths.records + streamId + '.' + record.sequence,
         content: JSON.stringify(record, null, 2)
       }));
 
@@ -89,20 +89,11 @@ class FlatFileEventLog extends karma.EventLog {
     _mkdir(baseDir);
     _mkdir(this._paths.records);
 
-    this._subscribers = {};
-    this._notified = {};
+    this._subscriptions = [];
     this._notificationQueue = queue({concurrency: 1, autostart: true});
   }
 
-  subscribe(subscriptionId, streamHeads, subscriber) {
-    this._notified[subscriptionId] = this._notified[subscriptionId] || {};
-
-    if (!this._watcher) {
-      this._watcher = chokidar.watch(this._paths.records);
-      this._watcher.on('add', (file) =>
-        this._notificationQueue.push(() => this._notifySubscribers(file, this._subscribers)))
-    }
-
+  replay(streamHeads, reader) {
     return fs.readdirAsync(this._paths.records)
 
       .then(files => files.map(f => ({
@@ -117,35 +108,46 @@ class FlatFileEventLog extends karma.EventLog {
 
       .then(files => files.map(file => this._paths.records + file.name))
 
-      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, {[subscriptionId]: subscriber})))
-
-      .then(() => this._subscribers[subscriptionId] = subscriber)
+      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, [reader])))
 
       .then(() => this)
+  }
+
+  subscribe(subscriber) {
+    if (!this._watcher) {
+      this._watcher = chokidar.watch(this._paths.records);
+      this._watcher.on('add', (file) =>
+        this._notificationQueue.push(() =>
+          this._notifySubscribers(file, this._activeSubscriptions()
+            .map(s => s.subscriber))))
+    }
+
+    var subscription = {subscriber, active: true};
+    this._subscriptions.push(subscription);
+
+    return {cancel: () => {
+      subscription.active = false;
+      if (this._activeSubscriptions().length == 0) {
+        return this._close();
+      }
+    }}
+  }
+
+  _activeSubscriptions() {
+    return this._subscriptions
+      .filter(s => s.active);
   }
 
   _notifySubscribers(path, subscribers) {
     return fs.readFileAsync(path).then(JSON.parse)
 
-      .then(record => ({...record, event: new Proxy(record.event, {
-        get: (target, name) => name == 'time' ? new Date(target[name]) : target[name]
-      })}))
+      .then(record => ({
+        ...record, event: new Proxy(record.event, {
+          get: (target, name) => name == 'time' ? new Date(target[name]) : target[name]
+        })
+      }))
 
-      .then(record => Object.keys(subscribers).forEach(id => {
-        if (path in this._notified[id]) return;
-        this._notified[id][path] = true;
-
-        subscribers[id](record)
-      }));
-  }
-
-  cancel(subscriptionId) {
-    delete this._subscribers[subscriptionId];
-    delete this._notified[subscriptionId];
-    if (Object.keys(this._subscribers).length == 0) {
-      return this._close();
-    }
-    return Promise.resolve();
+      .then(record => subscribers.forEach(subscriber => subscriber(record)));
   }
 
   _close() {

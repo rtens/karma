@@ -68,13 +68,13 @@ expressWs(app);
 app.post('/:command', (req, res) => {
   domain.execute(new karma.Command(req.params.command, req.body, Math.round(Math.random() * 1000000)))
     .then(() => res.send({success: true}))
-    .catch(e => res.send({error: e.Message}))
+    .catch(e => res.send({error: e.message}))
 });
 
 app.get('/:query', (req, res) => {
   domain.respondTo(new karma.Query(req.params.query, req.query.$ ? JSON.parse(req.query.$) : req.query))
     .then(response => res.send({data: response}))
-    .catch(e => res.send({error: e.Message}))
+    .catch(e => res.send({error: e.message}))
 });
 
 app.ws('/:query', function (ws, req) {

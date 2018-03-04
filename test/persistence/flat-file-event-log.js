@@ -19,7 +19,7 @@ describe('Flat file Event Log', () => {
     directory = os.tmpdir + '/karma3_' + Date.now() + Math.round(Math.random() * 1000);
   });
 
-  it('reads Records from files', () => {
+  it('replays Records from files', () => {
     let records = [];
     let log = new flatFile.EventLog(directory);
 
@@ -29,9 +29,7 @@ describe('Flat file Event Log', () => {
       fs.writeFileAsync(directory + '/records/one.2', JSON.stringify({event: {name: 'One'}}))
     ])
 
-      .then(() => log.subscribe('foo', {}, record => records.push(record.event.name)))
-
-      .then(() => log.cancel('foo'))
+      .then(() => log.replay({}, record => records.push(record.event.name)))
 
       .then(() => records.should.eql(['One', 'Two', 'Three']))
   });
@@ -42,9 +40,7 @@ describe('Flat file Event Log', () => {
 
     return fs.writeFileAsync(directory + '/records/two.3', JSON.stringify({event: {time: '2011-12-13T14:15:16Z'}}))
 
-      .then(() => log.subscribe('foo', {}, record => times.push(record.event.time.getTime())))
-
-      .then(() => log.cancel('foo'))
+      .then(() => log.replay({}, record => times.push(record.event.time.getTime())))
 
       .then(() => times.should.eql([1323785716000]))
   });
@@ -60,9 +56,7 @@ describe('Flat file Event Log', () => {
       fs.writeFileAsync(directory + '/records/two.14', JSON.stringify({event: {name: 'Two'}}))
     ])
 
-      .then(() => log.subscribe('foo', {one: 11, two: 13}, record => records.push(record.event.name)))
-
-      .then(() => log.cancel('foo'))
+      .then(() => log.replay({one: 11, two: 13}, record => records.push(record.event.name)))
 
       .then(() => records.should.eql(['One', 'Two']))
   });
@@ -71,63 +65,18 @@ describe('Flat file Event Log', () => {
     let records = [];
     let log = new flatFile.EventLog(directory);
 
+    let subscription;
     return Promise.resolve()
 
-      .then(() => log.subscribe('foo', {}, record => records.push(record.event.name)))
+      .then(() => subscription = log.subscribe(record => records.push(record.event.name)))
 
       .then(() => fs.writeFileAsync(directory + '/records/one-42', JSON.stringify({event: {name: 'One'}})))
 
       .then(() => new Promise(y => setTimeout(y, 100)))
 
-      .then(() => log.cancel('foo'))
+      .then(() => subscription.cancel())
 
       .then(() => records.should.eql(['One']))
-  });
-
-  it('de-duplicates notifications', () => {
-    let records = [];
-    let log = new flatFile.EventLog(directory);
-
-    return log
-
-      .subscribe('foo', {}, record => records.push('foo ' + record.event.name))
-
-      .then(() => fs.writeFileAsync(directory + '/records/one-42', JSON.stringify({event: {name: 'One'}})))
-
-      .then(() => new Promise(y => setTimeout(y, 100)))
-
-      .then(() => fs.unlinkAsync(directory + '/records/one-42'))
-
-      .then(() => log.subscribe('bar', {}, record => records.push('bar ' + record.event.name)))
-
-      .then(() => new Promise(y => setTimeout(y, 100)))
-
-      .then(() => fs.writeFileAsync(directory + '/records/one-42', JSON.stringify({event: {name: 'Two'}})))
-
-      .then(() => new Promise(y => setTimeout(y, 100)))
-
-      .then(() => log.cancel('foo'))
-
-      .then(() => log.cancel('bar'))
-
-      .then(() => records.should.eql(['foo One', 'bar Two']))
-  });
-
-  it('resets de-duplication on cancellation', () => {
-    let records = [];
-    let log = new flatFile.EventLog(directory);
-
-    return fs.writeFileAsync(directory + '/records/one-42', JSON.stringify({event: {name: 'One'}}))
-
-      .then(() => log.subscribe('foo', {}, record => records.push('a ' + record.event.name)))
-
-      .then(() => log.cancel('foo'))
-
-      .then(() => log.subscribe('foo', {}, record => records.push('b ' + record.event.name)))
-
-      .then(() => log.cancel('foo'))
-
-      .then(() => records.should.eql(['a One', 'b One']))
   });
 
   it('keeps order of recorded Events', () => {
@@ -140,9 +89,8 @@ describe('Flat file Event Log', () => {
     let records = [];
     let log = new flatFile.EventLog(directory);
 
-    return log
-
-      .subscribe('foo', {}, record => records.push(record.event.name))
+    let subscription;
+    return Promise.resolve(subscription = log.subscribe(record => records.push(record.event.name)))
 
       .then(() => fs.writeFileAsync(directory + '/records/one-1', JSON.stringify({event: {name: 'One'}})))
 
@@ -152,20 +100,18 @@ describe('Flat file Event Log', () => {
 
       .then(() => new Promise(y => setTimeout(y, 100)))
 
-      .then(() => log.cancel('foo'))
+      .then(() => subscription.cancel())
 
       .then(() => records.should.eql(['One', 'Two']))
   });
 
-  it('stops notifying about Events', () => {
+  it('stops notifying when cancelled', () => {
     let records = [];
     let log = new flatFile.EventLog(directory);
 
-    return log
+    return Promise.resolve(log.subscribe(record => records.push(record.event.name)))
 
-      .subscribe('foo', {}, record => records.push(record.event.name))
-
-      .then(() => log.cancel('foo'))
+      .then(subscription => subscription.cancel('foo'))
 
       .then(() => fs.writeFileAsync(directory + '/records/one-42', JSON.stringify({event: {name: 'One'}})))
 
@@ -178,19 +124,18 @@ describe('Flat file Event Log', () => {
     let records = [];
     let log = new flatFile.EventLog(directory);
 
-    return log
+    let subscription;
+    return Promise.resolve(subscription = log.subscribe(record => records.push(record.event.name)))
 
-      .subscribe('foo', {}, record => records.push(record.event.name))
+      .then(() => subscription.cancel('foo'))
 
-      .then(() => log.cancel('foo'))
-
-      .then(() => log.subscribe('foo', {}, record => records.push(record.event.name)))
+      .then(() => subscription = log.subscribe(record => records.push(record.event.name)))
 
       .then(() => fs.writeFileAsync(directory + '/records/one-42', JSON.stringify({event: {name: 'One'}})))
 
       .then(() => new Promise(y => setTimeout(y, 200)))
 
-      .then(() => log.cancel('foo'))
+      .then(() => subscription.cancel('foo'))
 
       .then(() => records.should.eql(['One']))
   });
