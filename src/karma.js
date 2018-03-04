@@ -12,8 +12,8 @@ class Module {
     this._sagas = new SagaRepository(eventLog, snapshotStore, this);
 
     this._subscription = this._log.subscribe(record => this.reactTo(record));
-    this._aggregates.add(sagaLock);
-    this._aggregates.add(sagaFailures);
+    this._aggregates.add(new SagaLockAggregate());
+    this._aggregates.add(new SagaFailuresAggregate());
   }
 
   add(unit) {
@@ -588,36 +588,45 @@ class SagaRepository extends UnitRepository {
   }
 }
 
-let sagaLock = new Aggregate('_SagaLock')
-  .initializing(function () {
-    this.locked = {};
-  })
+class SagaLockAggregate extends Aggregate {
+  constructor() {
+    super('_SagaLock');
 
-  .executing('_lock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
-    if (this.locked[JSON.stringify({streamId, sequence})]) {
-      throw new Error('Locked');
-    }
-    return [new Event('_saga-reaction-locked', {sagaKey, streamId, sequence})]
-  })
+    this.initializing(function () {
+      this.locked = {};
+    })
 
-  .executing('_unlock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
-    return [new Event('_saga-reaction-unlocked', {sagaKey, streamId, sequence})]
-  })
+      .executing('_lock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
+        if (this.locked[JSON.stringify({streamId, sequence})]) {
+          throw new Error('Locked');
+        }
+        return [new Event('_saga-reaction-locked', {sagaKey, streamId, sequence})]
+      })
 
-  .applying('_saga-reaction-locked', function ({streamId, sequence}) {
-    //noinspection JSUnusedAssignment
-    this.locked[JSON.stringify({streamId, sequence})] = true;
-  })
+      .executing('_unlock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
+        return [new Event('_saga-reaction-unlocked', {sagaKey, streamId, sequence})]
+      })
 
-  .applying('_saga-reaction-unlocked', function ({streamId, sequence}) {
-    delete this.locked[JSON.stringify({streamId, sequence})];
-  });
+      .applying('_saga-reaction-locked', function ({streamId, sequence}) {
+        //noinspection JSUnusedAssignment
+        this.locked[JSON.stringify({streamId, sequence})] = true;
+      })
 
-let sagaFailures = new Aggregate('_SagaFailures')
+      .applying('_saga-reaction-unlocked', function ({streamId, sequence}) {
+        delete this.locked[JSON.stringify({streamId, sequence})];
+      });
+  }
+}
 
-  .executing('_mark-saga-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, errors}) {
-    return [new Event('_saga-reaction-failed', {sagaId, sagaKey, record, errors})]
-  });
+class SagaFailuresAggregate extends Aggregate {
+  constructor() {
+    super('_SagaFailures');
+
+    this.executing('_mark-saga-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, errors}) {
+        return [new Event('_saga-reaction-failed', {sagaId, sagaKey, record, errors})]
+      });
+  }
+}
 
 //------ SNAPSHOT -----//
 
