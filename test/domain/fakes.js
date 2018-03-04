@@ -16,26 +16,25 @@ class FakeEventLog extends karma.EventLog {
   constructor() {
     super();
     this.records = [];
-    this.subscribed = [];
-    this.cancelled = [];
-    this._subscriptions = {};
+    this.replayed = [];
+    this.subscriptions = [];
   }
 
   publish(record) {
-    Object.values(this._subscriptions).forEach(subscriber => subscriber(record));
+    return Promise.all(Object.values(this.subscriptions).map(s => s.subscriber(record)));
   }
 
-  subscribe(subscriptionId, streamHeads, subscriber) {
-    this.subscribed.push({subscriptionId, streamHeads: Object.assign({}, streamHeads)});
-    this.records.forEach(m => subscriber(m));
-    this._subscriptions[subscriptionId] = subscriber;
+  replay(streamHeads, reader) {
+    this.replayed.push({streamHeads: Object.assign({}, streamHeads)});
+    this.records.forEach(m => reader(m));
     return Promise.resolve();
   }
 
-  cancel(subscriptionId) {
-    this.cancelled.push({subscriptionId});
-    delete this._subscriptions[subscriptionId];
-    return Promise.resolve();
+  subscribe(subscriber) {
+    let subscription = {subscriber, active: true};
+    this.subscriptions.push(subscription);
+
+    return {cancel: () => subscription.active = false}
   }
 }
 
@@ -54,7 +53,7 @@ class FakeSnapshotStore extends karma.SnapshotStore {
   fetch(key, version) {
     this.fetched.push({key, version});
     var found = this.snapshots.find(s =>
-      JSON.stringify(s.key) == JSON.stringify(key) && s.version == version);
+    JSON.stringify(s.key) == JSON.stringify(key) && s.version == version);
     return found ? Promise.resolve(found.snapshot) : Promise.reject()
   }
 }

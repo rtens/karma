@@ -29,11 +29,11 @@ describe('Executing a Command', () => {
       deps.store || new k.EventStore());
 
   it('fails if no executer is defined', () => {
-    (() => Module()
+    return Module()
 
-      .execute(new k.Command('Foo')))
+      .execute(new k.Command('Foo'))
 
-      .should.throw(Error, 'Cannot handle [Foo]')
+      .should.be.rejectedWith(Error, 'Cannot handle Command [Foo]')
   });
 
   it('fails if an executer is defined twice in the same Aggregate', () => {
@@ -55,17 +55,17 @@ describe('Executing a Command', () => {
   });
 
   it('fails if an executer is defined twice across Aggregate', () => {
-    (() => Module()
+    return Module()
 
       .add(new k.Aggregate('One')
-        .executing('Foo'))
+        .executing('Foo', ()=>'foo'))
 
       .add(new k.Aggregate('Two')
-        .executing('Foo'))
+        .executing('Foo', ()=>'foo'))
 
-      .execute(new k.Command('Foo')))
+      .execute(new k.Command('Foo'))
 
-      .should.throw(Error, 'Too many handlers for [Foo]: [One, Two]')
+      .should.be.rejectedWith(Error, 'Too many handlers for Command [Foo]')
   });
 
   it('fails if the Command cannot be mapped to an Aggregate', () => {
@@ -198,7 +198,7 @@ describe('Executing a Command', () => {
       .should.not.be.rejected
   });
 
-  it('reconstitutes the Aggregate from Events', () => {
+  it('reconstitutes the Aggregate from existing Events', () => {
     let log = new fake.EventLog();
     log.records = [
       new k.Record(new k.Event('bard', 'one'), 'foo', 21),
@@ -236,8 +236,7 @@ describe('Executing a Command', () => {
         traceId: undefined
       }]))
 
-      .then(() => log.subscribed.should.eql([{
-        subscriptionId: 'Aggregate-One-foo',
+      .then(() => log.replayed.should.eql([{
         streamHeads: {}
       }]))
   });
@@ -273,8 +272,7 @@ describe('Executing a Command', () => {
         traceId: undefined
       }]))
 
-      .then(() => log.subscribed.should.eql([{
-        subscriptionId: 'Aggregate-One-foo',
+      .then(() => log.replayed.should.eql([{
         streamHeads: {}
       }]))
   });
@@ -323,8 +321,7 @@ describe('Executing a Command', () => {
         version: 'v1',
       }]))
 
-      .then(() => log.subscribed.should.eql([{
-        subscriptionId: 'Aggregate-One-foo',
+      .then(() => log.replayed.should.eql([{
         streamHeads: {foo: 21}
       }]))
   });
@@ -333,12 +330,12 @@ describe('Executing a Command', () => {
     let history = [];
     let wait = 10;
     let log = new (class extends k.EventLog {
-      subscribe(subscriptionId, streamHeads, subscriber) {
+      replay(streamHeads, reader) {
         history.push('loading');
         return new Promise(y => {
           setTimeout(() => {
             history.push('loaded');
-            y(super.subscribe(subscriptionId, streamHeads, subscriber))
+            y(super.replay(streamHeads, reader))
           }, wait);
           wait = 0;
         });
@@ -402,7 +399,7 @@ describe('Executing a Command', () => {
 
       .then(() => snapshots.fetched.length.should.equal(1))
 
-      .then(() => log.subscribed.length.should.equal(1))
+      .then(() => log.replayed.length.should.equal(1))
 
       .then(() => store.recorded.map(r => r.events).should.eql([
         [new k.Event('food', 'a one')],
@@ -528,6 +525,62 @@ describe('Executing a Command', () => {
       ]))
   });
 
+  it('subscribes the Aggregate to the EventLog', () => {
+    let log = new fake.EventLog();
+
+    let applied = [];
+
+    return Module({log})
+
+      .add(new k.Aggregate('One')
+        .applying('bard', (payload) => applied.push(payload))
+        .executing('Foo', $=>'foo', ()=>null))
+
+      .execute(new k.Command('Foo'))
+
+      .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+
+      .then(() => applied.should.eql(['one']))
+  });
+
+  it('subscribes to before replaying the EventLog', () => {
+    let history = [];
+    let log = new (class extends fake.EventLog {
+      replay(streamHeads, reader) {
+        this.publish(new k.Record(new k.Event('bard', 'two'), 'foo', 22));
+        this.publish(new k.Record(new k.Event('bard', 'tre'), 'foo', 23));
+
+        history.push('replay');
+        return super.replay(streamHeads, reader);
+      }
+
+      subscribe(subscriber) {
+        history.push('subscribe');
+        return super.subscribe(subscriber);
+      }
+    });
+    log.records = [
+      new k.Record(new k.Event('bard', 'one'), 'foo', 21),
+      new k.Record(new k.Event('bard', 'two'), 'foo', 22),
+    ];
+
+    let store = new fake.EventStore();
+
+    let applied = [];
+
+    return Module({log, store})
+
+      .add(new k.Aggregate('One')
+        .applying('bard', (payload) => applied.push(payload))
+        .executing('Foo', $=>'foo', ()=>null))
+
+      .execute(new k.Command('Foo'))
+
+      .then(() => history.should.eql(['subscribe', 'replay']))
+
+      .then(() => applied.should.eql(['one', 'two', 'tre']))
+  });
+
   it('can unload an Aggregate', () => {
     let log = new fake.EventLog();
     log.records = [
@@ -557,8 +610,8 @@ describe('Executing a Command', () => {
 
       .then(() => snapshots.fetched.length.should.equal(2))
 
-      .then(() => log.subscribed.length.should.equal(2))
+      .then(() => log.replayed.length.should.equal(2))
 
-      .then(() => log.cancelled.length.should.equal(2))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
   });
 });

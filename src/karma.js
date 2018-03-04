@@ -4,9 +4,14 @@ const crypto = require('crypto');
 
 class Module {
   constructor(eventLog, snapshotStore, repositoryStrategy, eventStore) {
+    this._log = eventLog;
     this._strategy = repositoryStrategy;
-    this._aggregates = new AggregateRepository(eventLog, snapshotStore, repositoryStrategy, eventStore);
-    this._projections = new ProjectionRepository(eventLog, snapshotStore, repositoryStrategy);
+
+    this._aggregates = new AggregateRepository(eventLog, snapshotStore, eventStore);
+    this._projections = new ProjectionRepository(eventLog, snapshotStore);
+    this._sagas = new SagaRepository(eventLog, snapshotStore, this);
+
+    this._subscription = null;
   }
 
   add(unit) {
@@ -16,6 +21,10 @@ class Module {
         break;
       case Projection.name:
         this._projections.add(unit);
+        break;
+      case Saga.name:
+        if (!this._subscription) this._onFirstSaga();
+        this._sagas.add(unit);
         break;
     }
     return this
@@ -50,6 +59,22 @@ class Module {
             this._strategy.onAccess(instance, this._aggregates);
             return subscription;
           }))
+  }
+
+  reactTo(record) {
+    return this._sagas
+      .getInstances(record.event)
+      .then(instances => Promise.all(
+        instances.map(instance => instance.reactTo(record)))
+        // .then(() => this._strategy.onAccess(instance, this._sagas))
+      )
+      .catch(e => console.error(e.stack))
+  }
+
+  _onFirstSaga() {
+    this._subscription = this._log.subscribe(record => this.reactTo(record));
+    this._aggregates.add(sagaLock);
+    this._aggregates.add(sagaFailures);
   }
 }
 
@@ -90,13 +115,13 @@ class Record {
 
 class EventLog {
   //noinspection JSUnusedLocalSymbols
-  subscribe(subscriptionId, streamHeads, subscriber) {
+  replay(streamHeads, reader) {
     return Promise.resolve()
   }
 
   //noinspection JSUnusedLocalSymbols
-  cancel(subscriptionId) {
-    return Promise.resolve()
+  subscribe(subscriber) {
+    return {cancel: () => null}
   }
 }
 
@@ -168,6 +193,8 @@ class UnitInstance {
 
     this._heads = {};
     this._state = {};
+    this._buffer = [];
+    this._subscription = null;
 
     this._loading = false;
     this._loaded = false;
@@ -192,6 +219,7 @@ class UnitInstance {
     return Promise.resolve()
       .then(() => this._loadSnapshot())
       .then(() => this._subscribeToLog())
+      .then(() => this._replayLog())
       .then(() => this._loadingFinished())
       .then(() => this);
   }
@@ -207,19 +235,27 @@ class UnitInstance {
       .catch(()=>null)
   }
 
+  _replayLog() {
+    debug('replay', {key: this._key, heads: this._heads});
+    return this._log.replay(this._heads, record => this.apply(record));
+  }
+
   _subscribeToLog() {
-    debug('subscribe', {key: this._key, heads: this._heads});
-    return this._log.subscribe(this._key, this._heads, record => this.apply(record));
+    debug('subscribe', {key: this._key});
+    this._subscription = this._log.subscribe(record =>
+      this._loaded ? this.apply(record) : this._buffer.push(record));
   }
 
   _loadingFinished() {
     this._loaded = true;
+    this._buffer.forEach(record => this.apply(record));
+    this._buffer = [];
     this._onLoad.forEach(l => l());
   }
 
   unload() {
     this._loaded = false;
-    this._log.cancel(this._key);
+    this._subscription.cancel();
   }
 
   takeSnapshot() {
@@ -228,9 +264,9 @@ class UnitInstance {
   }
 
   apply(record) {
+    debug('apply', {key: this._key, record, heads: this._heads});
     if (record.sequence <= this._heads[record.streamId]) return;
 
-    debug('apply', {key: this._key, record});
     (this._definition._appliers[record.event.name] || []).forEach(applier =>
       applier.call(this._state, record.event.payload, record));
 
@@ -251,41 +287,40 @@ class UnitRepository {
     this._definitions.push(definition);
   }
 
-  getInstance(message) {
-    let handlers = this._definitions.filter(d => d.canHandle(message));
+  getInstances(message) {
+    return Promise.all(this._getHandlersFor(message).map(unitDefinition => {
 
-    if (handlers.length == 0) {
-      throw new Error(`Cannot handle [${message.name}]`)
-    } else if (handlers.length > 1) {
-      throw new Error(`Too many handlers for [${message.name}]: [${handlers.map(u => u.name).join(', ')}]`)
-    }
+      var unitId = unitDefinition.mapToId(message);
+      if (!unitId) {
+        throw new Error(`Cannot map [${message.name}]`)
+      }
 
-    var unitDefinition = handlers[0];
-    var unitId = unitDefinition.mapToId(message);
+      return this._getOrLoad(unitDefinition, unitId)
+    }))
+  }
 
-    if (!unitId) {
-      throw new Error(`Cannot map [${message.name}]`)
-    }
-
-    return this._getOrLoad(unitDefinition, unitId);
+  _getHandlersFor(message) {
+    return this._definitions.filter(d => d.canHandle(message));
   }
 
   _getOrLoad(definition, unitId) {
-    if (this._instances[unitId]) {
-      return this._instances[unitId].load();
+    if (!this._instances[definition.name] || !this._instances[definition.name][unitId]) {
+      debug('load', {name: definition.name, id: unitId});
+      this._instances[definition.name] = this._instances[definition.name] || {};
+      this._instances[definition.name][unitId] = this._createInstance(definition, unitId);
     }
 
-    debug('load', {id: unitId});
-    this._instances[unitId] = this._createInstance(definition, unitId);
-    return this._instances[unitId].load();
+    return this._instances[definition.name][unitId].load();
   }
 
   _createInstance(definition, unitId) {
   }
 
   remove(unit) {
-    debug('unload', {id: unit.id});
-    delete this._instances[unit.id];
+    debug('unload', {name: unit._definition.name, id: unit.id});
+    if (this._instances[unit._definition.name]) {
+      delete this._instances[unit._definition.name][unit.id];
+    }
     unit.unload();
   }
 }
@@ -305,10 +340,6 @@ class Aggregate extends Unit {
 
   canHandle(command) {
     return command.name in this._executers;
-  }
-
-  applying(eventName, mapper, applier) {
-    return super.applying(eventName, mapper, applier);
   }
 
   executing(commandName, mapper, executer) {
@@ -353,9 +384,23 @@ class AggregateInstance extends UnitInstance {
 }
 
 class AggregateRepository extends UnitRepository {
-  constructor(log, snapshots, strategy, store) {
-    super(log, snapshots, strategy);
+  constructor(log, snapshots, store) {
+    super(log, snapshots);
     this._store = store;
+  }
+
+  getInstance(command) {
+    return this.getInstances(command)
+      .then(instances => {
+
+        if (instances.length == 0) {
+          throw new Error(`Cannot handle Command [${command.name}]`)
+        } else if (instances.length > 1) {
+          throw new Error(`Too many handlers for Command [${command.name}]`)
+        }
+
+        return instances[0];
+      })
   }
 
   _createInstance(definition, aggregateId) {
@@ -400,7 +445,6 @@ class ProjectionInstance extends UnitInstance {
   _proxyState() {
     return new Proxy(this._state, {
       ['set']: (target, name, value) => {
-        console.log('set', name, value);
         target[name] = value;
         this._subscriptions
           .filter((subscription) => subscription.active)
@@ -429,10 +473,157 @@ class ProjectionInstance extends UnitInstance {
 }
 
 class ProjectionRepository extends UnitRepository {
+  getInstance(query) {
+    return this.getInstances(query)
+      .then(instances => {
+
+        if (instances.length == 0) {
+          throw new Error(`Cannot handle Query [${query.name}]`)
+        } else if (instances.length > 1) {
+          throw new Error(`Too many handlers for Query [${query.name}]`)
+        }
+
+        return instances[0];
+      })
+  }
+
   _createInstance(definition, projectionId) {
     return new ProjectionInstance(projectionId, definition, this._log, this._snapshots);
   }
 }
+
+//-------- SAGA -------//
+
+class Saga extends Unit {
+  constructor(name) {
+    super(name);
+    this._reactors = {};
+
+    this.reactingTo('_saga-reaction-retry-requested', $=>$.sagaId);
+  }
+
+  canHandle(event) {
+    return event.name in this._reactors;
+  }
+
+  reactingTo(eventName, mapper, reactor) {
+    if (eventName in this._reactors) {
+      throw new Error(`Reaction to [${eventName}] is already defined in [${this.name}]`);
+    }
+    this._mappers[eventName] = mapper;
+    this._reactors[eventName] = reactor;
+    return this
+  }
+}
+
+class SagaInstance extends UnitInstance {
+  constructor(id, definition, log, snapshots, module) {
+    super(id, definition, log, snapshots);
+    this._module = module;
+  }
+
+  reactTo(record) {
+    if (record.event.name == '_saga-reaction-retry-requested') {
+      return this._reactTo(record.event.payload.record, [], 0);
+    }
+
+    return this._reactTo(record, [], 4);
+  }
+
+  _reactTo(record, errors, triesLeft) {
+    debug('reactTo', {key: this._key, record});
+
+    return this._lockReaction(record)
+      .then(locked => locked ? this._tryToReactTo(record, errors, triesLeft) : null)
+  }
+
+  _tryToReactTo(record, errors, triesLeft) {
+    var reactor = this._definition._reactors[record.event.name];
+
+    return new Promise(y => y(reactor.call(this._state, record.event.payload)))
+      .catch(err => {
+        errors.push(err.stack);
+        debug('failed', {key: this._key, record, triesLeft, errors});
+
+        return this._unlockReaction(record)
+          .then(() => triesLeft
+            ? setTimeout(() => this._reactTo(record, errors, triesLeft - 1), Math.pow(10, errors.length - 1))
+            : this._markReactionFailed(record, errors))
+      })
+  }
+
+  _lockReaction(record) {
+    return this._module.execute(new Command('_lock-saga-reaction', {
+      sagaKey: this._key,
+      streamId: record.streamId,
+      sequence: record.sequence
+    }))
+      .then(() => true)
+      .catch(error => {
+        debug('locked', {key: this._key, record, error: error.stack});
+        return false;
+      })
+  }
+
+  _unlockReaction(record) {
+    return this._module.execute(new Command('_unlock-saga-reaction', {
+      sagaKey: this._key,
+      streamId: record.streamId,
+      sequence: record.sequence
+    }))
+  }
+
+  _markReactionFailed(record, errors) {
+    return this._module.execute(new Command('_mark-saga-reaction-as-failed', {
+      sagaId: this.id,
+      sagaKey: this._key,
+      record,
+      errors
+    }))
+  }
+}
+
+class SagaRepository extends UnitRepository {
+  constructor(log, snapshots, module) {
+    super(log, snapshots);
+    this._module = module;
+  }
+
+  _createInstance(definition, sagaId) {
+    return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._module);
+  }
+}
+
+let sagaLock = new Aggregate('_SagaLock')
+  .initializing(function () {
+    this.locked = {};
+  })
+
+  .executing('_lock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
+    if (this.locked[JSON.stringify({streamId, sequence})]) {
+      throw new Error('Locked');
+    }
+    return [new Event('_saga-reaction-locked', {sagaKey, streamId, sequence})]
+  })
+
+  .executing('_unlock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
+    return [new Event('_saga-reaction-unlocked', {sagaKey, streamId, sequence})]
+  })
+
+  .applying('_saga-reaction-locked', function ({streamId, sequence}) {
+    //noinspection JSUnusedAssignment
+    this.locked[JSON.stringify({streamId, sequence})] = true;
+  })
+
+  .applying('_saga-reaction-unlocked', function ({streamId, sequence}) {
+    delete this.locked[JSON.stringify({streamId, sequence})];
+  });
+
+let sagaFailures = new Aggregate('_SagaFailures')
+
+  .executing('_mark-saga-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, errors}) {
+    return [new Event('_saga-reaction-failed', {sagaId, sagaKey, record, errors})]
+  });
 
 //------ SNAPSHOT -----//
 
@@ -457,27 +648,21 @@ class Snapshot {
 
 module.exports = {
   Module,
+
+  Message,
   Command,
   Query,
   Event,
 
-  Record,
-  EventStore,
-
-  Message,
-  EventLog,
-
-  Unit,
-  UnitInstance,
   RepositoryStrategy,
-
   Aggregate,
-  AggregateInstance,
-  AggregateRepository,
-
   Projection,
+  Saga,
 
+  Record,
+  EventLog,
   SnapshotStore,
+  EventStore,
   Snapshot
 };
 

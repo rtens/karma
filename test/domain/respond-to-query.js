@@ -16,11 +16,11 @@ describe('Responding to a Query', () => {
       deps.store || new k.EventStore());
 
   it('fails if no responder exists for that Query', () => {
-    (() => Module()
+    return Module()
 
-      .respondTo(new k.Query('Foo')))
+      .respondTo(new k.Query('Foo'))
 
-      .should.throw(Error, 'Cannot handle [Foo]')
+      .should.be.rejectedWith(Error, 'Cannot handle Query [Foo]')
   });
 
   it('fails if multiple responders exist for that Query in one Projection', () => {
@@ -34,17 +34,17 @@ describe('Responding to a Query', () => {
   });
 
   it('fails if multiple responders exist for that Query across Projections', () => {
-    (() => Module()
+    return Module()
 
       .add(new k.Projection('One')
-        .respondingTo('Foo'))
+        .respondingTo('Foo', ()=>'foo'))
 
       .add(new k.Projection('Two')
-        .respondingTo('Foo'))
+        .respondingTo('Foo', ()=>'foo'))
 
-      .respondTo(new k.Query('Foo')))
+      .respondTo(new k.Query('Foo'))
 
-      .should.throw(Error, 'Too many handlers for [Foo]: [One, Two]')
+      .should.be.rejectedWith(Error, 'Too many handlers for Query [Foo]')
   });
 
   it('fails if the Query cannot be mapped to a Projection instance', () => {
@@ -124,8 +124,7 @@ describe('Responding to a Query', () => {
 
       .then(result => result.should.eql(['a one', 'b one', 'a two', 'b two']))
 
-      .then(() => log.subscribed.should.eql([{
-        subscriptionId: 'Projection-One-foo',
+      .then(() => log.replayed.should.eql([{
         streamHeads: {}
       }]))
   });
@@ -169,8 +168,7 @@ describe('Responding to a Query', () => {
         version: 'v1',
       }]))
 
-      .then(() => log.subscribed.should.eql([{
-        subscriptionId: 'Projection-One-foo',
+      .then(() => log.replayed.should.eql([{
         streamHeads: {foo: 21, bar: 22}
       }]))
   });
@@ -179,12 +177,12 @@ describe('Responding to a Query', () => {
     let history = [];
     let wait = 10;
     let log = new (class extends k.EventLog {
-      subscribe(subscriptionId, streamHeads, subscriber) {
+      replay(streamHeads, reader) {
         history.push('loading');
         return new Promise(y => {
           setTimeout(() => {
             history.push('loaded');
-            y(super.subscribe(subscriptionId, streamHeads, subscriber))
+            y(super.replay(streamHeads, reader))
           }, wait);
           wait = 0;
         });
@@ -250,7 +248,7 @@ describe('Responding to a Query', () => {
 
       .then(() => snapshots.fetched.length.should.equal(1))
 
-      .then(() => log.subscribed.length.should.equal(1))
+      .then(() => log.replayed.length.should.equal(1))
   });
 
   it('can take a Snapshot of the Projection', () => {
@@ -372,6 +370,62 @@ describe('Responding to a Query', () => {
       ]))
   });
 
+  it('subscribes the Projection to the EventLog', () => {
+    let log = new fake.EventLog();
+
+    let applied = [];
+
+    return Module({log})
+
+      .add(new k.Projection('One')
+        .applying('bard', (payload) => applied.push(payload))
+        .respondingTo('Foo', $=>'foo', ()=>null))
+
+      .respondTo(new k.Query('Foo'))
+
+      .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+
+      .then(() => applied.should.eql(['one']))
+  });
+
+  it('subscribes to before replaying the EventLog', () => {
+    let history = [];
+    let log = new (class extends fake.EventLog {
+      replay(streamHeads, reader) {
+        this.publish(new k.Record(new k.Event('bard', 'two'), 'foo', 22));
+        this.publish(new k.Record(new k.Event('bard', 'tre'), 'foo', 23));
+
+        history.push('replay');
+        return super.replay(streamHeads, reader);
+      }
+
+      subscribe(subscriber) {
+        history.push('subscribe');
+        return super.subscribe(subscriber);
+      }
+    });
+    log.records = [
+      new k.Record(new k.Event('bard', 'one'), 'foo', 21),
+      new k.Record(new k.Event('bard', 'two'), 'foo', 22),
+    ];
+
+    let store = new fake.EventStore();
+
+    let applied = [];
+
+    return Module({log, store})
+
+      .add(new k.Projection('One')
+        .applying('bard', (payload) => applied.push(payload))
+        .respondingTo('Foo', $=>'foo', ()=>null))
+
+      .respondTo(new k.Query('Foo'))
+
+      .then(() => history.should.eql(['subscribe', 'replay']))
+
+      .then(() => applied.should.eql(['one', 'two', 'tre']))
+  });
+
   it('can unload a Projection', () => {
     let log = new fake.EventLog();
     log.records = [
@@ -401,12 +455,9 @@ describe('Responding to a Query', () => {
 
       .then(() => snapshots.fetched.length.should.equal(2))
 
-      .then(() => log.subscribed.length.should.equal(2))
+      .then(() => log.replayed.length.should.equal(2))
 
-      .then(() => log.cancelled.should.eql([
-        {subscriptionId: 'Projection-One-foo'},
-        {subscriptionId: 'Projection-One-foo'},
-      ]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
   });
 })
 ;

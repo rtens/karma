@@ -16,11 +16,11 @@ describe('Subscribing to a Query', () => {
       deps.store || new k.EventStore());
 
   it('fails if no responder exists for that Query', () => {
-    (() => Module()
+    return Module()
 
-      .subscribeTo(new k.Query('Foo')))
+      .subscribeTo(new k.Query('Foo'))
 
-      .should.throw(Error, 'Cannot handle [Foo]')
+      .should.be.rejectedWith(Error, 'Cannot handle Query [Foo]')
   });
 
   it('sends a value', () => {
@@ -159,7 +159,7 @@ describe('Subscribing to a Query', () => {
 
       .then(subscription => subscription.cancel())
 
-      .then(() => log.cancelled.should.eql([]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
   });
 
   it('unloads projection if all subscriptions are cancelled', () => {
@@ -189,9 +189,7 @@ describe('Subscribing to a Query', () => {
 
       .then(() => domain.respondTo(new k.Query('Foo')))
 
-      .then(() => log.cancelled.should.eql([
-        {subscriptionId: 'Projection-One-foo'}
-      ]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([false]))
   });
 
   it('can take a Snapshot of the Projection', () => {
