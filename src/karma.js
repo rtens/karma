@@ -11,7 +11,9 @@ class Module {
     this._projections = new ProjectionRepository(eventLog, snapshotStore);
     this._sagas = new SagaRepository(eventLog, snapshotStore, this);
 
-    this._subscription = null;
+    this._subscription = this._log.subscribe(record => this.reactTo(record));
+    this._aggregates.add(sagaLock);
+    this._aggregates.add(sagaFailures);
   }
 
   add(unit) {
@@ -23,7 +25,6 @@ class Module {
         this._projections.add(unit);
         break;
       case Saga.name:
-        if (!this._subscription) this._onFirstSaga();
         this._sagas.add(unit);
         break;
     }
@@ -65,16 +66,9 @@ class Module {
     return this._sagas
       .getInstances(record.event)
       .then(instances => Promise.all(
-        instances.map(instance => instance.reactTo(record)))
-        // .then(() => this._strategy.onAccess(instance, this._sagas))
-      )
+        instances.map(instance => instance.reactTo(record)
+          .then(() => this._strategy.onAccess(instance, this._sagas)))))
       .catch(e => console.error(e.stack))
-  }
-
-  _onFirstSaga() {
-    this._subscription = this._log.subscribe(record => this.reactTo(record));
-    this._aggregates.add(sagaLock);
-    this._aggregates.add(sagaFailures);
   }
 }
 

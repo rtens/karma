@@ -3,7 +3,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const fake = require('./fakes');
+const fake = require('./../fakes');
 const k = require('../../src/karma');
 
 describe('Subscribing to a Query', () => {
@@ -159,7 +159,7 @@ describe('Subscribing to a Query', () => {
 
       .then(subscription => subscription.cancel())
 
-      .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([true, true]))
   });
 
   it('unloads projection if all subscriptions are cancelled', () => {
@@ -189,31 +189,6 @@ describe('Subscribing to a Query', () => {
 
       .then(() => domain.respondTo(new k.Query('Foo')))
 
-      .then(() => log.subscriptions.map(s => s.active).should.eql([false]))
-  });
-
-  it('can take a Snapshot of the Projection', () => {
-    let snapshots = new fake.SnapshotStore();
-
-    let strategy = new (class extends k.RepositoryStrategy {
-      //noinspection JSUnusedGlobalSymbols
-      onAccess(unit) {
-        unit.takeSnapshot();
-      }
-    })();
-
-    return Module({snapshots, strategy})
-
-      .add(new k.Projection('One')
-        .withVersion('v1')
-        .respondingTo('Foo', ()=>'foo', ()=>null))
-
-      .subscribeTo(new k.Query('Foo', 'foo'))
-
-      .then(() => snapshots.stored.should.eql([{
-        key: 'Projection-One-foo',
-        version: 'v1',
-        snapshot: {heads: {}, state: {}}
-      }]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([true, false]))
   });
 });
