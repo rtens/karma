@@ -11,9 +11,17 @@ class Module {
     this._projections = new ProjectionRepository(eventLog, snapshotStore);
     this._sagas = new SagaRepository(eventLog, snapshotStore, this);
 
-    this._subscription = this._log.subscribe(record => this.reactTo(record));
+    this._subscription = null;
     this._aggregates.add(new SagaLockAggregate());
     this._aggregates.add(new SagaFailuresAggregate());
+    this._projections.add(new SagaReactionHeadsProjection());
+  }
+
+  start() {
+    return this.respondTo(new Query('_saga-reaction-heads'))
+      .then(heads => this._log.subscribe(heads, record => this.reactTo(record)))
+      .then(subscription => this._subscription = subscription)
+      .then(() => this)
   }
 
   add(unit) {
@@ -109,13 +117,8 @@ class Record {
 
 class EventLog {
   //noinspection JSUnusedLocalSymbols
-  replay(streamHeads, reader) {
-    return Promise.resolve()
-  }
-
-  //noinspection JSUnusedLocalSymbols
-  subscribe(subscriber) {
-    return {cancel: () => null}
+  subscribe(streamHeads, subscriber) {
+    return Promise.resolve({cancel: () => null})
   }
 }
 
@@ -187,7 +190,6 @@ class UnitInstance {
 
     this._heads = {};
     this._state = {};
-    this._buffer = [];
     this._subscription = null;
 
     this._loading = false;
@@ -213,7 +215,6 @@ class UnitInstance {
     return Promise.resolve()
       .then(() => this._loadSnapshot())
       .then(() => this._subscribeToLog())
-      .then(() => this._replayLog())
       .then(() => this._loadingFinished())
       .then(() => this);
   }
@@ -229,21 +230,14 @@ class UnitInstance {
       .catch(()=>null)
   }
 
-  _replayLog() {
-    debug('replay', {key: this._key, heads: this._heads});
-    return this._log.replay(this._heads, record => this.apply(record));
-  }
-
   _subscribeToLog() {
-    debug('subscribe', {key: this._key});
-    this._subscription = this._log.subscribe(record =>
-      this._loaded ? this.apply(record) : this._buffer.push(record));
+    debug('subscribe', {key: this._key, heads: this._heads});
+    return this._log.subscribe(this._heads, record => this.apply(record))
+      .then(subscription => this._subscription = subscription)
   }
 
   _loadingFinished() {
     this._loaded = true;
-    this._buffer.forEach(record => this.apply(record));
-    this._buffer = [];
     this._onLoad.forEach(l => l());
   }
 
@@ -623,8 +617,38 @@ class SagaFailuresAggregate extends Aggregate {
     super('_SagaFailures');
 
     this.executing('_mark-saga-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, errors}) {
-        return [new Event('_saga-reaction-failed', {sagaId, sagaKey, record, errors})]
-      });
+      return [new Event('_saga-reaction-failed', {sagaId, sagaKey, record, errors})]
+    });
+  }
+}
+
+class SagaReactionHeadsProjection extends Projection {
+  constructor() {
+    super('_SagaReactionHeads');
+
+    this
+
+      .initializing(function () {
+        this.heads = {};
+        this.pastHeads = {};
+      })
+
+      .applying('_saga-reaction-locked', function ({streamId, sequence}) {
+        if (!this.heads[streamId] || this.heads[streamId] == sequence - 1)
+        this.heads[streamId] = sequence;
+
+        this.pastHeads[streamId] = this.pastHeads[streamId] || [];
+        this.pastHeads[streamId].unshift(sequence)
+      })
+
+      .applying('_saga-reaction-unlocked', function ({streamId, sequence}) {
+        this.pastHeads[streamId] = this.pastHeads[streamId].filter(s => s < sequence);
+        this.heads[streamId] = this.pastHeads[streamId][0]
+      })
+
+      .respondingTo('_saga-reaction-heads', $=>'karma', function () {
+        return this.heads
+      })
   }
 }
 

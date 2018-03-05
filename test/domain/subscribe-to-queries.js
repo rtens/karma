@@ -159,7 +159,7 @@ describe('Subscribing to a Query', () => {
 
       .then(subscription => subscription.cancel())
 
-      .then(() => log.subscriptions.map(s => s.active).should.eql([true, true]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
   });
 
   it('unloads projection if all subscriptions are cancelled', () => {
@@ -189,6 +189,6 @@ describe('Subscribing to a Query', () => {
 
       .then(() => domain.respondTo(new k.Query('Foo')))
 
-      .then(() => log.subscriptions.map(s => s.active).should.eql([true, false]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([ false]))
   });
 });

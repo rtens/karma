@@ -112,14 +112,14 @@ describe('Applying Events', () => {
         let history = [];
         let wait = 10;
         let log = new (class extends k.EventLog {
-          replay(streamHeads, reader) {
-            if (!wait) return super.replay(streamHeads, reader);
+          subscribe(streamHeads, subscriber) {
+            if (!wait) return super.subscribe(streamHeads, subscriber);
 
             history.push('loading');
             return new Promise(y => {
               setTimeout(() => {
                 history.push('loaded');
-                y(super.replay(streamHeads, reader))
+                y(super.subscribe(streamHeads, subscriber))
               }, wait);
               wait = 0;
             });
@@ -129,14 +129,14 @@ describe('Applying Events', () => {
         return Promise.resolve(Module({log})
 
           .add(new unit.Unit('One')
-            [unit.handling]('Foo', ()=>'foo', (payload) => history.push('handled ' + payload))))
+            [unit.handling]('Foo', ()=>'foo', () => history.push('handled'))))
 
           .then(module => new Promise(y => {
-            module[unit.handle](new unit.Message('Foo', 'one')).then(y);
-            module[unit.handle](new unit.Message('Foo', 'two'));
+            module[unit.handle](new unit.Message('Foo')).then(y);
+            module[unit.handle](new unit.Message('Foo'));
           }))
 
-          .then(() => history.slice(0, 2).should.eql(['loading', 'loaded']))
+          .then(() => history.should.eql(['loading', 'loaded', 'handled', 'handled']))
       });
 
       it('keeps the reconstituted Unit', () => {
@@ -186,44 +186,6 @@ describe('Applying Events', () => {
           .then(() => applied.should.eql(['one']))
 
           .then(() => log.subscriptions.slice(-1).map(s => s.active).should.eql([true]))
-      });
-
-      it('subscribes to before replaying the EventLog', () => {
-        let history = [];
-        let log = new (class extends fake.EventLog {
-          replay(streamHeads, reader) {
-            this.publish(new k.Record(new k.Event('bard', 'two'), 'foo', 22));
-            this.publish(new k.Record(new k.Event('bard', 'tre'), 'foo', 23));
-
-            history.push('replay');
-            return super.replay(streamHeads, reader);
-          }
-
-          //noinspection JSUnusedGlobalSymbols
-          subscribe(subscriber) {
-            history.push('subscribe');
-            return super.subscribe(subscriber);
-          }
-        });
-
-        log.records = [
-          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-          new k.Record(new k.Event('bard', 'two'), 'foo', 22),
-        ];
-
-        let applied = [];
-
-        return Module({log})
-
-          .add(new unit.Unit('One')
-            .applying('bard', (payload) => applied.push(payload))
-            [unit.handling]('Foo', $=>'foo', ()=>null))
-
-          [unit.handle](new unit.Message('Foo'))
-
-          .then(() => history.slice(0, 3).should.eql(['subscribe', 'subscribe', 'replay']))
-
-          .then(() => applied.should.eql(['one', 'two', 'tre']))
       });
 
       if (unit.name != 'a subscribed Projection') {

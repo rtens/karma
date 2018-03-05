@@ -24,17 +24,14 @@ class FakeEventLog extends karma.EventLog {
     return Promise.all(Object.values(this.subscriptions).map(s => s.subscriber(record)));
   }
 
-  replay(streamHeads, reader) {
+  subscribe(streamHeads, subscriber) {
     this.replayed.push({streamHeads: Object.assign({}, streamHeads)});
-    this.records.forEach(m => reader(m));
-    return Promise.resolve();
-  }
 
-  subscribe(subscriber) {
     let subscription = {subscriber, active: true};
     this.subscriptions.push(subscription);
 
-    return {cancel: () => subscription.active = false}
+    return Promise.all(this.records.map(m => subscriber(m)))
+      .then(() => ({cancel: () => subscription.active = false}))
   }
 }
 
