@@ -136,7 +136,7 @@ describe('Subscribing to a Query', () => {
       .then(() => responses.should.eql(['']))
   });
 
-  it('keeps the Projection loaded', () => {
+  it('keeps the Projection subscribed even if removed', () => {
     let log = new fake.EventLog();
 
     let strategy = new (class extends k.RepositoryStrategy {
@@ -154,15 +154,11 @@ describe('Subscribing to a Query', () => {
         .respondingTo('Foo', ()=>'foo', ()=>null))
 
       .subscribeTo(new k.Query('Foo'), ()=>null)
-
-      .then(() => domain.subscribeTo(new k.Query('Foo'), ()=>null))
-
-      .then(subscription => subscription.cancel())
 
       .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
   });
 
-  it('unloads projection if all subscriptions are cancelled', () => {
+  it('un-subscribes projection if removed and all subscriptions are cancelled', () => {
     let log = new fake.EventLog();
 
     let strategy = new (class extends k.RepositoryStrategy {
@@ -187,8 +183,34 @@ describe('Subscribing to a Query', () => {
 
       .then(subscription => subscription.cancel())
 
-      .then(() => domain.respondTo(new k.Query('Foo')))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
+  });
 
-      .then(() => log.subscriptions.map(s => s.active).should.eql([ false]))
+  it('do not un-subscribes projection if not removed and all subscriptions are cancelled', () => {
+    let log = new fake.EventLog();
+
+    let strategy = new (class extends k.RepositoryStrategy {
+      //noinspection JSUnusedGlobalSymbols
+      onAccess(unit, repository) {
+        repository.remove(unit);
+      }
+    })();
+
+    let domain = Module({log, strategy});
+
+    return domain
+
+      .add(new k.Projection('One')
+        .respondingTo('Foo', ()=>'foo', ()=>null))
+
+      .subscribeTo(new k.Query('Foo'), ()=>null)
+
+      .then(subscription => subscription.cancel())
+
+      .then(() => domain.subscribeTo(new k.Query('Foo'), ()=>null))
+
+      .then(subscription => subscription.cancel())
+
+      .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
   });
 });

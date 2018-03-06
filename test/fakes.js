@@ -8,7 +8,7 @@ class FakeEventStore extends karma.EventStore {
 
   record(events, streamId, onSequence, traceId) {
     this.recorded.push({events, streamId, onSequence, traceId});
-    return Promise.resolve()
+    return new Promise(y => process.nextTick(y))
   }
 }
 
@@ -51,7 +51,9 @@ class FakeSnapshotStore extends karma.SnapshotStore {
     this.fetched.push({key, version});
     var found = this.snapshots.find(s =>
     JSON.stringify(s.key) == JSON.stringify(key) && s.version == version);
-    return found ? Promise.resolve(found.snapshot) : Promise.reject()
+
+    if (!found) return Promise.reject(new Error('No snapshot'));
+    return new Promise(y => process.nextTick(() => y(found.snapshot)))
   }
 }
 

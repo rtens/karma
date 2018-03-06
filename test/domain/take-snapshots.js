@@ -45,7 +45,7 @@ describe('Taking a Snapshot', () => {
   };
 
   let subscribe = {
-    name: 'a subscribed Projection',
+    name: 'a Subscription',
     Unit: k.Projection,
     Message: k.Query,
     handling: 'respondingTo',
@@ -98,7 +98,7 @@ describe('Taking a Snapshot', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => snapshots.stored.slice(-1).should.eql([{
+          .then(() => snapshots.stored.slice(0, 1).should.eql([{
             key: unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: {heads: {foo: 21}, state: {bards: ['one']}}
@@ -243,6 +243,41 @@ describe('Taking a Snapshot', () => {
           }))
       });
 
+      it('saves the Snapshot if handler fails', () => {
+        let _setTimeout = setTimeout;
+        setTimeout = fn => fn();
+
+        let snapshots = new fake.SnapshotStore();
+
+        let strategy = new (class extends k.RepositoryStrategy {
+          //noinspection JSUnusedGlobalSymbols
+          onAccess(unit) {
+            unit.takeSnapshot();
+          }
+        })();
+
+        return Module({snapshots, strategy})
+
+          .add(new unit.Unit('One')
+            .withVersion('v1')
+            [unit.handling]('Foo', ()=>'foo',
+            () => {
+              throw new Error('Nope')
+            }))
+
+          [unit.handle](new unit.Message('Foo'))
+
+          .catch(()=>null)
+
+          .then(() => setTimeout = _setTimeout)
+
+          .then(() => snapshots.stored.slice(0, 1).should.eql([{
+            key: unit.Unit.name + '-One-foo',
+            version: 'v1',
+            snapshot: {heads: {}, state: {}}
+          }]))
+      });
+
       if (unit.name != 'an Aggregate') {
         it('reconstitutes from Snapshot and Events of multiple streams', () => {
           let log = new fake.EventLog();
@@ -319,7 +354,7 @@ describe('Taking a Snapshot', () => {
 
             [unit.handle](new unit.Message('Foo', 'foo'))
 
-            .then(() => snapshots.stored.slice(-1).should.eql([{
+            .then(() => snapshots.stored.slice(0, 1).should.eql([{
               key: unit.Unit.name + '-One-foo',
               version: 'v1',
               snapshot: {heads: {foo: 21, bar: 42}, state: {bards: ['one', 'two']}}

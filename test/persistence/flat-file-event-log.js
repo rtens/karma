@@ -115,8 +115,6 @@ describe('Flat file Event Log', () => {
         sequence: 21
       })))
 
-      .then(() => console.log('written'))
-
       .then(() => subscription1.cancel('foo'))
 
       .then(() => subscription2.cancel('bar'))

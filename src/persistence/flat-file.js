@@ -47,7 +47,7 @@ class FlatFileEventStore extends karma.EventStore {
 
   _acquireLock(streamId) {
     return lockFile.lockAsync(this._paths.lock(streamId), {wait: 100, pollPeriod: 10})
-      .catch(e => Promise.reject(new Error('Locked')))
+      .catch(e => Promise.reject(new Error('Write locked')))
   }
 
   _releaseLock(streamId) {
@@ -94,18 +94,11 @@ class FlatFileEventLog extends karma.EventLog {
   }
 
   subscribe(streamHeads, subscriber) {
-    if (!this._watcher) {
-      this._watcher = chokidar.watch(this._paths.records);
-      this._watcher.on('add', (file) =>
-      {
-        return this._notificationQueue.push(() =>
-          this._notifySubscribers(file, this._subscriptions.filter(s => s.active)))
-      })
-    }
-
     let subscription = {subscriber, active: true, heads: {}};
 
-    return fs.readdirAsync(this._paths.records)
+    return this._startWatching()
+
+      .then(() => fs.readdirAsync(this._paths.records))
 
       .then(files => files.map(f => ({
         name: f,
@@ -134,6 +127,19 @@ class FlatFileEventLog extends karma.EventLog {
       )
   }
 
+  _startWatching() {
+    if (this._watcher) {
+      return Promise.resolve();
+    }
+
+    return new Promise(y =>
+      this._watcher = chokidar.watch(this._paths.records).on('ready', y))
+
+      .then(() => this._watcher.on('add', (file) => this._notificationQueue.push(() =>
+          this._notifySubscribers(file, this._subscriptions.filter(s => s.active)))))
+
+  }
+
   _notifySubscribers(path, subscriptions) {
     return fs.readFileAsync(path).then(JSON.parse)
 
@@ -143,14 +149,7 @@ class FlatFileEventLog extends karma.EventLog {
         })
       }))
 
-      .then(record => Promise.all(subscriptions.map(subscription => {
-        if (record.sequence <= subscription.heads[record.streamId]) {
-          return Promise.resolve()
-        }
-        subscription.heads[record.streamId] = record.sequence;
-
-        return subscription.subscriber(record)
-      })));
+      .then(record => Promise.all(subscriptions.map(subscription => subscription.subscriber(record))));
   }
 
   _close() {
@@ -184,7 +183,7 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
     var file = path + '/' + version;
 
     if (fs.existsSync(path) && !fs.existsSync(file)) {
-      return this._clear(path).then(() => null);
+      return this._clear(path).then(() => Promise.reject());
     }
 
     return fs.readFileAsync(file)

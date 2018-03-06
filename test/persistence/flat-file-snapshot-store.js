@@ -3,8 +3,7 @@ const fs = require('fs');
 
 const chai = require('chai');
 const promised = require('chai-as-promised');
-const should = chai.should();
-
+chai.should();
 chai.use(promised);
 
 const karma = require('../../src/karma');
@@ -57,7 +56,7 @@ describe('Flat file Snapshot store', () => {
       .should.be.rejected
   });
 
-  it('return null and deletes existing Snapshots if the version does not match', () => {
+  it('fails and deletes existing Snapshots if the version does not match', () => {
     return new Promise(y => {
       fs.mkdirSync(directory);
       fs.mkdirSync(directory + '/snapshots');
@@ -69,7 +68,7 @@ describe('Flat file Snapshot store', () => {
 
         .fetch('foo', 'v2'))
 
-      .then(snapshot => should.not.exist(snapshot))
+      .should.be.rejected
 
       .then(() => fs.existsSync(directory + '/snapshots/foo/v1').should.be.false)
   });
