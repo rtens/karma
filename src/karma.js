@@ -33,7 +33,6 @@ class BaseModule {
     return this._aggregates
       .getInstance(command)
       .then(instance => instance.execute(command))
-      .then(() => this)
   }
 
   respondTo(query) {
@@ -159,9 +158,9 @@ class EventStore {
     this.module = moduleName;
   }
 
-  //noinspection JSUnusedLocalSymbols
   record(events, streamId, onSequence, traceId) {
-    return Promise.resolve()
+    return Promise.resolve(events.map((e, i) =>
+      new Record(e, streamId, (onSequence || 0) + i, traceId)))
   }
 }
 
@@ -440,9 +439,9 @@ class AggregateInstance extends UnitInstance {
   _execute(command, tries = 0) {
     let events = this._definition._executers[command.name].call(this._state, command.payload);
 
-    if (!Array.isArray(events)) return Promise.resolve();
+    if (!Array.isArray(events)) return Promise.resolve([]);
 
-    debug('record', {id: this.id, triessequence: this._heads[this.id], events});
+    debug('record', {id: this.id, tries, sequence: this._heads[this.id], events});
     return this._store.record(events, this.id, this._heads[this.id], command.traceId)
       .catch(e => {
         if (tries > 3) throw e;

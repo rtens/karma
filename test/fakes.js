@@ -8,7 +8,7 @@ class FakeEventStore extends karma.EventStore {
 
   record(events, streamId, onSequence, traceId) {
     this.recorded.push({events, streamId, onSequence, traceId});
-    return new Promise(y => process.nextTick(y))
+    return new Promise(y => process.nextTick(y(super.record(events, streamId, onSequence, traceId))))
   }
 }
 
