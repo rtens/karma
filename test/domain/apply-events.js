@@ -7,70 +7,68 @@ const fake = require('./../fakes');
 const k = require('../../src/karma');
 
 describe('Applying Events', () => {
+  let _Date, Module;
 
-  let _Date = Date;
+  let units = {
+    execute: {
+      name: 'an Aggregate',
+      Unit: k.Aggregate,
+      Message: k.Command,
+      handling: 'executing',
+      handle: 'execute',
+      extraReplay: 0
+    },
+    respond: {
+      name: 'a Projection',
+      Unit: k.Projection,
+      Message: k.Query,
+      handling: 'respondingTo',
+      handle: 'respondTo',
+      extraReplay: 0
+    },
+    subscribe: {
+      name: 'a subscribed Projection',
+      Unit: k.Projection,
+      Message: k.Query,
+      handling: 'respondingTo',
+      handle: 'subscribeTo',
+      extraReplay: 0
+    },
+    react: {
+      name: 'a Saga',
+      Unit: k.Saga,
+      Message: class extends k.Record {
+        //noinspection JSUnusedGlobalSymbols
+        constructor(name, payload) {
+          super(new k.Event(name, payload))
+        }
+      },
+      handling: 'reactingTo',
+      handle: 'reactTo',
+      extraReplay: 1
+    }
+  };
 
   before(() => {
+    _Date = Date;
     Date = function () {
       return new _Date('2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
+
+    Module = (deps = {}) =>
+      new k.Module(
+        deps.log || new k.EventLog(),
+        deps.snapshots || new k.SnapshotStore(),
+        deps.strategy || new k.RepositoryStrategy(),
+        deps.store || new k.EventStore());
   });
 
   after(() => {
     Date = _Date;
   });
 
-  let Module = (deps = {}) =>
-    new k.Module(
-      deps.log || new k.EventLog(),
-      deps.snapshots || new k.SnapshotStore(),
-      deps.strategy || new k.RepositoryStrategy(),
-      deps.store || new k.EventStore());
-
-  let execute = {
-    name: 'an Aggregate',
-    Unit: k.Aggregate,
-    Message: k.Command,
-    handling: 'executing',
-    handle: 'execute',
-    extraReplay: 0
-  };
-
-  let respond = {
-    name: 'a Projection',
-    Unit: k.Projection,
-    Message: k.Query,
-    handling: 'respondingTo',
-    handle: 'respondTo',
-    extraReplay: 0
-  };
-
-  let subscribe = {
-    name: 'a subscribed Projection',
-    Unit: k.Projection,
-    Message: k.Query,
-    handling: 'respondingTo',
-    handle: 'subscribeTo',
-    extraReplay: 0
-  };
-
-  let react = {
-    name: 'a Saga',
-    Unit: k.Saga,
-    Message: class extends k.Record {
-      //noinspection JSUnusedGlobalSymbols
-      constructor(name, payload) {
-        super(new k.Event(name, payload))
-      }
-    },
-    handling: 'reactingTo',
-    handle: 'reactTo',
-    extraReplay: 1
-  };
-
-  [execute, respond, subscribe, react].forEach(unit => {
-
+  Object.values(units).forEach(unit =>
     describe('to ' + unit.name, () => {
 
       it('uses recorded Events', () => {
@@ -242,6 +240,5 @@ describe('Applying Events', () => {
             }]))
         });
       }
-    })
-  })
+    }))
 });

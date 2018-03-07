@@ -7,66 +7,64 @@ const fake = require('./../fakes');
 const k = require('../../src/karma');
 
 describe('Taking a Snapshot', () => {
+  let _Date, Module;
 
-  let _Date = Date;
+  let units = {
+    execute: {
+      name: 'an Aggregate',
+      Unit: k.Aggregate,
+      Message: k.Command,
+      handling: 'executing',
+      handle: 'execute',
+    },
+    respond: {
+      name: 'a Projection',
+      Unit: k.Projection,
+      Message: k.Query,
+      handling: 'respondingTo',
+      handle: 'respondTo',
+    },
+    subscribe: {
+      name: 'a subscribed Projection',
+      Unit: k.Projection,
+      Message: k.Query,
+      handling: 'respondingTo',
+      handle: 'subscribeTo',
+    },
+    react: {
+      name: 'a Saga',
+      Unit: k.Saga,
+      Message: class extends k.Record {
+        //noinspection JSUnusedGlobalSymbols
+        constructor(name, payload) {
+          super(new k.Event(name, payload))
+        }
+      },
+      handling: 'reactingTo',
+      handle: 'reactTo',
+    }
+  };
 
   before(() => {
+    _Date = Date;
     Date = function () {
       return new _Date('2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
+
+    Module = (deps = {}) =>
+      new k.Module(
+        deps.log || new k.EventLog(),
+        deps.snapshots || new k.SnapshotStore(),
+        deps.strategy || new k.RepositoryStrategy(),
+        deps.store || new k.EventStore());
   });
 
   after(() => {
     Date = _Date;
   });
 
-  let Module = (deps = {}) =>
-    new k.Module(
-      deps.log || new k.EventLog(),
-      deps.snapshots || new k.SnapshotStore(),
-      deps.strategy || new k.RepositoryStrategy(),
-      deps.store || new k.EventStore());
-
-  let execute = {
-    name: 'an Aggregate',
-    Unit: k.Aggregate,
-    Message: k.Command,
-    handling: 'executing',
-    handle: 'execute',
-  };
-
-  let respond = {
-    name: 'a Projection',
-    Unit: k.Projection,
-    Message: k.Query,
-    handling: 'respondingTo',
-    handle: 'respondTo',
-  };
-
-  let subscribe = {
-    name: 'a Subscription',
-    Unit: k.Projection,
-    Message: k.Query,
-    handling: 'respondingTo',
-    handle: 'subscribeTo',
-  };
-
-  let react = {
-    name: 'a Saga',
-    Unit: k.Saga,
-    Message: class extends k.Record {
-      //noinspection JSUnusedGlobalSymbols
-      constructor(name, payload) {
-        super(new k.Event(name, payload))
-      }
-    },
-    handling: 'reactingTo',
-    handle: 'reactTo',
-  };
-
-  [execute, respond, subscribe, react].forEach(unit => {
-
+  Object.values(units).forEach(unit =>
     describe('of ' + unit.name, () => {
 
       it('saves the Snapshot by key and version', () => {
@@ -361,6 +359,5 @@ describe('Taking a Snapshot', () => {
             }]))
         });
       }
-    })
-  })
+    }))
 });
