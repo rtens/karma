@@ -112,7 +112,8 @@ class FlatFileEventLog extends karma.EventLog {
       .then(() => ({
           cancel: () => {
             subscription.active = false;
-            if (this._subscriptions.filter(s => s.active).length == 0) {
+            this._subscriptions = this._subscriptions.filter(s => s.active);
+            if (this._subscriptions.length == 0) {
               return this._close();
             }
           }
@@ -129,7 +130,7 @@ class FlatFileEventLog extends karma.EventLog {
       this._watcher = chokidar.watch(this._paths.records).on('ready', y))
 
       .then(() => this._watcher.on('add', (file) => this._notificationQueue.push(() =>
-        this._notifySubscribers(file, this._subscriptions.filter(s => s.active)))))
+        this._notifySubscribers(file, this._subscriptions))))
   }
 
   _readStreams(streamHeads, subscription) {
@@ -166,7 +167,7 @@ class FlatFileEventLog extends karma.EventLog {
 
   _close() {
     if (this._notificationQueue.length == 0) {
-      this._watcher.close();
+      if (this._watcher) this._watcher.close();
       this._watcher = null;
       return Promise.resolve();
     }

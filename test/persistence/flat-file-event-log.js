@@ -115,9 +115,33 @@ describe('Flat file Event Log', () => {
         sequence: 21
       })))
 
-      .then(() => subscription1.cancel('foo'))
+      .then(() => subscription1.cancel())
 
-      .then(() => subscription2.cancel('bar'))
+      .then(() => subscription2.cancel())
+
+      .then(() => records.should.eql(['foo One', 'bar One']))
+  });
+
+  it('Manages concurrent cancellation', () => {
+    let _readFile = fs.readFile;
+    fs.readFile = (f, cb) => {
+      setTimeout(() => _readFile(f, cb), 10);
+      fs.readFile = _readFile
+    };
+
+    let records = [];
+    let log = new flatFile.EventLog(directory, 'Test');
+
+    return fs.writeFileAsync(directory + '/Test/records/one-42', JSON.stringify({event: {name: 'One'}}))
+
+      .then(() => Promise.all([
+        Promise.resolve()
+          .then(() => log.subscribe({}, record => records.push('foo ' + record.event.name)))
+          .then(s => s.cancel()),
+        Promise.resolve()
+          .then(() => log.subscribe({}, record => records.push('bar ' + record.event.name)))
+          .then(s => s.cancel()),
+      ]))
 
       .then(() => records.should.eql(['foo One', 'bar One']))
   });

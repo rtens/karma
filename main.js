@@ -58,6 +58,12 @@ new karma.Module('Demo',
       return this.total
     }))
 
+  .add(new karma.Saga('John')
+
+    .reactingTo('food', ()=>'paul', function (payload) {
+      console.log('###########JOHN ' + JSON.stringify(payload));
+    }))
+
   .add(new karma.Saga('Pete')
 
     .reactingTo('food', ()=>'pete', function (payload) {

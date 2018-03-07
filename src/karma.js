@@ -58,7 +58,6 @@ class Module extends BaseModule {
     this._meta = new BaseModule(name + '__meta', repositoryStrategy, metaPersistenceFactory);
     this._sagas = new SagaRepository(this._log, this._snapshots, repositoryStrategy, this._meta);
 
-    this._subscription = null;
     this._meta._aggregates.add(new SagaLockAggregate());
     this._meta._aggregates.add(new SagaFailuresAggregate());
     this._meta._projections.add(new SagaReactionHeadsProjection());
@@ -80,7 +79,6 @@ class Module extends BaseModule {
         debug('subscribe module', {heads});
         return this._log.subscribe(heads, record => this.reactTo(record))
       })
-      .then(subscription => this._subscription = subscription)
       .then(() => this)
   }
 
