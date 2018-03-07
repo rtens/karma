@@ -20,14 +20,14 @@ describe('Flat file Event Store', () => {
   });
 
   it('stores Events in files', () => {
-    return new flatFile.EventStore(directory)
+    return new flatFile.EventStore(directory, 'Test')
 
       .record([
         new karma.Event('One', 'foo', new Date('2011-12-13')),
         new karma.Event('Two', 'bar', new Date('2011-12-14'))
       ], 'one', undefined, 'trace')
 
-      .then(() => fs.readFileAsync(directory + '/records/one.1').then(JSON.parse)
+      .then(() => fs.readFileAsync(directory + '/Test/records/one.1').then(JSON.parse)
         .then(c => c.should.eql({
           event: {
             name: 'One',
@@ -39,7 +39,7 @@ describe('Flat file Event Store', () => {
           traceId: 'trace'
         })))
 
-      .then(() => fs.readFileAsync(directory + '/records/one.2').then(JSON.parse)
+      .then(() => fs.readFileAsync(directory + '/Test/records/one.2').then(JSON.parse)
         .then(c => c.should.eql({
           event: {
             name: "Two",
@@ -51,17 +51,17 @@ describe('Flat file Event Store', () => {
           traceId: 'trace'
         })))
 
-      .then(() => fs.readFileAsync(directory + '/one.write').then(JSON.parse)
+      .then(() => fs.readFileAsync(directory + '/Test/one.write').then(JSON.parse)
         .then(c => c.should.eql({
           sequence: 2
         })))
   });
 
   it('keeps Events in sequence', () => {
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventStore(directory, 'Test');
     return Promise.resolve()
 
-      .then(() => fs.writeFileAsync(directory + '/one.write', JSON.stringify({
+      .then(() => fs.writeFileAsync(directory + '/Test/one.write', JSON.stringify({
         sequence: 42
       })))
 
@@ -71,10 +71,10 @@ describe('Flat file Event Store', () => {
   });
 
   it('avoids gaps in sequence', () => {
-    let store = new flatFile.EventStore(directory);
+    let store = new flatFile.EventStore(directory, 'Test');
     return Promise.resolve()
 
-      .then(() => fs.writeFileAsync(directory + '/one.write', JSON.stringify({
+      .then(() => fs.writeFileAsync(directory + '/Test/one.write', JSON.stringify({
         sequence: 42
       })))
 
@@ -90,7 +90,7 @@ describe('Flat file Event Store', () => {
       fs.writeFile = _writeFile;
     };
 
-    return Promise.resolve(new flatFile.EventStore(directory))
+    return Promise.resolve(new flatFile.EventStore(directory, 'Test'))
 
       .then(store => new Promise((y, n) => {
         store.record([new karma.Event('One', 'uno')], 'foo');
@@ -107,7 +107,7 @@ describe('Flat file Event Store', () => {
       fs.writeFile = _writeFile;
     };
 
-    return Promise.resolve(new flatFile.EventStore(directory))
+    return Promise.resolve(new flatFile.EventStore(directory, 'Test'))
 
       .then(store => new Promise((y, n) => {
         store.record([new karma.Event('One', 'uno')], 'foo');
@@ -118,7 +118,7 @@ describe('Flat file Event Store', () => {
   });
 
   it('unlocks after conflict', () => {
-    var store = new flatFile.EventStore(directory);
+    var store = new flatFile.EventStore(directory, 'Test');
 
     return store
 

@@ -7,13 +7,17 @@ const fake = require('./../fakes');
 const k = require('../../src/karma');
 
 describe('Subscribing to a Query', () => {
+  let Module;
 
-  let Module = (deps = {}) =>
-    new k.Module(
-      deps.log || new k.EventLog(),
-      deps.snapshots || new k.SnapshotStore(),
-      deps.strategy || new k.RepositoryStrategy(),
-      deps.store || new k.EventStore());
+  before(() => {
+    Module = (args = {}) =>
+      new k.Module(
+        args.name || 'Test',
+        args.log || new k.EventLog(),
+        args.snapshots || new k.SnapshotStore(),
+        args.strategy || new k.RepositoryStrategy(),
+        args.store || new k.EventStore());
+  });
 
   it('fails if no responder exists for that Query', () => {
     return Module()
@@ -43,7 +47,7 @@ describe('Subscribing to a Query', () => {
 
     let snapshots = new fake.SnapshotStore();
     snapshots.snapshots = [{
-      key: 'Projection-One-foo',
+      key: 'Test-Projection-One-foo',
       version: 'v1',
       snapshot: new k.Snapshot({}, {foods: 'snap '})
     }];

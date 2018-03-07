@@ -52,12 +52,13 @@ describe('Taking a Snapshot', () => {
     };
     Date.prototype = _Date.prototype;
 
-    Module = (deps = {}) =>
+    Module = (args = {}) =>
       new k.Module(
-        deps.log || new k.EventLog(),
-        deps.snapshots || new k.SnapshotStore(),
-        deps.strategy || new k.RepositoryStrategy(),
-        deps.store || new k.EventStore());
+        args.name || 'Test',
+        args.log || new k.EventLog(),
+        args.snapshots || new k.SnapshotStore(),
+        args.strategy || new k.RepositoryStrategy(),
+        args.store || new k.EventStore());
   });
 
   after(() => {
@@ -97,7 +98,7 @@ describe('Taking a Snapshot', () => {
           [unit.handle](new unit.Message('Foo'))
 
           .then(() => snapshots.stored.slice(0, 1).should.eql([{
-            key: unit.Unit.name + '-One-foo',
+            key: 'Test-' + unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: {heads: {foo: 21}, state: {bards: ['one']}}
           }]))
@@ -112,7 +113,7 @@ describe('Taking a Snapshot', () => {
 
         let snapshots = new fake.SnapshotStore();
         snapshots.snapshots = [{
-          key: unit.Unit.name + '-One-foo',
+          key: 'Test-' + unit.Unit.name + '-One-foo',
           version: 'v1',
           snapshot: new k.Snapshot({foo: 21}, {bards: ['snap']})
         }];
@@ -137,7 +138,7 @@ describe('Taking a Snapshot', () => {
           .then(() => state.should.eql([['snap', 'one']]))
 
           .then(() => snapshots.fetched.slice(0, 1).should.eql([{
-            key: unit.Unit.name + '-One-foo',
+            key: 'Test-' + unit.Unit.name + '-One-foo',
             version: 'v1',
           }]))
 
@@ -217,25 +218,25 @@ describe('Taking a Snapshot', () => {
           .then(() => domain[unit.handle](new unit.Message('Ban')))
 
           .then(() => snapshots.stored.should.deep.contain({
-            key: unit.Unit.name + '-One-foo',
+            key: 'Test-' + unit.Unit.name + '-One-foo',
             version: 'b16fcb72b0dfffc93af957c61bf1105b',
             snapshot: {heads: {}, state: {foo: 'one'}}
           }))
 
           .then(() => snapshots.stored.should.deep.contain({
-            key: unit.Unit.name + '-Two-bar',
+            key: 'Test-' + unit.Unit.name + '-Two-bar',
             version: 'b16fcb72b0dfffc93af957c61bf1105b',
             snapshot: {heads: {}, state: {foo: 'one'}}
           }))
 
           .then(() => snapshots.stored.should.deep.contain({
-            key: unit.Unit.name + '-Three-baz',
+            key: 'Test-' + unit.Unit.name + '-Three-baz',
             version: 'e0deac31cb640f25e89614c48a0f370e',
             snapshot: {heads: {}, state: {foo: 'two'}}
           }))
 
           .then(() => snapshots.stored.should.deep.contain({
-            key: unit.Unit.name + '-Four-ban',
+            key: 'Test-' + unit.Unit.name + '-Four-ban',
             version: '05f2c32b673bbd8641329a4866ea54bf',
             snapshot: {heads: {}, state: {foo: 'two'}}
           }))
@@ -270,7 +271,7 @@ describe('Taking a Snapshot', () => {
           .then(() => setTimeout = _setTimeout)
 
           .then(() => snapshots.stored.slice(0, 1).should.eql([{
-            key: unit.Unit.name + '-One-foo',
+            key: 'Test-' + unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: {heads: {}, state: {}}
           }]))
@@ -288,7 +289,7 @@ describe('Taking a Snapshot', () => {
 
           let snapshots = new fake.SnapshotStore();
           snapshots.snapshots = [{
-            key: unit.Unit.name + '-One-foo',
+            key: 'Test-' + unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: new k.Snapshot({foo: 21, bar: 22}, {bards: ['snap']})
           }];
@@ -313,7 +314,7 @@ describe('Taking a Snapshot', () => {
             .then(() => state.should.eql([['snap', 'one', 'two']]))
 
             .then(() => snapshots.fetched.slice(0, 1).should.eql([{
-              key: unit.Unit.name + '-One-foo',
+              key: 'Test-' + unit.Unit.name + '-One-foo',
               version: 'v1',
             }]))
 
@@ -353,7 +354,7 @@ describe('Taking a Snapshot', () => {
             [unit.handle](new unit.Message('Foo', 'foo'))
 
             .then(() => snapshots.stored.slice(0, 1).should.eql([{
-              key: unit.Unit.name + '-One-foo',
+              key: 'Test-' + unit.Unit.name + '-One-foo',
               version: 'v1',
               snapshot: {heads: {foo: 21, bar: 42}, state: {bards: ['one', 'two']}}
             }]))

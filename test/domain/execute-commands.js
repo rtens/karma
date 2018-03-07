@@ -7,26 +7,27 @@ const fake = require('./../fakes');
 const k = require('../../src/karma');
 
 describe('Executing a Command', () => {
-
-  let _Date = Date;
+  let _Date, Module;
 
   before(() => {
+    _Date = Date;
     Date = function () {
       return new _Date('2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
+
+    Module = (args = {}) =>
+      new k.Module(
+        args.name || 'Test',
+        args.log || new k.EventLog(),
+        args.snapshots || new k.SnapshotStore(),
+        args.strategy || new k.RepositoryStrategy(),
+        args.store || new k.EventStore())
   });
 
   after(() => {
     Date = _Date;
   });
-
-  let Module = (deps = {}) =>
-    new k.Module(
-      deps.log || new k.EventLog(),
-      deps.snapshots || new k.SnapshotStore(),
-      deps.strategy || new k.RepositoryStrategy(),
-      deps.store || new k.EventStore());
 
   it('fails if no executer is defined', () => {
     return Module()

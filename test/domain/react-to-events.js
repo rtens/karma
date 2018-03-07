@@ -7,26 +7,27 @@ const fake = require('./../fakes');
 const k = require('../../src/karma');
 
 describe('Reacting to an Event', () => {
-
-  let _Date = Date;
+  let _Date, Module;
 
   before(() => {
+    _Date = Date;
     Date = function () {
       return new _Date('2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
+
+    Module = (args = {}) =>
+      new k.Module(
+        args.name || 'Test',
+        args.log || new k.EventLog(),
+        args.snapshots || new k.SnapshotStore(),
+        args.strategy || new k.RepositoryStrategy(),
+        args.store || new k.EventStore());
   });
 
   after(() => {
     Date = _Date;
   });
-
-  let Module = (deps = {}) =>
-    new k.Module(
-      deps.log || new k.EventLog(),
-      deps.snapshots || new k.SnapshotStore(),
-      deps.strategy || new k.RepositoryStrategy(),
-      deps.store || new k.EventStore());
 
   it('fails if a Saga has more than one reactor for the same Event', () => {
     (() => Module()
@@ -79,12 +80,12 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one']))
 
       .then(() => store.recorded.should.eql([{
-        events: [new k.Event('_saga-reaction-locked', {
-          sagaKey: '_Saga-One-foo',
+        events: [new k.Event('__saga-reaction-locked', {
+          sagaKey: '__Test-Saga-One-foo',
           streamId: 'foo',
           sequence: 23
         })],
-        streamId: '_Saga-One-foo',
+        streamId: '__Test-Saga-One-foo',
         onSequence: undefined,
         traceId: undefined
       }]))
@@ -93,14 +94,14 @@ describe('Reacting to an Event', () => {
   it('uses last consecutive locked Reaction as head', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('_saga-reaction-locked', {streamId: 'foo', sequence: 20})),
-      new k.Record(new k.Event('_saga-reaction-locked', {streamId: 'foo', sequence: 21})),
-      new k.Record(new k.Event('_saga-reaction-unlocked', {streamId: 'foo', sequence: 21})),
-      new k.Record(new k.Event('_saga-reaction-unlocked', {streamId: 'foo', sequence: 22})),
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 20})),
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 21})),
+      new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 21})),
+      new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 22})),
 
-      new k.Record(new k.Event('_saga-reaction-locked', {streamId: 'bar', sequence: 21})),
-      new k.Record(new k.Event('_saga-reaction-locked', {streamId: 'bar', sequence: 22})),
-      new k.Record(new k.Event('_saga-reaction-locked', {streamId: 'bar', sequence: 24})),
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 21})),
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 22})),
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 24})),
     ];
 
     let store = new fake.EventStore();
@@ -153,7 +154,7 @@ describe('Reacting to an Event', () => {
   it('does not invoke reactor if reaction is locked', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('_saga-reaction-locked', {streamId: 'foo', sequence: 22}), '_Saga-One-bar', 3),
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 22}), '__Test-Saga-One-bar', 3),
       new k.Record(new k.Event('food', 'one'), 'foo', 21)
     ];
 
@@ -175,19 +176,19 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one', 'two']))
 
       .then(() => store.recorded.should.eql([{
-        events: [new k.Event('_saga-reaction-locked', {
-          sagaKey: '_Saga-One-bar',
+        events: [new k.Event('__saga-reaction-locked', {
+          sagaKey: '__Test-Saga-One-bar',
           streamId: 'foo',
           sequence: 21})],
-        streamId: '_Saga-One-bar',
+        streamId: '__Test-Saga-One-bar',
         onSequence: 3,
         traceId: undefined
       }, {
-        events: [new k.Event('_saga-reaction-locked', {
-          sagaKey: '_Saga-One-bar',
+        events: [new k.Event('__saga-reaction-locked', {
+          sagaKey: '__Test-Saga-One-bar',
           streamId: 'bar',
           sequence: 22})],
-        streamId: '_Saga-One-bar',
+        streamId: '__Test-Saga-One-bar',
         onSequence: 3,
         traceId: undefined
       }]))
@@ -196,8 +197,8 @@ describe('Reacting to an Event', () => {
   it('invokes reactor if reaction is unlocked', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('_saga-reaction-locked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 3),
-      new k.Record(new k.Event('_saga-reaction-unlocked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 4)
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 3),
+      new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 4)
     ];
 
     let store = new fake.EventStore();
@@ -252,24 +253,24 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one', 'one', 'one', 'one', 'one']))
 
       .then(() => store.recorded.map(r=>r.events.map(e=>[e.name, e.payload])).should.eql([
-        [["_saga-reaction-locked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["_saga-reaction-unlocked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-locked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-unlocked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["_saga-reaction-locked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["_saga-reaction-unlocked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-locked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-unlocked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["_saga-reaction-locked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["_saga-reaction-unlocked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-locked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-unlocked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["_saga-reaction-locked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["_saga-reaction-unlocked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-locked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-unlocked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["_saga-reaction-locked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["_saga-reaction-unlocked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-locked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-unlocked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["_saga-reaction-failed", {
+        [["__saga-reaction-failed", {
           sagaId: 'foo',
-          sagaKey: '_Saga-One-foo',
+          sagaKey: '__Test-Saga-One-foo',
           record: {
             event: {name: 'food', payload: 'one', time: new Date()},
             sequence: 23,
@@ -324,9 +325,9 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new k.Record(new k.Event('_saga-reaction-retry-requested', {
+      .then(() => log.publish(new k.Record(new k.Event('__saga-reaction-retry-requested', {
         sagaId: 'foo',
-        sagaKey: '_Saga-One-foo',
+        sagaKey: '__Test-Saga-One-foo',
         record: {
           event: {name: 'food', payload: 'one', time: new Date()},
           sequence: 23,
@@ -338,7 +339,7 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one']))
 
       .then(() => store.recorded.map(r=>r.events.map(e=>[e.name, e.payload])).should.eql([
-        [["_saga-reaction-locked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]]
+        [["__saga-reaction-locked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]]
       ]))
   });
 
@@ -362,9 +363,9 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new k.Record(new k.Event('_saga-reaction-retry-requested', {
+      .then(() => log.publish(new k.Record(new k.Event('__saga-reaction-retry-requested', {
         sagaId: 'foo',
-        sagaKey: '_Saga-One-foo',
+        sagaKey: '__Test-Saga-One-foo',
         record: {
           event: {name: 'food', payload: 'one', time: new Date()},
           sequence: 23,
@@ -376,12 +377,12 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one']))
 
       .then(() => store.recorded.map(r=>r.events.map(e=>[e.name, e.payload])).should.eql([
-        [["_saga-reaction-locked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["_saga-reaction-unlocked", {sagaKey: '_Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-locked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__saga-reaction-unlocked", {sagaKey: '__Test-Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["_saga-reaction-failed", {
+        [["__saga-reaction-failed", {
           sagaId: 'foo',
-          sagaKey: '_Saga-One-foo',
+          sagaKey: '__Test-Saga-One-foo',
           record: {
             event: {name: 'food', payload: 'one', time: new Date()},
             sequence: 23,

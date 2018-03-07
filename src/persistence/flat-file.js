@@ -19,16 +19,21 @@ function _mkdir(dir) {
 }
 
 class FlatFileEventStore extends karma.EventStore {
-  constructor(baseDir) {
+  constructor(baseDir, moduleName) {
     super();
+    this._module = moduleName;
+
     this._paths = {
-      base: baseDir + '/',
-      records: baseDir + '/records/',
-      write: streamId => baseDir + '/' + streamId + '.write',
-      lock: streamId => baseDir + '/' + streamId + '.lock',
+      base: baseDir,
+      module: [baseDir, moduleName].join('/'),
+      records: [baseDir, moduleName, 'records'].join('/'),
+      write: streamId => [baseDir, moduleName, streamId + '.write'].join('/'),
+      lock: streamId => [baseDir, moduleName, streamId + '.lock'].join('/'),
+      record: (streamId, sequence) => [baseDir, moduleName, 'records', streamId + '.' + sequence].join('/'),
     };
 
-    _mkdir(baseDir);
+    _mkdir(this._paths.base);
+    _mkdir(this._paths.module);
     _mkdir(this._paths.records);
   }
 
@@ -66,7 +71,7 @@ class FlatFileEventStore extends karma.EventStore {
     var files = events
       .map((event, i) => new karma.Record(event, streamId, onSequence + 1 + i, traceId))
       .map(record => ({
-        path: this._paths.records + streamId + '.' + record.sequence,
+        path: this._paths.record(streamId, record.sequence),
         content: JSON.stringify(record, null, 2)
       }));
 
@@ -79,15 +84,20 @@ class FlatFileEventStore extends karma.EventStore {
 }
 
 class FlatFileEventLog extends karma.EventLog {
-  constructor(baseDir) {
+  constructor(baseDir, moduleNames) {
     super();
+
+    this._modules = moduleNames;
     this._paths = {
-      base: baseDir + '/',
-      records: baseDir + '/records/'
+      module: module => baseDir + '/' + module + '/',
+      records: module => baseDir + '/' + module + '/records/'
     };
 
     _mkdir(baseDir);
-    _mkdir(this._paths.records);
+    moduleNames.forEach(module => {
+      _mkdir(this._paths.module(module));
+      _mkdir(this._paths.records(module))
+    });
 
     this._subscriptions = [];
     this._notificationQueue = queue({concurrency: 1, autostart: true});
@@ -98,21 +108,7 @@ class FlatFileEventLog extends karma.EventLog {
 
     return this._startWatching()
 
-      .then(() => fs.readdirAsync(this._paths.records))
-
-      .then(files => files.map(f => ({
-        name: f,
-        streamId: path.basename(f, path.extname(f)),
-        sequence: parseInt(path.extname(f).substr(1))
-      })))
-
-      .then(files => files.sort((a, b) => a.sequence - b.sequence))
-
-      .then(files => files.filter(f => !streamHeads[f.streamId] || f.sequence > streamHeads[f.streamId]))
-
-      .then(files => files.map(file => this._paths.records + file.name))
-
-      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, [subscription])))
+      .then(() => this._readStreams(streamHeads, subscription))
 
       .then(() => this._subscriptions.push(subscription))
 
@@ -133,11 +129,30 @@ class FlatFileEventLog extends karma.EventLog {
     }
 
     return new Promise(y =>
-      this._watcher = chokidar.watch(this._paths.records).on('ready', y))
+      this._watcher = chokidar.watch(this._modules.map(this._paths.records)).on('ready', y))
 
       .then(() => this._watcher.on('add', (file) => this._notificationQueue.push(() =>
-          this._notifySubscribers(file, this._subscriptions.filter(s => s.active)))))
+        this._notifySubscribers(file, this._subscriptions.filter(s => s.active)))))
+  }
 
+  _readStreams(streamHeads, subscription) {
+    return Promise.all(this._modules.map(module => Promise.resolve()
+
+      .then(() => fs.readdirAsync(this._paths.records(module)))
+
+      .then(files => files.map(f => ({
+        name: f,
+        streamId: path.basename(f, path.extname(f)),
+        sequence: parseInt(path.extname(f).substr(1))
+      })))
+
+      .then(files => files.sort((a, b) => a.sequence - b.sequence))
+
+      .then(files => files.filter(f => !streamHeads[f.streamId] || f.sequence > streamHeads[f.streamId]))
+
+      .then(files => files.map(file => this._paths.records(module) + file.name))
+
+      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, [subscription])))))
   }
 
   _notifySubscribers(path, subscriptions) {
@@ -163,17 +178,20 @@ class FlatFileEventLog extends karma.EventLog {
 }
 
 class FlatFileSnapshotStore extends karma.SnapshotStore {
-  constructor(baseDir) {
+  constructor(baseDir, moduleName) {
     super();
-    this._dir = baseDir + '/snapshots';
 
-    FlatFileSnapshotStore._mkdir(baseDir);
-    FlatFileSnapshotStore._mkdir(this._dir);
+    this._module = moduleName;
+    this._dir = baseDir + '/' + moduleName + '/snapshots';
+
+    _mkdir(baseDir);
+    _mkdir(baseDir + '/' + moduleName);
+    _mkdir(this._dir);
   }
 
   store(key, version, snapshot) {
     var path = this._dir + '/' + key;
-    FlatFileSnapshotStore._mkdir(path);
+    _mkdir(path);
 
     return fs.writeFileAsync(path + '/' + version, JSON.stringify(snapshot, null, 2))
   }
@@ -188,14 +206,6 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
 
     return fs.readFileAsync(file)
       .then(content => JSON.parse(content))
-  }
-
-  static _mkdir(dir) {
-    try {
-      fs.mkdirSync(dir)
-    } catch (err) {
-      if (err.code !== 'EEXIST') throw err
-    }
   }
 
   _clear(directory) {

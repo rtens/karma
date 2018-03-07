@@ -6,13 +6,17 @@ chai.should();
 const k = require('../../src/karma');
 
 describe('Responding to a Query', () => {
+  let Module;
 
-  let Module = (deps = {}) =>
-    new k.Module(
-      deps.log || new k.EventLog(),
-      deps.snapshots || new k.SnapshotStore(),
-      deps.strategy || new k.RepositoryStrategy(),
-      deps.store || new k.EventStore());
+  before(() => {
+    Module = (args = {}) =>
+      new k.Module(
+        args.name || 'Test',
+        args.log || new k.EventLog(),
+        args.snapshots || new k.SnapshotStore(),
+        args.strategy || new k.RepositoryStrategy(),
+        args.store || new k.EventStore());
+  });
 
   it('fails if no responder exists for that Query', () => {
     return Module()

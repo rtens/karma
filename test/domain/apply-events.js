@@ -56,12 +56,13 @@ describe('Applying Events', () => {
     };
     Date.prototype = _Date.prototype;
 
-    Module = (deps = {}) =>
+    Module = (args = {}) =>
       new k.Module(
-        deps.log || new k.EventLog(),
-        deps.snapshots || new k.SnapshotStore(),
-        deps.strategy || new k.RepositoryStrategy(),
-        deps.store || new k.EventStore());
+        args.name || 'Test',
+        args.log || new k.EventLog(),
+        args.snapshots || new k.SnapshotStore(),
+        args.strategy || new k.RepositoryStrategy(),
+        args.store || new k.EventStore());
   });
 
   after(() => {
