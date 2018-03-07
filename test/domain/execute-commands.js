@@ -19,14 +19,34 @@ describe('Executing a Command', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.log || new k.EventLog(),
-        args.snapshots || new k.SnapshotStore(),
         args.strategy || new k.RepositoryStrategy(),
-        args.store || new k.EventStore())
+        {
+          eventLog: () => args.log || new k.EventLog(),
+          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
+          eventStore: () => args.store || new k.EventStore()
+        },
+        {
+          eventLog: () => args.metaLog || new k.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
+          eventStore: () => args.metaStore || new k.EventStore()
+        })
   });
 
   after(() => {
     Date = _Date;
+  });
+
+  it('passes Module names to the EventStore', () => {
+    let oassedNames = [];
+    var persistence = new class extends k.PersistenceFactory {
+      //noinspection JSUnusedGlobalSymbols
+      eventStore(name) {
+        oassedNames.push(name);
+      }
+    };
+    new k.Module('Foo', new k.RepositoryStrategy, persistence, persistence);
+
+    oassedNames.should.eql(['Foo', 'Foo__meta']);
   });
 
   it('fails if no executer is defined', () => {

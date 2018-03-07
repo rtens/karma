@@ -3,24 +3,29 @@ const crypto = require('crypto');
 //------ DOMAIN -------//
 
 class BaseModule {
-  constructor(name, eventLog, snapshotStore, repositoryStrategy, eventStore) {
-    this._log = eventLog;
+  constructor(name, repositoryStrategy, persistenceFactory) {
+    this._log = new MultiEventLog().add(persistenceFactory.eventLog(name));
+    this._snapshots = persistenceFactory.snapshotStore(name);
+    this._store = persistenceFactory.eventStore(name);
 
-    this._aggregates = new AggregateRepository(name, eventLog, snapshotStore, repositoryStrategy, eventStore);
-    this._projections = new ProjectionRepository(name, eventLog, snapshotStore, repositoryStrategy);
-    this._subscriptions = new SubscriptionRepository(name, eventLog, snapshotStore, repositoryStrategy);
+    this._projections = new ProjectionRepository(this._log, this._snapshots, repositoryStrategy);
+    this._subscriptions = new SubscriptionRepository(this._log, this._snapshots, repositoryStrategy);
+    this._aggregates = new AggregateRepository(this._log, this._snapshots, repositoryStrategy, this._store);
+  }
+
+  use(eventLog) {
+    this._log.add(eventLog);
+    return this;
   }
 
   add(unit) {
-    switch (unit.constructor.name) {
-      case Aggregate.name:
-        this._aggregates.add(unit);
-        break;
-      case Projection.name:
-        this._projections.add(unit);
-        this._subscriptions.add(unit);
-        break;
+    if (unit instanceof Aggregate) {
+      this._aggregates.add(unit);
+    } else if (unit instanceof Projection) {
+      this._projections.add(unit);
+      this._subscriptions.add(unit);
     }
+
     return this
   }
 
@@ -45,11 +50,13 @@ class BaseModule {
 }
 
 class Module extends BaseModule {
-  constructor(name, eventLog, snapshotStore, repositoryStrategy, eventStore) {
-    super(name, eventLog, snapshotStore, repositoryStrategy, eventStore);
+  constructor(name, repositoryStrategy, persistenceFactory, metaPersistenceFactory) {
+    super(name, repositoryStrategy, persistenceFactory);
 
-    this._meta = new BaseModule(name + '__meta', eventLog, snapshotStore, repositoryStrategy, eventStore);
-    this._sagas = new SagaRepository(name, eventLog, snapshotStore, repositoryStrategy, this._meta);
+    this._log.add(metaPersistenceFactory.eventLog('__admin'));
+
+    this._meta = new BaseModule(name + '__meta', repositoryStrategy, metaPersistenceFactory);
+    this._sagas = new SagaRepository(this._log, this._snapshots, repositoryStrategy, this._meta);
 
     this._subscription = null;
     this._meta._aggregates.add(new SagaLockAggregate());
@@ -58,13 +65,12 @@ class Module extends BaseModule {
   }
 
   add(unit) {
-    switch (unit.constructor.name) {
-      case Saga.name:
-        this._sagas.add(unit);
-        break;
-      default:
-        super.add(unit)
+    if (unit instanceof Saga) {
+      this._sagas.add(unit);
+    } else {
+      super.add(unit)
     }
+
     return this
   }
 
@@ -120,17 +126,83 @@ class Record {
   }
 }
 
+//--- PERSISTENCE ---//
+
 class EventLog {
+  constructor(moduleName) {
+    this.module = moduleName;
+  }
+
   //noinspection JSUnusedLocalSymbols
   subscribe(streamHeads, subscriber) {
     return Promise.resolve({cancel: () => null})
   }
 }
 
+class MultiEventLog extends EventLog {
+  constructor() {
+    super();
+    this._logs = [];
+  }
+
+  add(eventLog) {
+    this._logs.push(eventLog);
+    return this
+  }
+
+  subscribe(streamHeads, subscriber) {
+    return Promise.all(this._logs.map(log => log.subscribe(streamHeads, subscriber)))
+      .then(subscriptions => ({cancel: () => subscriptions.forEach(s => s.cancel())}))
+  }
+}
+
 class EventStore {
+  constructor(moduleName) {
+    this.module = moduleName;
+  }
+
   //noinspection JSUnusedLocalSymbols
   record(events, streamId, onSequence, traceId) {
     return Promise.resolve()
+  }
+}
+
+class PersistenceFactory {
+  eventLog(moduleName) {
+    return new EventLog(moduleName)
+  }
+
+  snapshotStore(moduleName) {
+    return new SnapshotStore(moduleName);
+  }
+
+  eventStore(moduleName) {
+    return new EventStore(moduleName);
+  }
+}
+
+//------ SNAPSHOT -----//
+
+class SnapshotStore {
+  constructor(moduleName) {
+    this.module = moduleName;
+  }
+
+  //noinspection JSUnusedLocalSymbols
+  store(key, version, snapshot) {
+    return Promise.resolve()
+  }
+
+  //noinspection JSUnusedLocalSymbols
+  fetch(key, version) {
+    return Promise.reject(new Error('No snapshot'))
+  }
+}
+
+class Snapshot {
+  constructor(heads, state) {
+    this.heads = heads;
+    this.state = state;
   }
 }
 
@@ -186,11 +258,10 @@ class Unit {
 }
 
 class UnitInstance {
-  constructor(id, definition, module, log, snapshots) {
+  constructor(id, definition, log, snapshots) {
     this.id = id;
 
     this._definition = definition;
-    this._module = module;
     this._log = log;
     this._snapshots = snapshots;
 
@@ -207,7 +278,6 @@ class UnitInstance {
 
   get _key() {
     return [
-      this._module,
       this._definition.constructor.name,
       this._definition.name,
       this.id
@@ -271,8 +341,7 @@ class UnitInstance {
 }
 
 class UnitRepository {
-  constructor(module, log, snapshots, strategy) {
-    this._module = module;
+  constructor(log, snapshots, strategy) {
     this._log = log;
     this._snapshots = snapshots;
     this._strategy = strategy;
@@ -355,8 +424,8 @@ class Aggregate extends Unit {
 }
 
 class AggregateInstance extends UnitInstance {
-  constructor(id, definition, module, log, snapshots, store) {
-    super(id, definition, module, log, snapshots);
+  constructor(id, definition, log, snapshots, store) {
+    super(id, definition, log, snapshots);
     this._store = store;
   }
 
@@ -385,8 +454,8 @@ class AggregateInstance extends UnitInstance {
 }
 
 class AggregateRepository extends UnitRepository {
-  constructor(module, log, snapshots, strategy, store) {
-    super(module, log, snapshots, strategy);
+  constructor(log, snapshots, strategy, store) {
+    super(log, snapshots, strategy);
     this._store = store;
   }
 
@@ -405,7 +474,7 @@ class AggregateRepository extends UnitRepository {
   }
 
   _createInstance(definition, aggregateId) {
-    return new AggregateInstance(aggregateId, definition, this._module, this._log, this._snapshots, this._store);
+    return new AggregateInstance(aggregateId, definition, this._log, this._snapshots, this._store);
   }
 }
 
@@ -470,15 +539,15 @@ class ProjectionRepository extends UnitRepository {
   }
 
   _createInstance(definition, projectionId) {
-    return new ProjectionInstance(projectionId, definition, this._module, this._log, this._snapshots);
+    return new ProjectionInstance(projectionId, definition, this._log, this._snapshots);
   }
 }
 
 //---- SUBSCRIPTION ---//
 
 class SubscriptionInstance extends ProjectionInstance {
-  constructor(id, definition, module, log, snapshots) {
-    super(id, definition, module, log, snapshots);
+  constructor(id, definition, log, snapshots) {
+    super(id, definition, log, snapshots);
     this._subscriptions = [];
     this._unloaded = false;
   }
@@ -506,7 +575,7 @@ class SubscriptionInstance extends ProjectionInstance {
 
 class SubscriptionRepository extends ProjectionRepository {
   _createInstance(definition, projectionId) {
-    return new SubscriptionInstance(projectionId, definition, this._module, this._log, this._snapshots);
+    return new SubscriptionInstance(projectionId, definition, this._log, this._snapshots);
   }
 }
 
@@ -535,8 +604,8 @@ class Saga extends Unit {
 }
 
 class SagaInstance extends UnitInstance {
-  constructor(id, definition, module, log, snapshots, meta) {
-    super(id, definition, module, log, snapshots);
+  constructor(id, definition, log, snapshots, meta) {
+    super(id, definition, log, snapshots);
     this._meta = meta;
   }
 
@@ -602,13 +671,13 @@ class SagaInstance extends UnitInstance {
 }
 
 class SagaRepository extends UnitRepository {
-  constructor(module, log, snapshots, strategy, metaModule) {
-    super(module, log, snapshots, strategy);
+  constructor(log, snapshots, strategy, metaModule) {
+    super(log, snapshots, strategy);
     this._meta = metaModule;
   }
 
   _createInstance(definition, sagaId) {
-    return new SagaInstance(sagaId, definition, this._module, this._log, this._snapshots, this._meta);
+    return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._meta);
   }
 }
 
@@ -684,27 +753,6 @@ class SagaReactionHeadsProjection extends Projection {
   }
 }
 
-//------ SNAPSHOT -----//
-
-class SnapshotStore {
-  //noinspection JSUnusedLocalSymbols
-  store(key, version, snapshot) {
-    return Promise.resolve()
-  }
-
-  //noinspection JSUnusedLocalSymbols
-  fetch(key, version) {
-    return Promise.reject(new Error('No snapshot'))
-  }
-}
-
-class Snapshot {
-  constructor(heads, state) {
-    this.heads = heads;
-    this.state = state;
-  }
-}
-
 module.exports = {
   Module,
 
@@ -720,6 +768,7 @@ module.exports = {
 
   Record,
   EventLog,
+  PersistenceFactory,
   SnapshotStore,
   EventStore,
   Snapshot

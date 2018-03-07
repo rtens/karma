@@ -55,14 +55,34 @@ describe('Taking a Snapshot', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.log || new k.EventLog(),
-        args.snapshots || new k.SnapshotStore(),
         args.strategy || new k.RepositoryStrategy(),
-        args.store || new k.EventStore());
+        {
+          eventLog: () => args.log || new k.EventLog(),
+          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
+          eventStore: () => args.store || new k.EventStore()
+        },
+        {
+          eventLog: () => args.metaLog || new k.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
+          eventStore: () => args.metaStore || new k.EventStore()
+        })
   });
 
   after(() => {
     Date = _Date;
+  });
+
+  it('passes Module names to the SnapshotStore', () => {
+    let passedNames = [];
+    var persistence = new class extends k.PersistenceFactory {
+      //noinspection JSUnusedGlobalSymbols
+      snapshotStore(name) {
+        passedNames.push(name);
+      }
+    };
+    new k.Module('Foo', new k.RepositoryStrategy, persistence, persistence);
+
+    passedNames.should.eql(['Foo', 'Foo__meta']);
   });
 
   Object.values(units).forEach(unit =>
@@ -97,8 +117,8 @@ describe('Taking a Snapshot', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => snapshots.stored.slice(0, 1).should.eql([{
-            key: 'Test-' + unit.Unit.name + '-One-foo',
+          .then(() => snapshots.stored.should.eql([{
+            key: unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: {heads: {foo: 21}, state: {bards: ['one']}}
           }]))
@@ -113,7 +133,7 @@ describe('Taking a Snapshot', () => {
 
         let snapshots = new fake.SnapshotStore();
         snapshots.snapshots = [{
-          key: 'Test-' + unit.Unit.name + '-One-foo',
+          key: unit.Unit.name + '-One-foo',
           version: 'v1',
           snapshot: new k.Snapshot({foo: 21}, {bards: ['snap']})
         }];
@@ -137,12 +157,12 @@ describe('Taking a Snapshot', () => {
 
           .then(() => state.should.eql([['snap', 'one']]))
 
-          .then(() => snapshots.fetched.slice(0, 1).should.eql([{
-            key: 'Test-' + unit.Unit.name + '-One-foo',
+          .then(() => snapshots.fetched.should.eql([{
+            key: unit.Unit.name + '-One-foo',
             version: 'v1',
           }]))
 
-          .then(() => log.replayed.slice(0, 1).should.eql([{
+          .then(() => log.replayed.should.eql([{
             streamHeads: {foo: 21}
           }]))
       });
@@ -217,29 +237,23 @@ describe('Taking a Snapshot', () => {
 
           .then(() => domain[unit.handle](new unit.Message('Ban')))
 
-          .then(() => snapshots.stored.should.deep.contain({
-            key: 'Test-' + unit.Unit.name + '-One-foo',
+          .then(() => snapshots.stored.should.eql([{
+            key: unit.Unit.name + '-One-foo',
             version: 'b16fcb72b0dfffc93af957c61bf1105b',
             snapshot: {heads: {}, state: {foo: 'one'}}
-          }))
-
-          .then(() => snapshots.stored.should.deep.contain({
-            key: 'Test-' + unit.Unit.name + '-Two-bar',
+          }, {
+            key: unit.Unit.name + '-Two-bar',
             version: 'b16fcb72b0dfffc93af957c61bf1105b',
             snapshot: {heads: {}, state: {foo: 'one'}}
-          }))
-
-          .then(() => snapshots.stored.should.deep.contain({
-            key: 'Test-' + unit.Unit.name + '-Three-baz',
+          }, {
+            key: unit.Unit.name + '-Three-baz',
             version: 'e0deac31cb640f25e89614c48a0f370e',
             snapshot: {heads: {}, state: {foo: 'two'}}
-          }))
-
-          .then(() => snapshots.stored.should.deep.contain({
-            key: 'Test-' + unit.Unit.name + '-Four-ban',
+          }, {
+            key: unit.Unit.name + '-Four-ban',
             version: '05f2c32b673bbd8641329a4866ea54bf',
             snapshot: {heads: {}, state: {foo: 'two'}}
-          }))
+          }]))
       });
 
       it('saves the Snapshot if handler fails', () => {
@@ -270,8 +284,8 @@ describe('Taking a Snapshot', () => {
 
           .then(() => setTimeout = _setTimeout)
 
-          .then(() => snapshots.stored.slice(0, 1).should.eql([{
-            key: 'Test-' + unit.Unit.name + '-One-foo',
+          .then(() => snapshots.stored.should.eql([{
+            key: unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: {heads: {}, state: {}}
           }]))
@@ -289,7 +303,7 @@ describe('Taking a Snapshot', () => {
 
           let snapshots = new fake.SnapshotStore();
           snapshots.snapshots = [{
-            key: 'Test-' + unit.Unit.name + '-One-foo',
+            key: unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: new k.Snapshot({foo: 21, bar: 22}, {bards: ['snap']})
           }];
@@ -313,12 +327,12 @@ describe('Taking a Snapshot', () => {
 
             .then(() => state.should.eql([['snap', 'one', 'two']]))
 
-            .then(() => snapshots.fetched.slice(0, 1).should.eql([{
-              key: 'Test-' + unit.Unit.name + '-One-foo',
+            .then(() => snapshots.fetched.should.eql([{
+              key: unit.Unit.name + '-One-foo',
               version: 'v1',
             }]))
 
-            .then(() => log.replayed.slice(0, 1).should.eql([{
+            .then(() => log.replayed.should.eql([{
               streamHeads: {foo: 21, bar: 22}
             }]))
         });
@@ -353,8 +367,8 @@ describe('Taking a Snapshot', () => {
 
             [unit.handle](new unit.Message('Foo', 'foo'))
 
-            .then(() => snapshots.stored.slice(0, 1).should.eql([{
-              key: 'Test-' + unit.Unit.name + '-One-foo',
+            .then(() => snapshots.stored.should.eql([{
+              key: unit.Unit.name + '-One-foo',
               version: 'v1',
               snapshot: {heads: {foo: 21, bar: 42}, state: {bards: ['one', 'two']}}
             }]))

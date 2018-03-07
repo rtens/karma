@@ -21,7 +21,7 @@ describe('Flat file Event Log', () => {
 
   it('replays Records from files in order', () => {
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     return Promise.all([
       fs.writeFileAsync(directory + '/Test/records/two.3', JSON.stringify({event: {name: 'Two'}})),
@@ -38,7 +38,7 @@ describe('Flat file Event Log', () => {
 
   it('inflates Event time', () => {
     let times = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     return fs.writeFileAsync(directory + '/Test/records/two.3', JSON.stringify({event: {time: '2011-12-13T14:15:16Z'}}))
 
@@ -51,7 +51,7 @@ describe('Flat file Event Log', () => {
 
   it('filters Records by sequence heads', () => {
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     return Promise.all([
       fs.writeFileAsync(directory + '/Test/records/one.11', JSON.stringify({event: {name: 'Not'}})),
@@ -69,7 +69,7 @@ describe('Flat file Event Log', () => {
 
   it('notifies about new Records', () => {
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     return Promise.resolve()
 
@@ -86,39 +86,9 @@ describe('Flat file Event Log', () => {
         .then(() => records.should.eql(['One'])))
   });
 
-  it('combines events of multiple modules', () => {
-    let records = {foo: [], bar: []};
-    let log = new flatFile.EventLog(directory, ['Foo', 'Bar']);
-
-    return Promise.all([
-      fs.writeFileAsync(directory + '/Foo/records/foo.1', JSON.stringify({event: {name: 'One'}, streamId: 'foo'})),
-      fs.writeFileAsync(directory + '/Bar/records/bar.1', JSON.stringify({event: {name: 'Uno'}, streamId: 'bar'})),
-    ])
-
-      .then(() => log.subscribe({}, record => records[record.streamId].push(record.event.name)))
-
-      .then(subscription => Promise.resolve()
-
-        .then(() => fs.writeFileAsync(directory + '/Foo/records/foo.2', JSON.stringify({
-          event: {name: 'Two'},
-          streamId: 'foo'
-        })))
-
-        .then(() => fs.writeFileAsync(directory + '/Bar/records/bar.2', JSON.stringify({
-          event: {name: 'Dos'},
-          streamId: 'bar'
-        })))
-
-        .then(() => new Promise(y => setTimeout(y, 100)))
-
-        .then(() => subscription.cancel())
-
-        .then(() => records.should.eql({foo: ['One', 'Two'], bar: ['Uno', 'Dos']})))
-  });
-
   it('de-duplicates notifications', () => {
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     let subscription1, subscription2;
     return log
@@ -154,7 +124,7 @@ describe('Flat file Event Log', () => {
 
   it('resets de-duplication on cancellation', () => {
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     return fs.writeFileAsync(directory + '/Test/records/one-42', JSON.stringify({event: {name: 'One'}}))
 
@@ -177,7 +147,7 @@ describe('Flat file Event Log', () => {
     };
 
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     let subscription;
     return log
@@ -201,7 +171,7 @@ describe('Flat file Event Log', () => {
 
   it('stops notifying when cancelled', () => {
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     return log
 
@@ -218,7 +188,7 @@ describe('Flat file Event Log', () => {
 
   it('restarts notifying about Events', () => {
     let records = [];
-    let log = new flatFile.EventLog(directory, ['Test']);
+    let log = new flatFile.EventLog(directory, 'Test');
 
     let subscription;
     return log

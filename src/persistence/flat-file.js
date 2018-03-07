@@ -21,7 +21,6 @@ function _mkdir(dir) {
 class FlatFileEventStore extends karma.EventStore {
   constructor(baseDir, moduleName) {
     super();
-    this._module = moduleName;
 
     this._paths = {
       base: baseDir,
@@ -84,20 +83,18 @@ class FlatFileEventStore extends karma.EventStore {
 }
 
 class FlatFileEventLog extends karma.EventLog {
-  constructor(baseDir, moduleNames) {
+  constructor(baseDir, moduleName) {
     super();
 
-    this._modules = moduleNames;
     this._paths = {
-      module: module => baseDir + '/' + module + '/',
-      records: module => baseDir + '/' + module + '/records/'
+      base: baseDir + '/' ,
+      module: baseDir + '/' + moduleName + '/',
+      records: baseDir + '/' + moduleName + '/records/'
     };
 
-    _mkdir(baseDir);
-    moduleNames.forEach(module => {
-      _mkdir(this._paths.module(module));
-      _mkdir(this._paths.records(module))
-    });
+    _mkdir(this._paths.base);
+    _mkdir(this._paths.module);
+    _mkdir(this._paths.records);
 
     this._subscriptions = [];
     this._notificationQueue = queue({concurrency: 1, autostart: true});
@@ -129,16 +126,16 @@ class FlatFileEventLog extends karma.EventLog {
     }
 
     return new Promise(y =>
-      this._watcher = chokidar.watch(this._modules.map(this._paths.records)).on('ready', y))
+      this._watcher = chokidar.watch(this._paths.records).on('ready', y))
 
       .then(() => this._watcher.on('add', (file) => this._notificationQueue.push(() =>
         this._notifySubscribers(file, this._subscriptions.filter(s => s.active)))))
   }
 
   _readStreams(streamHeads, subscription) {
-    return Promise.all(this._modules.map(module => Promise.resolve()
+    return Promise.resolve()
 
-      .then(() => fs.readdirAsync(this._paths.records(module)))
+      .then(() => fs.readdirAsync(this._paths.records))
 
       .then(files => files.map(f => ({
         name: f,
@@ -150,9 +147,9 @@ class FlatFileEventLog extends karma.EventLog {
 
       .then(files => files.filter(f => !streamHeads[f.streamId] || f.sequence > streamHeads[f.streamId]))
 
-      .then(files => files.map(file => this._paths.records(module) + file.name))
+      .then(files => files.map(file => this._paths.records + file.name))
 
-      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, [subscription])))))
+      .then(paths => Promise.each(paths, path => this._notifySubscribers(path, [subscription])))
   }
 
   _notifySubscribers(path, subscriptions) {
@@ -181,7 +178,6 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
   constructor(baseDir, moduleName) {
     super();
 
-    this._module = moduleName;
     this._dir = baseDir + '/' + moduleName + '/snapshots';
 
     _mkdir(baseDir);

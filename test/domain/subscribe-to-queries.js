@@ -13,10 +13,17 @@ describe('Subscribing to a Query', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.log || new k.EventLog(),
-        args.snapshots || new k.SnapshotStore(),
         args.strategy || new k.RepositoryStrategy(),
-        args.store || new k.EventStore());
+        {
+          eventLog: () => args.log || new k.EventLog(),
+          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
+          eventStore: () => args.store || new k.EventStore()
+        },
+        {
+          eventLog: () => args.metaLog || new k.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
+          eventStore: () => args.metaStore || new k.EventStore()
+        })
   });
 
   it('fails if no responder exists for that Query', () => {
@@ -47,7 +54,7 @@ describe('Subscribing to a Query', () => {
 
     let snapshots = new fake.SnapshotStore();
     snapshots.snapshots = [{
-      key: 'Test-Projection-One-foo',
+      key: 'Projection-One-foo',
       version: 'v1',
       snapshot: new k.Snapshot({}, {foods: 'snap '})
     }];

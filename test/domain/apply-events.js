@@ -16,7 +16,6 @@ describe('Applying Events', () => {
       Message: k.Command,
       handling: 'executing',
       handle: 'execute',
-      extraReplay: 0
     },
     respond: {
       name: 'a Projection',
@@ -24,7 +23,6 @@ describe('Applying Events', () => {
       Message: k.Query,
       handling: 'respondingTo',
       handle: 'respondTo',
-      extraReplay: 0
     },
     subscribe: {
       name: 'a subscribed Projection',
@@ -32,7 +30,6 @@ describe('Applying Events', () => {
       Message: k.Query,
       handling: 'respondingTo',
       handle: 'subscribeTo',
-      extraReplay: 0
     },
     react: {
       name: 'a Saga',
@@ -45,7 +42,6 @@ describe('Applying Events', () => {
       },
       handling: 'reactingTo',
       handle: 'reactTo',
-      extraReplay: 1
     }
   };
 
@@ -59,14 +55,34 @@ describe('Applying Events', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.log || new k.EventLog(),
-        args.snapshots || new k.SnapshotStore(),
         args.strategy || new k.RepositoryStrategy(),
-        args.store || new k.EventStore());
+        {
+          eventLog: () => args.log || new k.EventLog(),
+          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
+          eventStore: () => args.store || new k.EventStore()
+        },
+        {
+          eventLog: () => args.metaLog || new k.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
+          eventStore: () => args.metaStore || new k.EventStore()
+        })
   });
 
   after(() => {
     Date = _Date;
+  });
+
+  it('passes Module names to the EventLog', () => {
+    let passedNames = [];
+    var persistence = new class extends k.PersistenceFactory {
+      //noinspection JSUnusedGlobalSymbols
+      eventLog(name) {
+        passedNames.push(name);
+      }
+    };
+    new k.Module('Foo', new k.RepositoryStrategy, persistence, persistence);
+
+    passedNames.should.eql(['Foo', '__admin', 'Foo__meta']);
   });
 
   Object.values(units).forEach(unit =>
@@ -104,7 +120,7 @@ describe('Applying Events', () => {
 
           .then(() => state.should.eql([['a one', 'b one', 'a two', 'b two']]))
 
-          .then(() => log.replayed[0].should.eql({streamHeads: {}}))
+          .then(() => log.replayed.should.eql([{streamHeads: {}}]))
       });
 
       it('waits for the Unit to be loaded', () => {
@@ -163,7 +179,7 @@ describe('Applying Events', () => {
 
           .then(() => module[unit.handle](new unit.Message('Foo', 'two')))
 
-          .then(() => log.replayed.length.should.equal(1 + unit.extraReplay))
+          .then(() => log.replayed.length.should.equal(1))
 
           .then(() => state.should.eql(['a one', 'a two']))
       });
@@ -184,7 +200,33 @@ describe('Applying Events', () => {
 
           .then(() => applied.should.eql(['one']))
 
-          .then(() => log.subscriptions.slice(-1).map(s => s.active).should.eql([true]))
+          .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
+      });
+
+      it('subscribes the Unit to multiple EventLogs', () => {
+        let log1 = new fake.EventLog();
+        let log2 = new fake.EventLog();
+
+        let applied = [];
+        return Module({log: log1})
+
+          .use(log2)
+
+          .add(new unit.Unit('One')
+            .applying('bard', (payload) => applied.push(payload))
+            [unit.handling]('Foo', $=>'foo', ()=>null))
+
+          [unit.handle](new unit.Message('Foo'))
+
+          .then(() => log1.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+
+          .then(() => log2.publish(new k.Record(new k.Event('bard', 'two'), 'foo')))
+
+          .then(() => applied.should.eql(['one', 'two']))
+
+          .then(() => log1.subscriptions.map(s => s.active).should.eql([true]))
+
+          .then(() => log2.subscriptions.map(s => s.active).should.eql([true]))
       });
 
       if (unit.name != 'a subscribed Projection') {
@@ -211,9 +253,9 @@ describe('Applying Events', () => {
 
             .then(() => module[unit.handle](new unit.Message('Foo')))
 
-            .then(() => log.replayed.length.should.be.least(2 + unit.extraReplay))
+            .then(() => log.replayed.length.should.equal(2))
 
-            .then(() => log.subscriptions.slice(-2).map(s => s.active).should.eql([false, false]))
+            .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
         });
       }
 
@@ -236,9 +278,7 @@ describe('Applying Events', () => {
 
             .then(() => applied.should.eql(['one', 'two']))
 
-            .then(() => log.replayed.slice(0, 1).should.eql([{
-              streamHeads: {}
-            }]))
+            .then(() => log.replayed.should.eql([{streamHeads: {}}]))
         });
       }
     }))

@@ -12,10 +12,17 @@ describe('Responding to a Query', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.log || new k.EventLog(),
-        args.snapshots || new k.SnapshotStore(),
         args.strategy || new k.RepositoryStrategy(),
-        args.store || new k.EventStore());
+        {
+          eventLog: () => args.log || new k.EventLog(),
+          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
+          eventStore: () => args.store || new k.EventStore()
+        },
+        {
+          eventLog: () => args.metaLog || new k.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
+          eventStore: () => args.metaStore || new k.EventStore()
+        })
   });
 
   it('fails if no responder exists for that Query', () => {
