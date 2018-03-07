@@ -1,4 +1,5 @@
-const os = require('os');
+if (!process.env.FLAT_FILE_TEST_DIR) return;
+
 const fs = require('fs');
 
 const chai = require('chai');
@@ -16,7 +17,7 @@ describe('Flat file Event Log', () => {
   let directory;
 
   beforeEach(() => {
-    directory = os.tmpdir + '/karma3_' + Date.now() + Math.round(Math.random() * 1000);
+    directory = process.env.FLAT_FILE_TEST_DIR + '/karma3_' + Date.now() + Math.round(Math.random() * 1000);
   });
 
   it('replays Records from files in order', () => {
