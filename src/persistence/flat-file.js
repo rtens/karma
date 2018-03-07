@@ -211,7 +211,27 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
   }
 }
 
+class FlatFilePersistenceFactory extends karma.PersistenceFactory {
+  constructor(path) {
+    super();
+    this._path = path;
+  }
+
+  eventLog(moduleName) {
+    return new FlatFileEventLog(this._path, moduleName)
+  }
+
+  snapshotStore(moduleName) {
+    return new FlatFileSnapshotStore(this._path, moduleName);
+  }
+
+  eventStore(moduleName) {
+    return new FlatFileEventStore(this._path, moduleName);
+  }
+}
+
 module.exports = {
+  PersistenceFactory: FlatFilePersistenceFactory,
   EventLog: FlatFileEventLog,
   SnapshotStore: FlatFileSnapshotStore,
   EventStore: FlatFileEventStore

@@ -11,11 +11,10 @@ class RepositoryStrategy extends karma.RepositoryStrategy {
   }
 }
 
-new karma.Module(
-  new flatFile.EventLog('./data'),
-  new flatFile.SnapshotStore('./data'),
+new karma.Module('Demo',
   new RepositoryStrategy(),
-  new flatFile.EventStore('./data'))
+  new flatFile.PersistenceFactory('./data'),
+  new flatFile.PersistenceFactory('./data_meta'))
 
   .add(new karma.Aggregate('Bob')
 
