@@ -13,7 +13,7 @@ class BaseModule {
     this._aggregates = new AggregateRepository(this._log, this._snapshots, repositoryStrategy, this._store);
   }
 
-  use(eventLog) {
+  addEventLog(eventLog) {
     this._log.add(eventLog);
     return this;
   }

@@ -210,7 +210,7 @@ describe('Applying Events', () => {
         let applied = [];
         return Module({log: log1})
 
-          .use(log2)
+          .addEventLog(log2)
 
           .add(new unit.Unit('One')
             .applying('bard', (payload) => applied.push(payload))
