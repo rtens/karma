@@ -3,7 +3,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../src/karma');
+const k = require('../src/karma');
 
 describe('Responding to a Query', () => {
   let Module;
