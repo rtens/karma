@@ -2,29 +2,13 @@ const crypto = require('crypto');
 
 //------ DOMAIN -------//
 
-class Module {
+class BaseModule {
   constructor(eventLog, snapshotStore, repositoryStrategy, eventStore) {
     this._log = eventLog;
 
     this._aggregates = new AggregateRepository(eventLog, snapshotStore, repositoryStrategy, eventStore);
     this._projections = new ProjectionRepository(eventLog, snapshotStore, repositoryStrategy);
     this._subscriptions = new SubscriptionRepository(eventLog, snapshotStore, repositoryStrategy);
-    this._sagas = new SagaRepository(eventLog, snapshotStore, repositoryStrategy, this);
-
-    this._subscription = null;
-    this._aggregates.add(new SagaLockAggregate());
-    this._aggregates.add(new SagaFailuresAggregate());
-    this._projections.add(new SagaReactionHeadsProjection());
-  }
-
-  start() {
-    return this.respondTo(new Query('_saga-reaction-heads'))
-      .then(heads => {
-        debug('subscribe module', {heads});
-        return this._log.subscribe(heads, record => this.reactTo(record))
-      })
-      .then(subscription => this._subscription = subscription)
-      .then(() => this)
   }
 
   add(unit) {
@@ -35,9 +19,6 @@ class Module {
       case Projection.name:
         this._projections.add(unit);
         this._subscriptions.add(unit);
-        break;
-      case Saga.name:
-        this._sagas.add(unit);
         break;
     }
     return this
@@ -60,6 +41,41 @@ class Module {
     return this._subscriptions
       .getInstance(query)
       .then(instance => instance.subscribeTo(query, subscriber))
+  }
+}
+
+class Module extends BaseModule {
+  constructor(eventLog, snapshotStore, repositoryStrategy, eventStore) {
+    super(eventLog, snapshotStore, repositoryStrategy, eventStore);
+
+    this._meta = new BaseModule(eventLog, snapshotStore, repositoryStrategy, eventStore);
+    this._sagas = new SagaRepository(eventLog, snapshotStore, repositoryStrategy, this._meta);
+
+    this._subscription = null;
+    this._meta._aggregates.add(new SagaLockAggregate());
+    this._meta._aggregates.add(new SagaFailuresAggregate());
+    this._meta._projections.add(new SagaReactionHeadsProjection());
+  }
+
+  add(unit) {
+    switch (unit.constructor.name) {
+      case Saga.name:
+        this._sagas.add(unit);
+        break;
+      default:
+        super.add(unit)
+    }
+    return this
+  }
+
+  start() {
+    return this._meta.respondTo(new Query('_saga-reaction-heads'))
+      .then(heads => {
+        debug('subscribe module', {heads});
+        return this._log.subscribe(heads, record => this.reactTo(record))
+      })
+      .then(subscription => this._subscription = subscription)
+      .then(() => this)
   }
 
   reactTo(record) {
@@ -520,9 +536,9 @@ class Saga extends Unit {
 }
 
 class SagaInstance extends UnitInstance {
-  constructor(id, definition, log, snapshots, module) {
+  constructor(id, definition, log, snapshots, meta) {
     super(id, definition, log, snapshots);
-    this._module = module;
+    this._meta = meta;
   }
 
   reactTo(record) {
@@ -556,7 +572,7 @@ class SagaInstance extends UnitInstance {
   }
 
   _lockReaction(record) {
-    return this._module.execute(new Command('_lock-saga-reaction', {
+    return this._meta.execute(new Command('_lock-saga-reaction', {
       sagaKey: this._key,
       streamId: record.streamId,
       sequence: record.sequence
@@ -569,7 +585,7 @@ class SagaInstance extends UnitInstance {
   }
 
   _unlockReaction(record) {
-    return this._module.execute(new Command('_unlock-saga-reaction', {
+    return this._meta.execute(new Command('_unlock-saga-reaction', {
       sagaKey: this._key,
       streamId: record.streamId,
       sequence: record.sequence
@@ -577,7 +593,7 @@ class SagaInstance extends UnitInstance {
   }
 
   _markReactionFailed(record, errors) {
-    return this._module.execute(new Command('_mark-saga-reaction-as-failed', {
+    return this._meta.execute(new Command('_mark-saga-reaction-as-failed', {
       sagaId: this.id,
       sagaKey: this._key,
       record,
@@ -587,13 +603,13 @@ class SagaInstance extends UnitInstance {
 }
 
 class SagaRepository extends UnitRepository {
-  constructor(log, snapshots, strategy, module) {
+  constructor(log, snapshots, strategy, metaModule) {
     super(log, snapshots, strategy);
-    this._module = module;
+    this._meta = metaModule;
   }
 
   _createInstance(definition, sagaId) {
-    return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._module);
+    return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._meta);
   }
 }
 
