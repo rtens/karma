@@ -573,7 +573,7 @@ class SagaInstance extends UnitInstance {
 
   _lockReaction(record) {
     return this._meta.execute(new Command('_lock-saga-reaction', {
-      sagaKey: this._key,
+      sagaKey: '_' + this._key,
       streamId: record.streamId,
       sequence: record.sequence
     }))
@@ -586,7 +586,7 @@ class SagaInstance extends UnitInstance {
 
   _unlockReaction(record) {
     return this._meta.execute(new Command('_unlock-saga-reaction', {
-      sagaKey: this._key,
+      sagaKey: '_' + this._key,
       streamId: record.streamId,
       sequence: record.sequence
     }))
@@ -595,7 +595,7 @@ class SagaInstance extends UnitInstance {
   _markReactionFailed(record, errors) {
     return this._meta.execute(new Command('_mark-saga-reaction-as-failed', {
       sagaId: this.id,
-      sagaKey: this._key,
+      sagaKey: '_' + this._key,
       record,
       errors
     }))
