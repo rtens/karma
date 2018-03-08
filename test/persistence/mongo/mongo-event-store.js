@@ -15,7 +15,7 @@ describe('MongoDB Event Store', () => {
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    store = new mongo.EventStore('Test', process.env.MONGODB_URI_TEST, db);
+    store = new mongo.EventStore('Test', process.env.MONGODB_URI_TEST, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -30,12 +30,13 @@ describe('MongoDB Event Store', () => {
 
   afterEach(() => {
     return onDb(db => db.dropDatabase())
+      .then(store.close())
   });
 
   it('fails if it cannot connect', () => {
-    return new mongo.EventStore('Test', 'mongodb://foo')
-
-      .connect({reconnectTries: 0})
+    return new mongo.EventStore('Test', 'mongodb://foo', null, null, {reconnectTries: 0})
+      
+      .record([])
 
       .should.be.rejectedWith('EventStore cannot connect to MongoDB database')
   });
@@ -43,9 +44,7 @@ describe('MongoDB Event Store', () => {
   it('creates indexed collection', () => {
     return store.connect()
 
-      .then(() => store.close())
-
-      .then(() => onDb(db => db.collection('event_store').indexes()))
+      .then(() => onDb(db => db.collection('bla_event_store').indexes()))
 
       .then(indexes => {
         indexes[1].key.should.eql({a: 1, v: 1});
@@ -54,25 +53,17 @@ describe('MongoDB Event Store', () => {
   });
 
   it('stores Records in a Collection', () => {
-    let records;
-
-    return store.connect()
-
-      .then(() => store.record([
+    return store.record([
         new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
         new k.Event('bard', {c: 421}, new Date('2013-12-11')),
-      ], 'foo', null, 'trace'))
+      ], 'foo', null, 'trace')
 
-      .then(r => records = r)
-
-      .then(() => store.close())
-
-      .then(() => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 0, 'trace'),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 1, 'trace')
+      .then(records => records.should.eql([
+        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 1, 'trace'),
+        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 2, 'trace')
       ]))
 
-      .then(() => onDb(db => db.collection('event_store').find().toArray()))
+      .then(() => onDb(db => db.collection('bla_event_store').find().toArray()))
 
       .then(docs => docs
         .map(d=>({...d, _id: d._id.constructor.name})).should
@@ -80,7 +71,7 @@ describe('MongoDB Event Store', () => {
           _id: 'ObjectID',
           d: 'Test',
           a: 'foo',
-          v: null,
+          v: 1,
           e: [
             {n: 'food', a: {a: 'b'}, t: new Date('2011-12-13')},
             {n: 'bard', a: {c: 421}, t: new Date('2013-12-11')}
@@ -90,33 +81,25 @@ describe('MongoDB Event Store', () => {
   });
 
   it('rejects Records on occupied heads', () => {
-    return onDb(db => db.collection('event_store').insertOne({
+    return onDb(db => db.collection('bla_event_store').insertOne({
       a: 'foo',
       v: 42
     }))
 
-      .then(() => store.connect())
-
-      .then(() => store.record([], 'foo', 42))
+      .then(() => store.record([], 'foo', 41))
 
       .should.be.rejectedWith('Out of sequence')
-
-      .then(() => store.close())
   });
 
   it('allows gaps in sequence', () => {
     return onDb(db => Promise.all([
-      db.collection('event_store').insertOne({a: 'foo', v: 21}),
-      db.collection('event_store').insertOne({a: 'bar', v: 42}),
+      db.collection('bla_event_store').insertOne({a: 'foo', v: 21}),
+      db.collection('bla_event_store').insertOne({a: 'bar', v: 42}),
     ]))
 
-      .then(() => store.connect())
+      .then(() => store.record([], 'foo', 46))
 
-      .then(() => store.record([], 'foo', 42))
-
-      .then(() => store.close())
-
-      .then(() => onDb(db => db.collection('event_store').find().toArray()))
+      .then(() => onDb(db => db.collection('bla_event_store').find().toArray()))
 
       .then(docs => docs.slice(-1)
         .map(d=>({...d, _id: d._id.constructor.name})).should
@@ -124,7 +107,7 @@ describe('MongoDB Event Store', () => {
           _id: 'ObjectID',
           d: 'Test',
           a: 'foo',
-          v: 42,
+          v: 47,
           e: [],
           c: null
         }]))

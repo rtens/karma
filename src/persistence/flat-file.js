@@ -46,7 +46,7 @@ class FlatFileEventStore extends karma.EventStore {
       .then(() => this._writeWriteFile(streamId, onSequence + events.length))
       .then(() => this._releaseLock(streamId))
       .catch(e => this._releaseLock(streamId).then(() => Promise.reject(e)))
-      .then(() => this)
+      .then(() => super.record(events, streamId, onSequence, traceId))
   }
 
   _acquireLock(streamId) {

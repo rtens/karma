@@ -160,7 +160,7 @@ class EventStore {
 
   record(events, streamId, onSequence, traceId) {
     return Promise.resolve(events.map((e, i) =>
-      new Record(e, streamId, (onSequence || 0) + i, traceId)))
+      new Record(e, streamId, (onSequence || 0) + 1 + i, traceId)))
   }
 }
 

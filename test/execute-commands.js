@@ -144,8 +144,8 @@ describe('Executing a Command', () => {
       .execute(new k.Command('Foo', 'one', 'trace'))
 
       .then(records => records.should.eql([
-        new k.Record(new k.Event('food', 'one'), 'one', 0, 'trace'),
-        new k.Record(new k.Event('bard', 'two'), 'one', 1, 'trace'),
+        new k.Record(new k.Event('food', 'one'), 'one', 1, 'trace'),
+        new k.Record(new k.Event('bard', 'two'), 'one', 2, 'trace'),
       ]))
 
       .then(() => store.recorded.should.eql([{

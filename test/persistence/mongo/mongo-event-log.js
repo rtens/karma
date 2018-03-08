@@ -15,7 +15,7 @@ describe('MongoDB Event Log', () => {
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, process.env.MONGODB_OPLOG_URI_TEST, db);
+    log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, process.env.MONGODB_OPLOG_URI_TEST, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -34,17 +34,17 @@ describe('MongoDB Event Log', () => {
   });
 
   it('fails if it cannot connect to the database', () => {
-    return new mongo.EventLog('Test', 'mongodb://foo')
+    return new mongo.EventLog('Test', 'mongodb://foo', null, null, null, {reconnectTries: 0})
 
-      .connect({reconnectTries: 0})
+      .subscribe({})
 
       .should.be.rejectedWith('EventLog cannot connect to MongoDB database')
   });
 
   it('fails if it cannot connect to the oplog', () => {
-    return (log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, 'mongodb://foo'))
+    return (log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, 'mongodb://foo', null, {reconnectTries: 0}))
 
-      .connect({reconnectTries: 0})
+      .subscribe({})
 
       .should.be.rejectedWith('EventLog cannot connect to MongoDB oplog')
   });
@@ -53,29 +53,27 @@ describe('MongoDB Event Log', () => {
     let records = [];
 
     return Promise.resolve()
-      .then(() => onDb(db => db.collection('event_store').insertOne({
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({
         _id: mongodb.ObjectID.createFromTime(new Date('2013-12-11').getTime() / 1000),
         d: 'Test',
         a: 'foo',
-        v: null,
+        v: 21,
         e: [
           {n: 'food', a: {a: 'b'}, t: new Date('2011-12-13')},
           {n: 'bard', a: {c: 421}}
         ],
         c: 'trace'
       })))
-      .then(() => onDb(db => db.collection('event_store').insertOne({
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({
         d: 'Not Test',
         e: [{n: 'food'}]
       })))
 
-      .then(() => log.connect())
-
       .then(() => log.subscribe({}, record => records.push(record)))
 
       .then(() => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 0, 'trace'),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 1, 'trace')
+        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 21, 'trace'),
+        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 22, 'trace')
       ]))
   });
 
@@ -83,11 +81,9 @@ describe('MongoDB Event Log', () => {
     let records = [];
 
     return Promise.resolve()
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', a: 'foo', v: 22, e: [{n: 'three'}]})))
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', a: 'bar', v: 21, e: [{n: 'one'}]})))
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', a: 'foo', v: 21, e: [{n: 'two'}]})))
-
-      .then(() => log.connect())
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'foo', v: 22, e: [{n: 'three'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'bar', v: 21, e: [{n: 'one'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'foo', v: 21, e: [{n: 'two'}]})))
 
       .then(() => log.subscribe({}, record => records.push(record)))
 
@@ -98,12 +94,10 @@ describe('MongoDB Event Log', () => {
     let records = [];
 
     return Promise.resolve()
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', a: 'foo', v: 22, e: [{n: 'one'}]})))
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', a: 'bar', v: 22, e: [{n: 'not'}]})))
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', a: 'foo', v: 21, e: [{n: 'not'}]})))
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', a: 'bar', v: 25, e: [{n: 'two'}]})))
-
-      .then(() => log.connect())
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'foo', v: 22, e: [{n: 'one'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'bar', v: 22, e: [{n: 'not'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'foo', v: 21, e: [{n: 'not'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'bar', v: 25, e: [{n: 'two'}]})))
 
       .then(() => log.subscribe({foo: 21, bar: 23}, record => records.push(record)))
 
@@ -115,22 +109,20 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
 
-      .then(() => log.connect())
-
       .then(() => log.subscribe({}, record => records.push(record)))
 
-      .then(() => onDb(db => db.collection('event_store').insertOne({
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({
         _id: mongodb.ObjectID.createFromTime(new Date('2013-12-11').getTime() / 1000),
         d: 'Test',
         a: 'foo',
-        v: null,
+        v: 23,
         e: [
           {n: 'food', a: {a: 'b'}, t: new Date('2011-12-13')},
           {n: 'bard', a: {c: 421}}
         ],
         c: 'trace'
       })))
-      .then(() => onDb(db => db.collection('event_store').insertOne({
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({
         d: 'Not Test',
         e: [{n: 'food'}]
       })))
@@ -138,8 +130,8 @@ describe('MongoDB Event Log', () => {
       .then(() => new Promise(y => setTimeout(y, 100)))
 
       .then(() => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 0, 'trace'),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 1, 'trace')
+        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 23, 'trace'),
+        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 24, 'trace')
       ]))
   });
 
@@ -148,13 +140,11 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
 
-      .then(() => log.connect())
-
       .then(() => log.subscribe({}, record => records.push(record)))
 
       .then(subscription => subscription.cancel())
 
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', e: [{n: 'food'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', e: [{n: 'food'}]})))
 
       .then(() => new Promise(y => setTimeout(y, 100)))
 
@@ -166,14 +156,12 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
 
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', v: 1, e: [{n: 'one'}]})))
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', v: 2, e: [{n: 'two'}]})))
-
-      .then(() => log.connect())
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', v: 1, e: [{n: 'one'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', v: 2, e: [{n: 'two'}]})))
 
       .then(() => log.subscribe({}, record => records.push(record)))
 
-      .then(() => onDb(db => db.collection('event_store').insertOne({d: 'Test', e: [{n: 'tre'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', e: [{n: 'tre'}]})))
 
       .then(() => new Promise(y => setTimeout(y, 100)))
 

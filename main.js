@@ -1,7 +1,7 @@
 const express = require('express');
 const bodyParser = require('body-parser');
 const karma = require('./src/karma');
-const flatFile = require('./src/persistence/flat-file');
+const mongo = require('./src/persistence/mongo');
 const expressWs = require('express-ws');
 
 class RepositoryStrategy extends karma.RepositoryStrategy {
@@ -13,8 +13,8 @@ class RepositoryStrategy extends karma.RepositoryStrategy {
 
 new karma.Module('Demo',
   new RepositoryStrategy(),
-  new flatFile.PersistenceFactory('./data'),
-  new flatFile.PersistenceFactory('./data_meta'))
+  new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
+  new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))
 
   .add(new karma.Aggregate('Bob')
 
@@ -29,6 +29,7 @@ new karma.Module('Demo',
       }
       return [
         new karma.Event('food', {count, total: this.total + count}),
+        new karma.Event('bard', {foo: 42}),
       ]
     })
 
