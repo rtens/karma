@@ -22,7 +22,7 @@ describe('MongoDB Event Store', () => {
       return mongodb.MongoClient.connect(process.env.MONGODB_URI_TEST)
         .then(client => Promise.resolve(execute(client.db(db)))
           .then(r => result = r)
-          .catch(e => client.close() && console.error(e))
+          .catch(e => console.error(e))
           .then(() => client.close()))
         .then(() => result)
     }

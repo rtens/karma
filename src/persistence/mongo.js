@@ -115,9 +115,51 @@ class MongoEventLog extends karma.EventLog {
   }
 }
 
+class MongoSnapshotStore extends karma.SnapshotStore {
+  constructor(moduleName, connectionUri, database) {
+    super(moduleName);
+    this._uri = connectionUri;
+    this._dbName = database;
+
+    this._client = null;
+    this._db = null;
+  }
+
+  connect(options) {
+    return new mongodb.MongoClient(this._uri, options).connect()
+      .then(client => this._client = client)
+      .then(client => this._db = client.db(this._dbName))
+      .then(() => this._db.createCollection('snapshots_' + this.module))
+      .then(collection => collection.createIndex({k: 1, v: 1}))
+      .catch(err => Promise.reject(new Error('SnapshotStore cannot connect to MongoDB database: ' + err)))
+  }
+
+  store(key, version, snapshot) {
+      let document = {
+        k: key,
+        v: version,
+        h: snapshot.heads,
+        s: snapshot.state
+      };
+
+      return this._db.collection('snapshots_' + this.module).insertOne(document)
+  }
+
+  fetch(key, version) {
+    return this._db
+      .collection('snapshots_' + this.module)
+      .findOne({k: key, v: version})
+      .then(doc => doc ? new karma.Snapshot(doc.h, doc.s) : Promise.reject('No snapshot'));
+  }
+
+  close() {
+    if (this._client) this._client.close()
+  }
+}
+
 module.exports = {
   // PersistenceFactory: MongoPersistenceFactory,
   EventLog: MongoEventLog,
-  // SnapshotStore: MongoSnapshotStore,
+  SnapshotStore: MongoSnapshotStore,
   EventStore: MongoEventStore
 };
