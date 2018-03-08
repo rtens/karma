@@ -98,7 +98,7 @@ describe('Reacting to an Event', () => {
       }]))
   });
 
-  it('uses last consecutive locked Reaction as head', () => {
+  it('uses last locked Reaction as head', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
       new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 20})),
@@ -117,7 +117,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.replayed.should.eql([{streamHeads: {foo: 20, bar: 22}}]))
+      .then(() => log.replayed.should.eql([{streamHeads: {foo: 20, bar: 24}}]))
   });
 
   it('invokes the reactor for published Events', () => {

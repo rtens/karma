@@ -733,11 +733,11 @@ class SagaReactionHeadsProjection extends Projection {
       })
 
       .applying('__saga-reaction-locked', function ({streamId, sequence}) {
-        if (!this.heads[streamId] || this.heads[streamId] == sequence - 1)
-          this.heads[streamId] = sequence;
+        this.heads[streamId] = sequence;
 
         this.pastHeads[streamId] = this.pastHeads[streamId] || [];
-        this.pastHeads[streamId].unshift(sequence)
+        if (this.pastHeads[streamId].indexOf(sequence) < 0)
+          this.pastHeads[streamId].unshift(sequence)
       })
 
       .applying('__saga-reaction-unlocked', function ({streamId, sequence}) {
