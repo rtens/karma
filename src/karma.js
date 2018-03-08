@@ -180,6 +180,13 @@ class PersistenceFactory {
 
 //------ SNAPSHOT -----//
 
+class Snapshot {
+  constructor(heads, state) {
+    this.heads = heads;
+    this.state = state;
+  }
+}
+
 class SnapshotStore {
   constructor(moduleName) {
     this.module = moduleName;
@@ -193,13 +200,6 @@ class SnapshotStore {
   //noinspection JSUnusedLocalSymbols
   fetch(key, version) {
     return Promise.reject(new Error('No snapshot'))
-  }
-}
-
-class Snapshot {
-  constructor(heads, state) {
-    this.heads = heads;
-    this.state = state;
   }
 }
 

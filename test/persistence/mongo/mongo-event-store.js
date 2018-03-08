@@ -1,5 +1,5 @@
-if (!process.env.MONGO_TEST_URL)
-  return console.log('Set $MONGO_TEST_URL to test MongoEventStore');
+if (!process.env.MONGODB_URI_TEST)
+  return console.log('Set $MONGODB_URI_TEST to test MongoEventStore');
 
 const chai = require('chai');
 const promised = require('chai-as-promised');
@@ -11,15 +11,15 @@ const mongo = require('../../../src/persistence/mongo');
 const mongodb = require('mongodb');
 
 describe('MongoDB Event Store', () => {
-  let db, store, onDb;
+  let store, onDb;
 
   beforeEach(() => {
-    db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    store = new mongo.EventStore('Test', process.env.MONGO_TEST_URL, db);
+    let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
+    store = new mongo.EventStore('Test', process.env.MONGODB_URI_TEST, db);
 
     onDb = execute => {
       let result = null;
-      return mongodb.MongoClient.connect(process.env.MONGO_TEST_URL)
+      return mongodb.MongoClient.connect(process.env.MONGODB_URI_TEST)
         .then(client => Promise.resolve(execute(client.db(db)))
           .then(r => result = r)
           .catch(e => client.close() && console.error(e))
