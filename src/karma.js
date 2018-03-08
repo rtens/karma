@@ -219,28 +219,11 @@ class Unit {
   }
 
   canHandle(message) {
+    return false
   }
 
   mapToId(message) {
     return this._mappers[message.name](message.payload);
-  }
-
-  withVersion(version) {
-    this._version = version;
-    return this
-  }
-
-  get version() {
-    return this._version = this._version || this._inferVersion();
-  }
-
-  _inferVersion() {
-    var fingerprint = JSON.stringify([
-      Object.values(this._appliers).map(as => as.map(a => a.toString())),
-      Object.values(this._initializers).map(i => i.toString())
-    ]);
-
-    return crypto.createHash('md5').update(fingerprint).digest('hex');
   }
 
   initializing(initializer) {
@@ -251,6 +234,24 @@ class Unit {
   applying(eventName, applier) {
     (this._appliers[eventName] = this._appliers[eventName] || []).push(applier);
     return this
+  }
+
+  get version() {
+    return this._version = this._version || this._inferVersion();
+  }
+
+  withVersion(version) {
+    this._version = version;
+    return this
+  }
+
+  _inferVersion() {
+    var fingerprint = JSON.stringify([
+      Object.values(this._appliers).map(as => as.map(a => a.toString())),
+      Object.values(this._initializers).map(i => i.toString())
+    ]);
+
+    return crypto.createHash('md5').update(fingerprint).digest('hex');
   }
 }
 
