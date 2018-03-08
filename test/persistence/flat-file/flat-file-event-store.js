@@ -1,4 +1,5 @@
-if (!process.env.FLAT_FILE_TEST_DIR) return;
+if (!process.env.FLAT_FILE_TEST_DIR)
+  return console.log('Set $FLAT_FILE_TEST_DIR to test FlatFileEventStore');
 
 const fs = require('fs');
 
@@ -10,8 +11,8 @@ chai.should();
 const Promise = require("bluebird");
 Promise.promisifyAll(fs);
 
-const karma = require('../../src/karma');
-const flatFile = require('../../src/persistence/flat-file');
+const karma = require('../../../src/karma');
+const flatFile = require('../../../src/persistence/flat-file');
 
 describe('Flat file Event Store', () => {
   let directory;
@@ -20,7 +21,7 @@ describe('Flat file Event Store', () => {
     directory = process.env.FLAT_FILE_TEST_DIR + '/karma3_' + Date.now() + Math.round(Math.random() * 1000);
   });
 
-  it('stores Events in files', () => {
+  it('stores Records in files', () => {
     return new flatFile.EventStore(directory, 'Test')
 
       .record([
@@ -58,7 +59,7 @@ describe('Flat file Event Store', () => {
         })))
   });
 
-  it('keeps Events in sequence', () => {
+  it('rejects out-of-sequence Records', () => {
     let store = new flatFile.EventStore(directory, 'Test');
     return Promise.resolve()
 

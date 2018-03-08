@@ -1,4 +1,5 @@
-if (!process.env.FLAT_FILE_TEST_DIR) return;
+if (!process.env.FLAT_FILE_TEST_DIR)
+  return console.log('Set $FLAT_FILE_TEST_DIR to test FlatFileEventLog');
 
 const fs = require('fs');
 
@@ -10,8 +11,8 @@ chai.should();
 const Promise = require("bluebird");
 Promise.promisifyAll(fs);
 
-const karma = require('../../src/karma');
-const flatFile = require('../../src/persistence/flat-file');
+const karma = require('../../../src/karma');
+const flatFile = require('../../../src/persistence/flat-file');
 
 describe('Flat file Event Log', () => {
   let directory;

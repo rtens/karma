@@ -1,4 +1,5 @@
-if (!process.env.FLAT_FILE_TEST_DIR) return;
+if (!process.env.FLAT_FILE_TEST_DIR)
+  return console.log('Set $FLAT_FILE_TEST_DIR to test FlatFileSnapshotStore');
 
 const fs = require('fs');
 
@@ -7,8 +8,8 @@ const promised = require('chai-as-promised');
 chai.should();
 chai.use(promised);
 
-const karma = require('../../src/karma');
-const flatFile = require('../../src/persistence/flat-file');
+const karma = require('../../../src/karma');
+const flatFile = require('../../../src/persistence/flat-file');
 
 describe('Flat file Snapshot store', () => {
   let directory;
