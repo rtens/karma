@@ -37,7 +37,7 @@ describe('MongoDB Event Store', () => {
 
       .connect({reconnectTries: 0})
 
-      .should.be.rejectedWith('Cannot connect to MongoDB')
+      .should.be.rejectedWith('EventStore cannot connect to MongoDB database')
   });
 
   it('creates indexed collection', () => {
