@@ -34,7 +34,7 @@ describe('MongoDB Snapshot Store', () => {
   });
 
   it('fails if it cannot connect', () => {
-    return new mongo.SnapshotStore('Test', 'mongodb://foo', null, {reconnectTries: 0})
+    return new mongo.SnapshotStore('Test', 'mongodb://foo', null, null, {reconnectTries: 0})
 
       .fetch()
 

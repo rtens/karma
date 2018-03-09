@@ -74,10 +74,7 @@ class MongoEventLog extends karma.EventLog {
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB database: ' + err)))
 
       .then(() => this._oplog = mongoOplog(this._oplogUri, {ns: this._dbName + '.' + this._prefix + 'event_store'}))
-      .then(() => this._oplog.on('error', err => {
-        console.error('Oplog: ' + err);
-        this._oplogError = err;
-      }))
+      .then(() => this._oplog.on('error', err => this._oplogError = err))
       .then(() => this._oplog.on('insert', doc => this._notifySubscribers(doc.o, this._subscriptions)))
       .then(() => this._oplog.tail())
       .then(() => this._oplogError ? Promise.reject(this._oplogError) : null)
@@ -125,8 +122,15 @@ class MongoEventLog extends karma.EventLog {
 
   close() {
     return Promise.all([
-      this._client ? this._client.close().then(() => this._client = null) : Promise.resolve(),
-      this._oplog ? this._oplog.stop().then(() => this._oplog = null) : Promise.resolve()
+      this._client
+        ? this._client.close()
+        .then(() => this._client = null)
+        : Promise.resolve(),
+      this._oplog
+        ? this._oplog.stop()
+        .then(() => this._oplog.destroy())
+        .then(() => this._oplog = null)
+        : Promise.resolve()
     ])
   }
 }
