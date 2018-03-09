@@ -136,6 +136,27 @@ describe('MongoDB Event Log', () => {
       ]))
   });
 
+  it('catches error if subscriber fails', () => {
+    let logged = [];
+    let _error = console.error;
+    console.error = err => logged.push(err.toString());
+
+    return Promise.resolve()
+
+      .then(() => log.subscribe({}, () => Promise.reject(new Error('Nope'))))
+
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({
+        d: 'Test',
+        e: [{n: 'food'}]
+      })))
+
+      .then(() => new Promise(y => setTimeout(y, 100)))
+
+      .then(() => console.error = _error)
+
+      .then(() => logged.should.eql(['Error: Nope']))
+  });
+
   it('stops notifying when cancelled', () => {
     let records = [];
 

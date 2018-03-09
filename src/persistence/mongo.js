@@ -116,9 +116,10 @@ class MongoEventLog extends karma.EventLog {
     if (recordSet.d != this.module) return;
 
     subscriptions.forEach(s => recordSet.e.forEach((event, i) =>
-      s.subscriber(new karma.Record(
+      Promise.resolve(s.subscriber(new karma.Record(
         new karma.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
-        recordSet.a, recordSet.v + i, recordSet.c))))
+        recordSet.a, recordSet.v + i, recordSet.c)))
+        .catch(err => console.error(err))))
   }
 
   close() {
