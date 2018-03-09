@@ -388,15 +388,16 @@ class UnitRepository {
   _getOrLoad(definition, unitId) {
     this._instances[definition.name] = this._instances[definition.name] || {};
 
-    if (!this._instances[definition.name][unitId]) {
+    let instance = this._instances[definition.name][unitId];
+
+    if (!instance) {
       debug('load', {name: definition.name, id: unitId});
-      this._instances[definition.name][unitId] = this._createInstance(definition, unitId);
+      instance = this._instances[definition.name][unitId] = this._createInstance(definition, unitId);
+      instance.onApply(() => this._strategy.onApply(instance));
     }
 
-    let instance = this._instances[definition.name][unitId];
     return instance.load()
       .then(() => this._strategy.onAccess(instance, this))
-      .then(() => instance.onApply(() => this._strategy.onApply(instance)))
       .then(() => instance)
   }
 

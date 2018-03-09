@@ -231,6 +231,9 @@ describe('Applying Events', () => {
 
       it('notifies the RepositoryStrategy', () => {
         let log = new fake.EventLog('Foobar');
+        log.records = [
+          new k.Record(new k.Event('bard'), 'foo')
+        ];
 
         let notified = [];
         let strategy = {
@@ -238,7 +241,8 @@ describe('Applying Events', () => {
           onApply: (unit) => notified.push(['apply', unit.id])
         };
 
-        return Module({log, strategy})
+        let module = Module({log, strategy});
+        return module
 
           .add(new unit.Unit('One')
             .applying('bard', ()=>null)
@@ -246,9 +250,16 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+          .then(() => module[unit.handle](new unit.Message('Foo')))
+
+          .then(() => module[unit.handle](new unit.Message('Foo')))
+
+          .then(() => log.publish(new k.Record(new k.Event('bard'), 'foo')))
 
           .then(() => notified.filter(n=>n[1]!='__Saga-One-foo').should.eql([
+            ['apply', 'foo'],
+            ['access', 'foo'],
+            ['access', 'foo'],
             ['access', 'foo'],
             ['apply', 'foo']
           ]))
