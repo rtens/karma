@@ -5,9 +5,16 @@ const mongo = require('./src/persistence/mongo');
 const expressWs = require('express-ws');
 
 class RepositoryStrategy extends karma.RepositoryStrategy {
+  //noinspection JSUnusedGlobalSymbols
   onAccess(unit, repository) {
+    if (unit.id == 'karma') return;
+
     unit.takeSnapshot();
     repository.remove(unit);
+  }
+
+  onApply(unit) {
+    unit.takeSnapshot();
   }
 }
 
@@ -43,6 +50,10 @@ new karma.Module('Demo',
 
     .applying('incd', function ({by}) {
       this.limit += by;
+    })
+
+    .executing('Bar', $=>$.to, function ({to}) {
+      return [new karma.Event('bard', {foo: to})]
     }))
 
   .add(new karma.Projection('Alice')

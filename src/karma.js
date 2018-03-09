@@ -280,6 +280,7 @@ class UnitInstance {
     this._loading = false;
     this._loaded = false;
     this._onLoad = [];
+    this._onApply = [];
 
     definition._initializers.forEach(i => i.call(this._state));
   }
@@ -345,6 +346,12 @@ class UnitInstance {
       applier.call(this._state, record.event.payload, record));
 
     this._heads[record.streamId] = record.sequence;
+
+    this._onApply.forEach(notify => notify())
+  }
+
+  onApply(notify) {
+    this._onApply.push(notify)
   }
 }
 
@@ -389,6 +396,7 @@ class UnitRepository {
     let instance = this._instances[definition.name][unitId];
     return instance.load()
       .then(() => this._strategy.onAccess(instance, this))
+      .then(() => instance.onApply(() => this._strategy.onApply(instance)))
       .then(() => instance)
   }
 
@@ -404,7 +412,12 @@ class UnitRepository {
 }
 
 class RepositoryStrategy {
+  //noinspection JSUnusedGlobalSymbols
   onAccess(unit, repository) {
+  }
+
+  //noinspection JSUnusedGlobalSymbols
+  onApply(unit) {
   }
 }
 

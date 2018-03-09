@@ -229,6 +229,31 @@ describe('Applying Events', () => {
           .then(() => log2.subscriptions.map(s => s.active).should.eql([true]))
       });
 
+      it('notifies the RepositoryStrategy', () => {
+        let log = new fake.EventLog('Foobar');
+
+        let notified = [];
+        let strategy = {
+          onAccess: (unit, repository) => notified.push(['access', unit.id]),
+          onApply: (unit) => notified.push(['apply', unit.id])
+        };
+
+        return Module({log, strategy})
+
+          .add(new unit.Unit('One')
+            .applying('bard', ()=>null)
+            [unit.handling]('Foo', $=>'foo', ()=>null))
+
+          [unit.handle](new unit.Message('Foo'))
+
+          .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+
+          .then(() => notified.filter(n=>n[1]!='__Saga-One-foo').should.eql([
+            ['access', 'foo'],
+            ['apply', 'foo']
+          ]))
+      });
+
       if (unit.name != 'a subscribed Projection') {
         it('is redone if Unit is unloaded', () => {
           let log = new fake.EventLog();
