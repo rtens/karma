@@ -84,7 +84,17 @@ class Module extends BaseModule {
   reactTo(record) {
     return this._sagas
       .getInstances(record.event)
-      .then(instances => Promise.all(instances.map(instance => instance.reactTo(record))))
+      .then(instances => {
+        if (instances.length > 0) {
+          return Promise.all(instances.map(instance => instance.reactTo(record)));
+        } else {
+          return this._meta.execute(new Command('lock-saga-reaction', {
+            sagaKey: '__Module',
+            streamId: record.streamId,
+            sequence: record.sequence
+          }))
+        }
+      })
   }
 }
 

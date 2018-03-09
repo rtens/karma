@@ -26,7 +26,7 @@ describe('Reacting to an Event', () => {
           eventStore: () => args.store || new k.EventStore()
         },
         {
-          eventLog: () => args.metaLog || new k.EventLog(),
+          eventLog: args.metaLogFactory || (() => args.metaLog || new k.EventLog()),
           snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
           eventStore: () => args.metaStore || new k.EventStore()
         })
@@ -93,6 +93,37 @@ describe('Reacting to an Event', () => {
           sequence: 23
         })],
         streamId: '__Saga-One-foo',
+        onSequence: undefined,
+        traceId: undefined
+      }]))
+  });
+
+  it('locks generic Reaction if there is no other Reaction to Record', () => {
+    let log = new fake.EventLog();
+    log.records = [
+      new k.Record(new k.Event('food', 'one'), 'foo', 23)
+    ];
+
+    let metaStore = new fake.EventStore();
+
+    let reactions = [];
+
+    return Module({log, metaStore})
+
+      .add(new k.Saga('One')
+        .reactingTo('not food', ()=>'foo', (payload) => reactions.push(payload)))
+
+      .start()
+
+      .then(() => reactions.should.eql([]))
+
+      .then(() => metaStore.recorded.should.eql([{
+        events: [new k.Event('__saga-reaction-locked', {
+          sagaKey: '__Module',
+          streamId: 'foo',
+          sequence: 23
+        })],
+        streamId: '__Module',
         onSequence: undefined,
         traceId: undefined
       }]))
@@ -165,6 +196,11 @@ describe('Reacting to an Event', () => {
       new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
     ];
 
+    let metaLogFactory = (module) => ({
+      __admin: new k.EventLog(),
+      Test__meta: metaLog
+    })[module];
+
     let log = new fake.EventLog();
     log.records = [
       new k.Record(new k.Event('food', 'one'), 'foo', 21)
@@ -174,7 +210,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({metaLog, log, metaStore})
+    return Module({metaLogFactory, log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'bar', (payload) => reactions.push(payload)))
@@ -191,7 +227,8 @@ describe('Reacting to an Event', () => {
         events: [new k.Event('__saga-reaction-locked', {
           sagaKey: '__Saga-One-bar',
           streamId: 'foo',
-          sequence: 21})],
+          sequence: 21
+        })],
         streamId: '__Saga-One-bar',
         onSequence: 3,
         traceId: undefined
@@ -199,7 +236,8 @@ describe('Reacting to an Event', () => {
         events: [new k.Event('__saga-reaction-locked', {
           sagaKey: '__Saga-One-bar',
           streamId: 'bar',
-          sequence: 22})],
+          sequence: 22
+        })],
         streamId: '__Saga-One-bar',
         onSequence: 3,
         traceId: undefined
