@@ -7,7 +7,7 @@ const fake = require('./fakes');
 const k = require('../src/karma');
 
 describe('Executing a Command', () => {
-  let _Date, Module;
+  let _Date, _setTimeout, waits, Module;
 
   before(() => {
     _Date = Date;
@@ -15,6 +15,13 @@ describe('Executing a Command', () => {
       return new _Date('2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
+
+    waits = [];
+    _setTimeout = setTimeout;
+    setTimeout = (fn, wait) => {
+      waits.push(wait);
+      fn()
+    };
 
     Module = (args = {}) =>
       new k.Module(
@@ -34,6 +41,7 @@ describe('Executing a Command', () => {
 
   after(() => {
     Date = _Date;
+    setTimeout = _setTimeout;
   });
 
   it('passes Module names to the EventStore', () => {
@@ -191,8 +199,10 @@ describe('Executing a Command', () => {
   });
 
   it('fails if Events cannot be recorded', () => {
+    let count = 0;
     let store = new fake.EventStore();
     store.record = () => {
+      count++;
       return Promise.reject(new Error('Nope'))
     };
 
@@ -204,13 +214,17 @@ describe('Executing a Command', () => {
       .execute(new k.Command('Foo'))
 
       .should.be.rejectedWith(Error, 'Nope')
+
+      .then(() => count.should.equal(11))
+
+      .then(() => waits.should.eql([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n=>Math.pow(2, n))))
   });
 
-  it('retries recording before giving up', () => {
+  it('retries recording if fails', () => {
     let store = new fake.EventStore();
     let count = 0;
     store.record = () => new Promise(y => {
-      if (count++ < 3) throw new Error(count);
+      if (count++ < 10) throw new Error(count);
       y()
     });
 
@@ -220,8 +234,6 @@ describe('Executing a Command', () => {
         .executing('Foo', ()=>'foo', ()=>[]))
 
       .execute(new k.Command('Foo'))
-
-      .then(() => count.should.equal(4))
 
       .should.not.be.rejected
   });

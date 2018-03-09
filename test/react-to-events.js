@@ -101,14 +101,15 @@ describe('Reacting to an Event', () => {
   it('uses last locked Reaction as head', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 19})),
       new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 20})),
       new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 21})),
       new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 21})),
       new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 22})),
 
       new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 21})),
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 22})),
       new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 24})),
+      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 22})),
     ];
 
     let log = new fake.EventLog();

@@ -445,8 +445,8 @@ class AggregateInstance extends UnitInstance {
     debug('record', {id: this.id, tries, sequence: this._heads[this.id], events});
     return this._store.record(events, this.id, this._heads[this.id], command.traceId)
       .catch(e => {
-        if (tries > 3) throw e;
-        return this._execute(command, tries + 1)
+        if (tries >= 10) throw e;
+        return new Promise(y => setTimeout(() => y(this._execute(command, tries + 1)), Math.pow(2, 1 + tries)))
       })
   }
 }
@@ -729,24 +729,23 @@ class SagaReactionHeadsProjection extends Projection {
 
       .initializing(function () {
         this.heads = {};
-        this.pastHeads = {};
       })
 
       .applying('__saga-reaction-locked', function ({streamId, sequence}) {
-        this.heads[streamId] = sequence;
-
-        this.pastHeads[streamId] = this.pastHeads[streamId] || [];
-        if (this.pastHeads[streamId].indexOf(sequence) < 0)
-          this.pastHeads[streamId].unshift(sequence)
+        this.heads[streamId] = this.heads[streamId] || {};
+        this.heads[streamId][sequence] = sequence;
       })
 
       .applying('__saga-reaction-unlocked', function ({streamId, sequence}) {
-        this.pastHeads[streamId] = this.pastHeads[streamId].filter(s => s < sequence);
-        this.heads[streamId] = this.pastHeads[streamId][0]
+        delete this.heads[streamId][sequence];
       })
 
       .respondingTo('saga-reaction-heads', $=>'karma', function () {
-        return this.heads
+        return Object.keys(this.heads).reduce((heads, streamId) => {
+          let lastHead = Object.keys(this.heads[streamId]).pop();
+          heads[streamId] = this.heads[streamId][lastHead];
+          return heads
+        }, {})
       })
   }
 }

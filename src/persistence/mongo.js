@@ -74,7 +74,10 @@ class MongoEventLog extends karma.EventLog {
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB database: ' + err)))
 
       .then(() => this._oplog = mongoOplog(this._oplogUri, {ns: this._dbName + '.' + this._prefix + 'event_store'}))
-      .then(() => this._oplog.on('error', err => this._oplogError = err))
+      .then(() => this._oplog.on('error', err => {
+        console.error('Oplog: ' + err);
+        this._oplogError = err;
+      }))
       .then(() => this._oplog.on('insert', doc => this._notifySubscribers(doc.o, this._subscriptions)))
       .then(() => this._oplog.tail())
       .then(() => this._oplogError ? Promise.reject(this._oplogError) : null)
@@ -146,7 +149,7 @@ class MongoSnapshotStore extends karma.SnapshotStore {
     return new mongodb.MongoClient(this._uri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
-      .then(() => this._db.createCollection(this._prefix + 'snapshots_' + this.module, {strict: false}))
+      .then(() => this._db.createCollection(this._prefix + 'snapshots_' + this.module))
       .then(collection => collection.createIndex({k: 1, v: 1}))
       .catch(err => Promise.reject(new Error('SnapshotStore cannot connect to MongoDB database: ' + err)))
   }
