@@ -99,6 +99,7 @@ class MongoEventLog extends karma.EventLog {
       .map(streamId => ({a: streamId, v: {$gt: streamHeads[streamId]}}));
 
     if (greaterHeads.length) {
+      greaterHeads.push({a: {$nin: Object.keys(streamHeads)}});
       query.$or = greaterHeads;
     }
 

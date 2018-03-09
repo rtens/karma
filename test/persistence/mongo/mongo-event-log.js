@@ -98,10 +98,11 @@ describe('MongoDB Event Log', () => {
       .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'bar', v: 22, e: [{n: 'not'}]})))
       .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'foo', v: 21, e: [{n: 'not'}]})))
       .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'bar', v: 25, e: [{n: 'two'}]})))
+      .then(() => onDb(db => db.collection('bla_event_store').insertOne({d: 'Test', a: 'baz', v: 42, e: [{n: 'tre'}]})))
 
       .then(() => log.subscribe({foo: 21, bar: 23}, record => records.push(record)))
 
-      .then(() => records.map(r=>r.event.name).should.eql(['one', 'two']))
+      .then(() => records.map(r=>r.event.name).should.eql(['one', 'two', 'tre']))
   });
 
   it('notifies about new Records', () => {
