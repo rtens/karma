@@ -51,15 +51,17 @@ class BaseModule {
 class Module extends BaseModule {
   constructor(name, repositoryStrategy, persistenceFactory, metaPersistenceFactory) {
     super(name, repositoryStrategy, persistenceFactory);
+    this._name = name;
 
     this._log.add(metaPersistenceFactory.eventLog('__admin'));
 
     this._meta = new BaseModule(name + '__meta', repositoryStrategy, metaPersistenceFactory);
     this._sagas = new SagaRepository(this._log, this._snapshots, repositoryStrategy, this._meta);
 
-    this._meta._aggregates.add(new SagaLockAggregate());
-    this._meta._aggregates.add(new SagaFailuresAggregate());
-    this._meta._projections.add(new SagaReactionHeadsProjection());
+    this._meta._aggregates.add(new ReactionLockAggregate());
+    this._meta._aggregates.add(new ReactionFailuresAggregate());
+    this._meta._aggregates.add(new StreamHeadsAggregate());
+    this._meta._projections.add(new StreamHeadsProjection());
   }
 
   add(unit) {
@@ -73,7 +75,7 @@ class Module extends BaseModule {
   }
 
   start() {
-    return this._meta.respondTo(new Query('saga-reaction-heads'))
+    return this._meta.respondTo(new Query('stream-heads'))
       .then(heads => {
         debug('subscribe module', {heads});
         return this._log.subscribe(heads, record => this.reactTo(record))
@@ -88,8 +90,8 @@ class Module extends BaseModule {
         if (instances.length > 0) {
           return Promise.all(instances.map(instance => instance.reactTo(record)));
         } else {
-          return this._meta.execute(new Command('lock-saga-reaction', {
-            sagaKey: '__Module',
+          return this._meta.execute(new Command('consume-record', {
+            consumerKey: ['__Module', this._name, record.streamId].join('-'),
             streamId: record.streamId,
             sequence: record.sequence
           }))
@@ -608,7 +610,7 @@ class Saga extends Unit {
     super(name);
     this._reactors = {};
 
-    this.reactingTo('__saga-reaction-retry-requested', $=>$.sagaId);
+    this.reactingTo('__reaction-retry-requested', $=>$.sagaId);
   }
 
   canHandle(event) {
@@ -632,7 +634,7 @@ class SagaInstance extends UnitInstance {
   }
 
   reactTo(record) {
-    if (record.event.name == '__saga-reaction-retry-requested') {
+    if (record.event.name == '__reaction-retry-requested') {
       return this._reactTo(record.event.payload.record, [], 0);
     }
 
@@ -662,7 +664,7 @@ class SagaInstance extends UnitInstance {
   }
 
   _lockReaction(record) {
-    return this._meta.execute(new Command('lock-saga-reaction', {
+    return this._meta.execute(new Command('lock-reaction', {
       sagaKey: '__' + this._key,
       streamId: record.streamId,
       sequence: record.sequence
@@ -675,7 +677,7 @@ class SagaInstance extends UnitInstance {
   }
 
   _unlockReaction(record) {
-    return this._meta.execute(new Command('unlock-saga-reaction', {
+    return this._meta.execute(new Command('unlock-reaction', {
       sagaKey: '__' + this._key,
       streamId: record.streamId,
       sequence: record.sequence
@@ -683,7 +685,7 @@ class SagaInstance extends UnitInstance {
   }
 
   _markReactionFailed(record, errors) {
-    return this._meta.execute(new Command('mark-saga-reaction-as-failed', {
+    return this._meta.execute(new Command('mark-reaction-as-failed', {
       sagaId: this.id,
       sagaKey: '__' + this._key,
       record,
@@ -703,9 +705,9 @@ class SagaRepository extends UnitRepository {
   }
 }
 
-class SagaLockAggregate extends Aggregate {
+class ReactionLockAggregate extends Aggregate {
   constructor() {
-    super('SagaLock');
+    super('ReactionLock');
 
     this
 
@@ -713,41 +715,51 @@ class SagaLockAggregate extends Aggregate {
         this.locked = {};
       })
 
-      .executing('lock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
+      .executing('lock-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
         if (this.locked[JSON.stringify({streamId, sequence})]) {
           throw new Error('Reaction locked');
         }
-        return [new Event('__saga-reaction-locked', {sagaKey, streamId, sequence})]
+        return [new Event('__reaction-locked', {sagaKey, streamId, sequence})]
       })
 
-      .executing('unlock-saga-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
-        return [new Event('__saga-reaction-unlocked', {sagaKey, streamId, sequence})]
+      .executing('unlock-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
+        return [new Event('__reaction-unlocked', {sagaKey, streamId, sequence})]
       })
 
-      .applying('__saga-reaction-locked', function ({streamId, sequence}) {
+      .applying('__reaction-locked', function ({streamId, sequence}) {
         //noinspection JSUnusedAssignment
         this.locked[JSON.stringify({streamId, sequence})] = true;
       })
 
-      .applying('__saga-reaction-unlocked', function ({streamId, sequence}) {
+      .applying('__reaction-unlocked', function ({streamId, sequence}) {
         delete this.locked[JSON.stringify({streamId, sequence})];
       });
   }
 }
 
-class SagaFailuresAggregate extends Aggregate {
+class ReactionFailuresAggregate extends Aggregate {
   constructor() {
-    super('SagaFailures');
+    super('ReactionFailures');
 
-    this.executing('mark-saga-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, errors}) {
-      return [new Event('__saga-reaction-failed', {sagaId, sagaKey, record, errors})]
+    this.executing('mark-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, errors}) {
+      return [new Event('__reaction-failed', {sagaId, sagaKey, record, errors})]
     });
   }
 }
 
-class SagaReactionHeadsProjection extends Projection {
+class StreamHeadsAggregate extends Aggregate {
   constructor() {
-    super('SagaReactionHeads');
+    super('StreamHeads');
+
+    this.executing('consume-record', $=>$.consumerKey, function ({streamId, sequence}) {
+      return [new Event('__record-consumed', {streamId, sequence})]
+    })
+  }
+}
+
+class StreamHeadsProjection extends Projection {
+  constructor() {
+    super('StreamHeads');
 
     this
 
@@ -755,16 +767,21 @@ class SagaReactionHeadsProjection extends Projection {
         this.heads = {};
       })
 
-      .applying('__saga-reaction-locked', function ({streamId, sequence}) {
+      .applying('__record-consumed', function ({streamId, sequence}) {
         this.heads[streamId] = this.heads[streamId] || {};
         this.heads[streamId][sequence] = sequence;
       })
 
-      .applying('__saga-reaction-unlocked', function ({streamId, sequence}) {
+      .applying('__reaction-locked', function ({streamId, sequence}) {
+        this.heads[streamId] = this.heads[streamId] || {};
+        this.heads[streamId][sequence] = sequence;
+      })
+
+      .applying('__reaction-unlocked', function ({streamId, sequence}) {
         delete this.heads[streamId][sequence];
       })
 
-      .respondingTo('saga-reaction-heads', $=>'karma', function () {
+      .respondingTo('stream-heads', $=>'karma', function () {
         return Object.keys(this.heads).reduce((heads, streamId) => {
           let lastHead = Object.keys(this.heads[streamId]).pop();
           heads[streamId] = this.heads[streamId][lastHead];

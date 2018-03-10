@@ -87,7 +87,7 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one']))
 
       .then(() => metaStore.recorded.should.eql([{
-        events: [new k.Event('__saga-reaction-locked', {
+        events: [new k.Event('__reaction-locked', {
           sagaKey: '__Saga-One-foo',
           streamId: 'foo',
           sequence: 23
@@ -98,7 +98,7 @@ describe('Reacting to an Event', () => {
       }]))
   });
 
-  it('locks generic Reaction if there is no other Reaction to Record', () => {
+  it('records consumption of Record no Reaction exists for it', () => {
     let log = new fake.EventLog();
     log.records = [
       new k.Record(new k.Event('food', 'one'), 'foo', 23)
@@ -118,29 +118,29 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql([]))
 
       .then(() => metaStore.recorded.should.eql([{
-        events: [new k.Event('__saga-reaction-locked', {
-          sagaKey: '__Module',
+        events: [new k.Event('__record-consumed', {
           streamId: 'foo',
           sequence: 23
         })],
-        streamId: '__Module',
+        streamId: '__Module-Test-foo',
         onSequence: undefined,
         traceId: undefined
       }]))
   });
 
-  it('uses last locked Reaction as head', () => {
+  it('uses last locked Reaction or consumed Record as head', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 19})),
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 20})),
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 21})),
-      new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 21})),
-      new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 22})),
-
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 21})),
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 24})),
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'bar', sequence: 22})),
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 19})),
+      new k.Record(new k.Event('__record-consumed', {streamId: 'foo', sequence: 20})),
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 21})),
+      new k.Record(new k.Event('__reaction-unlocked', {streamId: 'foo', sequence: 21})),
+      new k.Record(new k.Event('__reaction-unlocked', {streamId: 'foo', sequence: 22})),
+      
+      new k.Record(new k.Event('__record-consumed', {streamId: 'bar', sequence: 20})),
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'bar', sequence: 21})),
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'bar', sequence: 24})),
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'bar', sequence: 22})),
     ];
 
     let log = new fake.EventLog();
@@ -193,7 +193,7 @@ describe('Reacting to an Event', () => {
   it('does not invoke reactor if reaction is locked', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
     ];
 
     let metaLogFactory = (module) => ({
@@ -224,7 +224,7 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one', 'two']))
 
       .then(() => metaStore.recorded.should.eql([{
-        events: [new k.Event('__saga-reaction-locked', {
+        events: [new k.Event('__reaction-locked', {
           sagaKey: '__Saga-One-bar',
           streamId: 'foo',
           sequence: 21
@@ -233,7 +233,7 @@ describe('Reacting to an Event', () => {
         onSequence: 3,
         traceId: undefined
       }, {
-        events: [new k.Event('__saga-reaction-locked', {
+        events: [new k.Event('__reaction-locked', {
           sagaKey: '__Saga-One-bar',
           streamId: 'bar',
           sequence: 22
@@ -247,8 +247,8 @@ describe('Reacting to an Event', () => {
   it('invokes reactor if reaction is unlocked', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__saga-reaction-locked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 3),
-      new k.Record(new k.Event('__saga-reaction-unlocked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 4)
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 3),
+      new k.Record(new k.Event('__reaction-unlocked', {streamId: 'foo', sequence: 22}), 'Saga-One-bar', 4)
     ];
 
     let log = new fake.EventLog();
@@ -303,22 +303,22 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one', 'one', 'one', 'one', 'one']))
 
       .then(() => metaStore.recorded.map(r=>r.events.map(e=>[e.name, e.payload])).should.eql([
-        [["__saga-reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["__saga-reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["__saga-reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["__saga-reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["__saga-reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["__saga-reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["__saga-reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["__saga-reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["__saga-reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["__saga-reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["__saga-reaction-failed", {
+        [["__reaction-failed", {
           sagaId: 'foo',
           sagaKey: '__Saga-One-foo',
           record: {
@@ -375,7 +375,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => metaLog.publish(new k.Record(new k.Event('__saga-reaction-retry-requested', {
+      .then(() => metaLog.publish(new k.Record(new k.Event('__reaction-retry-requested', {
         sagaId: 'foo',
         sagaKey: '__Saga-One-foo',
         record: {
@@ -389,7 +389,7 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one']))
 
       .then(() => metaStore.recorded.map(r=>r.events.map(e=>[e.name, e.payload])).should.eql([
-        [["__saga-reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]]
+        [["__reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]]
       ]))
   });
 
@@ -413,7 +413,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => metaLog.publish(new k.Record(new k.Event('__saga-reaction-retry-requested', {
+      .then(() => metaLog.publish(new k.Record(new k.Event('__reaction-retry-requested', {
         sagaId: 'foo',
         sagaKey: '__Saga-One-foo',
         record: {
@@ -427,10 +427,10 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one']))
 
       .then(() => metaStore.recorded.map(r=>r.events.map(e=>[e.name, e.payload])).should.eql([
-        [["__saga-reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
-        [["__saga-reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-locked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
+        [["__reaction-unlocked", {sagaKey: '__Saga-One-foo', sequence: 23, streamId: 'bar'}]],
 
-        [["__saga-reaction-failed", {
+        [["__reaction-failed", {
           sagaId: 'foo',
           sagaKey: '__Saga-One-foo',
           record: {
