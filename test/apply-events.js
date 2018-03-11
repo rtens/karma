@@ -3,47 +3,12 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const fake = require('./fakes');
+const fake = require('./common/fakes');
+const units = require('./common/units');
 const k = require('../src/karma');
 
 describe('Applying Events', () => {
   let _Date, Module;
-
-  let units = {
-    execute: {
-      name: 'an Aggregate',
-      Unit: k.Aggregate,
-      Message: k.Command,
-      handling: 'executing',
-      handle: 'execute',
-    },
-    respond: {
-      name: 'a Projection',
-      Unit: k.Projection,
-      Message: k.Query,
-      handling: 'respondingTo',
-      handle: 'respondTo',
-    },
-    subscribe: {
-      name: 'a subscribed Projection',
-      Unit: k.Projection,
-      Message: k.Query,
-      handling: 'respondingTo',
-      handle: 'subscribeTo',
-    },
-    react: {
-      name: 'a Saga',
-      Unit: k.Saga,
-      Message: class extends k.Record {
-        //noinspection JSUnusedGlobalSymbols
-        constructor(name, payload) {
-          super(new k.Event(name, payload))
-        }
-      },
-      handling: 'reactingTo',
-      handle: 'reactTo',
-    }
-  };
 
   before(() => {
     _Date = Date;
