@@ -22,6 +22,32 @@ describe('Handling HTTP requests', () => {
       .then(response => response.should.eql('Hello /foo'))
   });
 
+  it('receives payloads', () => {
+    return new http.RequestHandler()
+      .handling(req => req.body + req.query)
+
+      .handle(new http.Request()
+        .withBody('Foo')
+        .withQuery('Bar'))
+      .then(response => response.should.eql('FooBar'))
+  });
+
+  it('receives and sends status code and headers', () => {
+    return new http.RequestHandler()
+      .handling(req => new http.Response()
+        .withStatus(123)
+        .withHeader('Foo', 'bar')
+        .withBody('Hello ' + req.headers.Name))
+
+        .handle(new http.Request()
+          .withHeader('Name', 'Foo'))
+        .then(response => {
+          response.status.should.eql(123);
+          response.headers.Foo.should.eql('bar');
+          response.body.should.eql('Hello Foo')
+        })
+  });
+
   it('transforms the request before handling it', () => {
     return new http.RequestHandler()
       .beforeRequest(req => Promise.resolve(({foo: 'foo' + req.path})))
@@ -233,8 +259,4 @@ describe('Handling HTTP requests', () => {
         .then(response => response.should.eql('in four bar')),
     ])
   });
-
-  it('receives and sends status codes');
-
-  it('receives and sends headers');
 });

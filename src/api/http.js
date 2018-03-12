@@ -1,7 +1,48 @@
 class Request {
   constructor(method, path) {
+    this.headers = {};
     this.method = method;
     this.path = path;
+    this.body = null;
+    this.query = null;
+  }
+
+  withHeader(key, value) {
+    this.headers[key] = value;
+    return this
+  }
+
+  withBody(body) {
+    this.body = body;
+    return this
+  }
+
+  withQuery(query) {
+    this.query = query;
+    return this
+  }
+}
+
+class Response {
+  constructor() {
+    this.headers = {};
+    this.status = 200;
+    this.body = null;
+  }
+
+  withHeader(key, value) {
+    this.headers[key] = value;
+    return this
+  }
+
+  withStatus(status) {
+    this.status = status;
+    return this
+  }
+
+  withBody(body) {
+    this.body = body;
+    return this
   }
 }
 
@@ -122,6 +163,7 @@ class SegmentHandler extends RequestHandler {
 
 module.exports = {
   Request,
+  Response,
   RequestHandler,
   SlugHandler,
   SegmentHandler
