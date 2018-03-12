@@ -13,7 +13,7 @@ describe('Responding to a Query', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.strategy || new k.RepositoryStrategy(),
+        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new k.EventLog(),
           snapshotStore: () => args.snapshots || new k.SnapshotStore(),
@@ -129,6 +129,25 @@ describe('Responding to a Query', () => {
 
       .then(() => log.publish(new k.Record(new k.Event(), 'bar', 42)))
       .then(() => promise.should.eventually.equal('one later'))
+  });
+
+  it('does not un-subscribe Projection from EventLog until stream heads are reached', () => {
+    let log = new fake.EventLog();
+
+    let strategy = {onAccess: unit => unit.unload()};
+
+    let module = Module({log, strategy})
+      .add(new k.Projection('One')
+        .respondingTo('Foo', ()=>'foo', ()=>null));
+
+    module.respondTo(new k.Query('Foo').waitFor({bar: 42}));
+    module.respondTo(new k.Query('Foo'));
+
+    return new Promise(y => setTimeout(y, 0))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
+
+      .then(() => log.publish(new k.Record(new k.Event(), 'bar', 42)))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([false]))
   });
 
   it('is not delayed if heads are already reached', () => {

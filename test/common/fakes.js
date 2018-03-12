@@ -21,7 +21,9 @@ class FakeEventLog extends karma.EventLog {
   }
 
   publish(record) {
-    return Promise.all(Object.values(this.subscriptions).map(s => s.subscriber(record)));
+    return Promise.all(this.subscriptions
+      .filter(s => s.active)
+      .map(s => s.subscriber(record)));
   }
 
   subscribe(streamHeads, subscriber) {

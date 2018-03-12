@@ -26,7 +26,7 @@ describe('Executing a Command', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.strategy || new k.RepositoryStrategy(),
+        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new k.EventLog(),
           snapshotStore: () => args.snapshots || new k.SnapshotStore(),
@@ -52,7 +52,7 @@ describe('Executing a Command', () => {
         oassedNames.push(name);
       }
     };
-    new k.Module('Foo', new k.RepositoryStrategy, persistence, persistence);
+    new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
 
     oassedNames.should.eql(['Foo', 'Foo__meta']);
   });

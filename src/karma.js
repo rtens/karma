@@ -3,14 +3,16 @@ const crypto = require('crypto');
 //------ DOMAIN -------//
 
 class BaseModule {
-  constructor(name, repositoryStrategy, persistenceFactory) {
+  constructor(name, unitStrategy, persistenceFactory) {
+    this._strategy = unitStrategy;
+
     this._log = new MultiEventLog().add(persistenceFactory.eventLog(name));
     this._snapshots = persistenceFactory.snapshotStore(name);
     this._store = persistenceFactory.eventStore(name);
 
-    this._projections = new ProjectionRepository(this._log, this._snapshots, repositoryStrategy);
-    this._subscriptions = new SubscriptionRepository(this._log, this._snapshots, repositoryStrategy);
-    this._aggregates = new AggregateRepository(this._log, this._snapshots, repositoryStrategy, this._store);
+    this._projections = new ProjectionRepository(this._log, this._snapshots);
+    this._subscriptions = new SubscriptionRepository(this._log, this._snapshots);
+    this._aggregates = new AggregateRepository(this._log, this._snapshots, this._store);
   }
 
   addEventLog(eventLog) {
@@ -32,31 +34,46 @@ class BaseModule {
   execute(command) {
     return this._aggregates
       .getInstance(command)
-      .then(instance => instance.execute(command))
+      .then(instance => this._notifyAccess(instance,
+        instance.execute(command)))
   }
 
   respondTo(query) {
     return this._projections
       .getInstance(query)
-      .then(instance => instance.respondTo(query))
+      .then(instance => this._notifyAccess(instance,
+        instance.respondTo(query)))
   }
 
   subscribeTo(query, subscriber) {
     return this._subscriptions
       .getInstance(query)
-      .then(instance => instance.subscribeTo(query, subscriber))
+      .then(instance => this._notifyAccess(instance,
+        instance.subscribeTo(query, subscriber)))
+  }
+
+  _notifyAccess(instance, handler) {
+    return handler
+      .then(value => {
+        this._strategy.onAccess(instance);
+        return value
+      })
+      .catch(err => {
+        this._strategy.onAccess(instance);
+        return Promise.reject(err)
+      })
   }
 }
 
 class Module extends BaseModule {
-  constructor(name, repositoryStrategy, persistenceFactory, metaPersistenceFactory) {
-    super(name, repositoryStrategy, persistenceFactory);
+  constructor(name, unitStrategy, persistenceFactory, metaPersistenceFactory) {
+    super(name, unitStrategy, persistenceFactory);
     this._name = name;
 
     this._log.add(metaPersistenceFactory.eventLog('__admin'));
 
-    this._meta = new BaseModule(name + '__meta', repositoryStrategy, metaPersistenceFactory);
-    this._sagas = new SagaRepository(this._log, this._snapshots, repositoryStrategy, this._meta);
+    this._meta = new BaseModule(name + '__meta', unitStrategy, metaPersistenceFactory);
+    this._sagas = new SagaRepository(this._log, this._snapshots, this._meta);
 
     this._meta._aggregates.add(new ReactionLockAggregate());
     this._meta._aggregates.add(new ReactionFailuresAggregate());
@@ -88,7 +105,8 @@ class Module extends BaseModule {
       .getInstances(record.event)
       .then(instances => {
         if (instances.length > 0) {
-          return Promise.all(instances.map(instance => instance.reactTo(record)));
+          return Promise.all(instances.map(instance => this._notifyAccess(instance,
+            instance.reactTo(record))));
         } else {
           return this._meta.execute(new Command('consume-record', {
             consumerKey: ['__Module', this._name, record.streamId].join('-'),
@@ -286,7 +304,7 @@ class UnitInstance {
     this._loading = false;
     this._loaded = false;
     this._onLoad = [];
-    this._onApply = [];
+    this._onUnload = [];
 
     definition._initializers.forEach(i => i.call(this._state));
   }
@@ -333,9 +351,13 @@ class UnitInstance {
     this._onLoad.forEach(l => l(this));
   }
 
+  onUnload(fn) {
+    this._onUnload.push(fn);
+  }
+
   unload() {
     debug('unload', {key: this._key});
-    this._loaded = false;
+    this._onUnload.forEach(fn=>fn());
     this._subscription.cancel();
   }
 
@@ -352,20 +374,13 @@ class UnitInstance {
       applier.call(this._state, record.event.payload, record));
 
     this._heads[record.streamId] = record.sequence;
-
-    this._onApply.forEach(notify => notify())
-  }
-
-  onApply(notify) {
-    this._onApply.push(notify)
   }
 }
 
 class UnitRepository {
-  constructor(log, snapshots, strategy) {
+  constructor(log, snapshots) {
     this._log = log;
     this._snapshots = snapshots;
-    this._strategy = strategy;
 
     this._definitions = [];
     this._instances = {};
@@ -399,32 +414,20 @@ class UnitRepository {
     if (!instance) {
       debug('load', {name: definition.name, id: unitId});
       instance = this._instances[definition.name][unitId] = this._createInstance(definition, unitId);
-      instance.onApply(() => this._strategy.onApply(instance));
+      instance.onUnload(() => delete this._instances[definition.name][unitId])
     }
 
     return instance.load()
-      .then(() => this._strategy.onAccess(instance, this))
       .then(() => instance)
   }
 
   _createInstance(definition, unitId) {
   }
-
-  remove(unit) {
-    if (this._instances[unit._definition.name]) {
-      delete this._instances[unit._definition.name][unit.id];
-    }
-    unit.unload();
-  }
 }
 
-class RepositoryStrategy {
+class UnitStrategy {
   //noinspection JSUnusedGlobalSymbols
-  onAccess(unit, repository) {
-  }
-
-  //noinspection JSUnusedGlobalSymbols
-  onApply(unit) {
+  onAccess(unit) {
   }
 }
 
@@ -464,7 +467,11 @@ class AggregateInstance extends UnitInstance {
 
   execute(command) {
     debug('execute', {command, id: this.id});
-    return this._execute(command);
+    try {
+      return this._execute(command);
+    } catch (err) {
+      return Promise.reject(err)
+    }
   }
 
   _execute(command, tries = 0) {
@@ -482,8 +489,8 @@ class AggregateInstance extends UnitInstance {
 }
 
 class AggregateRepository extends UnitRepository {
-  constructor(log, snapshots, strategy, store) {
-    super(log, snapshots, strategy);
+  constructor(log, snapshots, store) {
+    super(log, snapshots);
     this._store = store;
   }
 
@@ -532,7 +539,9 @@ class ProjectionInstance extends UnitInstance {
   constructor(id, definition, log, snapshots) {
     super(id, definition, log, snapshots);
     this._waiters = [];
+    this._unloaded = false;
   }
+
   _loadSnapshot() {
     return super._loadSnapshot()
       .then(() => this._state = this._proxyState())
@@ -577,6 +586,13 @@ class ProjectionInstance extends UnitInstance {
       }
       return true;
     })
+  }
+
+  unload() {
+    if (this._waiters.length) {
+      return
+    }
+    super.unload()
   }
 }
 
@@ -728,8 +744,8 @@ class SagaInstance extends UnitInstance {
 }
 
 class SagaRepository extends UnitRepository {
-  constructor(log, snapshots, strategy, metaModule) {
-    super(log, snapshots, strategy);
+  constructor(log, snapshots, metaModule) {
+    super(log, snapshots);
     this._meta = metaModule;
   }
 
@@ -832,7 +848,7 @@ module.exports = {
   Query,
   Event,
 
-  RepositoryStrategy,
+  UnitStrategy,
   Aggregate,
   Projection,
   Saga,

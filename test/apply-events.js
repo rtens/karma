@@ -20,7 +20,7 @@ describe('Applying Events', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.strategy || new k.RepositoryStrategy(),
+        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new k.EventLog(),
           snapshotStore: () => args.snapshots || new k.SnapshotStore(),
@@ -45,7 +45,7 @@ describe('Applying Events', () => {
         passedNames.push(name);
       }
     };
-    new k.Module('Foo', new k.RepositoryStrategy, persistence, persistence);
+    new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
 
     passedNames.should.eql(['Foo', '__admin', 'Foo__meta']);
   });
@@ -194,23 +194,20 @@ describe('Applying Events', () => {
           .then(() => log2.subscriptions.map(s => s.active).should.eql([true]))
       });
 
-      it('notifies the RepositoryStrategy', () => {
+      it('notifies the UnitStrategy', () => {
         let log = new fake.EventLog('Foobar');
         log.records = [
           new k.Record(new k.Event('bard'), 'foo')
         ];
 
         let notified = [];
-        let strategy = {
-          onAccess: (unit, repository) => notified.push(['access', unit.id]),
-          onApply: (unit) => notified.push(['apply', unit.id])
-        };
+        let strategy = {onAccess: (unit) => notified.push(['access', unit.id])};
 
         let module = Module({log, strategy});
         return module
 
           .add(new unit.Unit('One')
-            .applying('bard', ()=>null)
+            .applying('bard', ()=>notified.push('applied'))
             [unit.handling]('Foo', $=>'foo', ()=>null))
 
           [unit.handle](new unit.Message('Foo'))
@@ -219,48 +216,44 @@ describe('Applying Events', () => {
 
           .then(() => module[unit.handle](new unit.Message('Foo')))
 
-          .then(() => log.publish(new k.Record(new k.Event('bard'), 'foo')))
-
-          .then(() => notified.filter(n=>n[1]!='__Saga-One-foo').should.eql([
-            ['apply', 'foo'],
+          .then(() => notified.filter(n=>n[1] != '__Saga-One-foo').should.eql([
+            'applied',
             ['access', 'foo'],
             ['access', 'foo'],
             ['access', 'foo'],
-            ['apply', 'foo']
           ]))
       });
 
-      if (unit.name != 'a subscribed Projection') {
+      if (unit.name != 'a subscribed Projection')
         it('is redone if Unit is unloaded', () => {
           let log = new fake.EventLog();
           log.records = [
-            new k.Record('foo')
+            new k.Record(new k.Event('food', 'one'), 'foo')
           ];
 
-          let strategy = new (class extends k.RepositoryStrategy {
-            //noinspection JSUnusedGlobalSymbols
-            onAccess(unit, repository) {
-              repository.remove(unit);
-            }
-          })();
+          let strategy = {onAccess: unit => unit.unload()};
+
+          let applied = [];
 
           let module = Module({log, strategy});
           return module
 
             .add(new unit.Unit('One')
+              .applying('food', payload => applied.push(payload))
               [unit.handling]('Foo', ()=>'foo', ()=>null))
 
             [unit.handle](new unit.Message('Foo', 'foo'))
 
             .then(() => module[unit.handle](new unit.Message('Foo')))
 
+            .then(() => applied.should.eql(['one', 'one']))
+
             .then(() => log.replayed.length.should.equal(2))
 
             .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
         });
-      }
 
-      if (unit.name != 'an Aggregate') {
+      if (unit.name != 'an Aggregate')
         it('uses recorded Events of any stream', () => {
           let log = new fake.EventLog();
           log.records = [
@@ -281,6 +274,5 @@ describe('Applying Events', () => {
 
             .then(() => log.replayed.should.eql([{streamHeads: {}}]))
         });
-      }
     }))
 });

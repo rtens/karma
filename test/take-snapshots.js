@@ -20,7 +20,7 @@ describe('Taking a Snapshot', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.strategy || new k.RepositoryStrategy(),
+        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new k.EventLog(),
           snapshotStore: () => args.snapshots || new k.SnapshotStore(),
@@ -45,7 +45,7 @@ describe('Taking a Snapshot', () => {
         passedNames.push(name);
       }
     };
-    new k.Module('Foo', new k.RepositoryStrategy, persistence, persistence);
+    new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
 
     passedNames.should.eql(['Foo', 'Foo__meta']);
   });
@@ -61,12 +61,7 @@ describe('Taking a Snapshot', () => {
 
         let snapshots = new fake.SnapshotStore();
 
-        let strategy = new (class extends k.RepositoryStrategy {
-          //noinspection JSUnusedGlobalSymbols
-          onAccess(unit) {
-            unit.takeSnapshot();
-          }
-        })();
+        let strategy = {onAccess: unit => unit.takeSnapshot()};
 
         return Module({log, snapshots, strategy})
 
@@ -147,12 +142,7 @@ describe('Taking a Snapshot', () => {
       it('infers Snapshot version from initializers and appliers', () => {
         let snapshots = new fake.SnapshotStore();
 
-        let strategy = new (class extends k.RepositoryStrategy {
-          //noinspection JSUnusedGlobalSymbols
-          onAccess(unit) {
-            unit.takeSnapshot();
-          }
-        })();
+        let strategy = {onAccess: unit => unit.takeSnapshot()};
 
         var domain = Module({snapshots, strategy});
 
@@ -227,12 +217,7 @@ describe('Taking a Snapshot', () => {
 
         let snapshots = new fake.SnapshotStore();
 
-        let strategy = new (class extends k.RepositoryStrategy {
-          //noinspection JSUnusedGlobalSymbols
-          onAccess(unit) {
-            unit.takeSnapshot();
-          }
-        })();
+        let strategy = {onAccess: unit => unit.takeSnapshot()};
 
         return Module({snapshots, strategy})
 
@@ -311,12 +296,7 @@ describe('Taking a Snapshot', () => {
 
           let snapshots = new fake.SnapshotStore();
 
-          let strategy = new (class extends k.RepositoryStrategy {
-            //noinspection JSUnusedGlobalSymbols
-            onAccess(unit) {
-              unit.takeSnapshot();
-            }
-          })();
+          let strategy = {onAccess: unit => unit.takeSnapshot()};
 
           return Module({log, snapshots, strategy})
 

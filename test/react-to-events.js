@@ -19,7 +19,7 @@ describe('Reacting to an Event', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.strategy || new k.RepositoryStrategy(),
+        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new k.EventLog(),
           snapshotStore: () => args.snapshots || new k.SnapshotStore(),

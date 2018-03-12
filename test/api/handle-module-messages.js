@@ -17,7 +17,7 @@ describe('Handling Module Messages', () => {
       snapshotStore: () => new k.SnapshotStore()
     };
 
-    let module = new k.Module('Test', new k.RepositoryStrategy(), persistence, persistence)
+    let module = new k.Module('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo})=>'Hello ' + foo));
@@ -37,7 +37,7 @@ describe('Handling Module Messages', () => {
     };
 
     let executed = [];
-    let module = new k.Module('Test', new k.RepositoryStrategy(), persistence, persistence)
+    let module = new k.Module('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => executed.push(foo)));
@@ -62,7 +62,7 @@ describe('Handling Module Messages', () => {
     };
 
     let applied;
-    let module = new k.Module('Test', new k.RepositoryStrategy(), persistence, persistence)
+    let module = new k.Module('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', () => [new k.Event(), new k.Event()]))

@@ -4,22 +4,17 @@ const karma = require('./src/karma');
 const mongo = require('./src/persistence/mongo');
 const expressWs = require('express-ws');
 
-class RepositoryStrategy extends karma.RepositoryStrategy {
-  //noinspection JSUnusedGlobalSymbols
-  onAccess(unit, repository) {
+let strategy = {
+  onAccess: unit => {
     if (unit.id == 'karma') return;
 
     unit.takeSnapshot();
-    repository.remove(unit);
+    unit.unload();
   }
-
-  onApply(unit) {
-    unit.takeSnapshot();
-  }
-}
+};
 
 new karma.Module('Demo',
-  new RepositoryStrategy(),
+  strategy,
   new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
   new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))
 

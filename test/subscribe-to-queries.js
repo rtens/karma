@@ -13,7 +13,7 @@ describe('Subscribing to a Query', () => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',
-        args.strategy || new k.RepositoryStrategy(),
+        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new k.EventLog(),
           snapshotStore: () => args.snapshots || new k.SnapshotStore(),
@@ -150,12 +150,7 @@ describe('Subscribing to a Query', () => {
   it('keeps the Projection subscribed even if removed', () => {
     let log = new fake.EventLog();
 
-    let strategy = new (class extends k.RepositoryStrategy {
-      //noinspection JSUnusedGlobalSymbols
-      onAccess(unit, repository) {
-        repository.remove(unit);
-      }
-    })();
+    let strategy = {onAccess: unit => unit.unload()};
 
     let domain = Module({log, strategy});
 
@@ -172,12 +167,7 @@ describe('Subscribing to a Query', () => {
   it('un-subscribes projection if removed and all subscriptions are cancelled', () => {
     let log = new fake.EventLog();
 
-    let strategy = new (class extends k.RepositoryStrategy {
-      //noinspection JSUnusedGlobalSymbols
-      onAccess(unit, repository) {
-        repository.remove(unit);
-      }
-    })();
+    let strategy = {onAccess: unit => unit.unload()};
 
     let domain = Module({log, strategy});
 
@@ -200,12 +190,7 @@ describe('Subscribing to a Query', () => {
   it('does not un-subscribes projection if not removed and all subscriptions are cancelled', () => {
     let log = new fake.EventLog();
 
-    let strategy = new (class extends k.RepositoryStrategy {
-      //noinspection JSUnusedGlobalSymbols
-      onAccess(unit, repository) {
-        repository.remove(unit);
-      }
-    })();
+    let strategy = {onAccess: unit => unit.unload()};
 
     let domain = Module({log, strategy});
 
