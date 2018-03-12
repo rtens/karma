@@ -197,7 +197,7 @@ describe('Subscribing to a Query', () => {
       .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
   });
 
-  it('do not un-subscribes projection if not removed and all subscriptions are cancelled', () => {
+  it('does not un-subscribes projection if not removed and all subscriptions are cancelled', () => {
     let log = new fake.EventLog();
 
     let strategy = new (class extends k.RepositoryStrategy {

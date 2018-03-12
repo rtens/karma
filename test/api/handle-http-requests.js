@@ -19,7 +19,7 @@ describe('Handling HTTP requests', () => {
       .handling(req => 'Hello ' + req.path)
 
       .handle(new http.Request('GET', '/foo'))
-      .then(response => response.should.eql('Hello /foo'))
+      .should.eventually.eql('Hello /foo')
   });
 
   it('receives payloads', () => {
@@ -29,7 +29,7 @@ describe('Handling HTTP requests', () => {
       .handle(new http.Request()
         .withBody('Foo')
         .withQuery('Bar'))
-      .then(response => response.should.eql('FooBar'))
+      .should.eventually.eql('FooBar')
   });
 
   it('receives and sends status code and headers', () => {
@@ -55,7 +55,7 @@ describe('Handling HTTP requests', () => {
       .beforeRequest(req => ({foo: req.foo + '/baz'}))
 
       .handle(new http.Request('GET', '/bar'))
-      .then(response => response.should.eql('Hello foo/bar/baz'))
+      .should.eventually.eql('Hello foo/bar/baz')
   });
 
   it('transforms the response before returning it', () => {
@@ -65,7 +65,7 @@ describe('Handling HTTP requests', () => {
       .afterResponse(res => res + '/baz')
 
       .handle(new http.Request('GET', '/bar'))
-      .then(response => response.should.eql('Hello /bar/baz'))
+      .should.eventually.eql('Hello /bar/baz')
   });
 
   it('throws errors', () => {
@@ -86,7 +86,7 @@ describe('Handling HTTP requests', () => {
       .catching((err, req) => req.method + req.path + ': ' + err.message)
 
       .handle(new http.Request('GET', '/foo'))
-      .then(response => response.should.eql('GET/foo: Nope'))
+      .should.eventually.eql('GET/foo: Nope')
   });
 
   it('catches specific error', () => {
@@ -109,7 +109,7 @@ describe('Handling HTTP requests', () => {
       .catching(() => 'Neither caught here')
 
       .handle(new http.Request())
-      .then(response => response.should.eql('Nope'))
+      .should.eventually.eql('Nope')
   });
 
   it('delegates request to next handler', () => {
@@ -118,7 +118,7 @@ describe('Handling HTTP requests', () => {
         .handling(req => 'Deep ' + req.path))
 
       .handle(new http.Request('GET', '/foo'))
-      .then(response => response.should.eql('Deep /foo'))
+      .should.eventually.eql('Deep /foo')
   });
 
   it('matches request method', () => {
@@ -132,27 +132,29 @@ describe('Handling HTTP requests', () => {
 
     return Promise.all([
       handler.handle(new http.Request('FOO', '/foo'))
-        .then(response => response.should.eql('food /foo')),
+        .should.eventually.eql('food /foo'),
 
       handler.handle(new http.Request('BAR', '/foo'))
-        .then(response => response.should.eql('bard /foo')),
+        .should.eventually.eql('bard /foo'),
     ])
   });
 
   it('handles slug', () => {
     let handler = new http.RequestHandler()
       .handling(new http.SlugHandler()
-        .handling(req => 'Hello' + req.path + ' from ' + req.slug));
+        .beforeRequest(req => ({...req, foo: req.path}))
+        .afterResponse(res => 'Hello' + res)
+        .handling(req => req.foo + ' from ' + req.slug));
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/'))
-        .then(response => response.should.eql('Hello from ')),
+        .should.eventually.eql('Hello from '),
 
       handler.handle(new http.Request('GET', '/foo'))
-        .then(response => response.should.eql('Hello from foo')),
+        .should.eventually.eql('Hello from foo'),
 
       handler.handle(new http.Request('GET', '/bar'))
-        .then(response => response.should.eql('Hello from bar')),
+        .should.eventually.eql('Hello from bar'),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
         .should.be.rejectedWith('Cannot handle Request [GET /foo/bar]')
@@ -167,7 +169,7 @@ describe('Handling HTTP requests', () => {
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/foo'))
-        .then(response => response.should.eql('Hello')),
+        .should.eventually.eql('Hello'),
 
       handler.handle(new http.Request('GET', '/bar'))
         .should.be.rejectedWith('Cannot handle Request [GET /bar]'),
@@ -183,7 +185,9 @@ describe('Handling HTTP requests', () => {
   it('handles segment', () => {
     let handler = new http.RequestHandler()
       .handling(new http.SegmentHandler()
-        .handling(req => 'Hello ' + req.path + ' from ' + req.segment));
+        .beforeRequest(req => ({...req, foo: req.path}))
+        .afterResponse(res => 'Hello ' + res)
+        .handling(req => req.foo + ' from ' + req.segment));
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/'))
@@ -193,7 +197,7 @@ describe('Handling HTTP requests', () => {
         .should.be.rejectedWith('Cannot handle Request [GET /foo]'),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
-        .then(response => response.should.eql('Hello /bar from foo')),
+        .should.eventually.eql('Hello /bar from foo'),
     ])
   });
 
@@ -211,7 +215,7 @@ describe('Handling HTTP requests', () => {
         .should.be.rejectedWith('Cannot handle Request [GET /foo]'),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
-        .then(response => response.should.eql('Hello /bar')),
+        .should.eventually.eql('Hello /bar'),
     ])
   });
 
@@ -241,22 +245,22 @@ describe('Handling HTTP requests', () => {
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/'))
-        .then(response => response.should.eql('one')),
+        .should.eventually.eql('one'),
 
       handler.handle(new http.Request('GET', '/foo'))
-        .then(response => response.should.eql('two')),
+        .should.eventually.eql('two'),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
-        .then(response => response.should.eql('in got three foo')),
+        .should.eventually.eql('in got three foo'),
 
       handler.handle(new http.Request('POST', '/foo/bar'))
-        .then(response => response.should.eql('in posted three foo')),
+        .should.eventually.eql('in posted three foo'),
 
       handler.handle(new http.Request('GET', '/bar/bar'))
-        .then(response => response.should.eql('in got three bar')),
+        .should.eventually.eql('in got three bar'),
 
       handler.handle(new http.Request('GET', '/bar/baz'))
-        .then(response => response.should.eql('in four bar')),
+        .should.eventually.eql('in four bar'),
     ])
   });
 });

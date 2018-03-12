@@ -104,14 +104,16 @@ describe('Responding to a Query', () => {
       .should.be.rejectedWith('Nope')
   });
 
-  it('can be delayed until a Record is applied', () => {
+  it('can be delayed until Projection reaches stream heads', () => {
     let response = null;
 
     let log = new fake.EventLog();
 
+    let applied;
     let module = Module({log})
       .add(new k.Projection('One')
-        .respondingTo('Foo', ()=>'foo', ()=>'later'));
+        .applying('food', payload => applied = payload)
+        .respondingTo('Foo', ()=>'foo', () => applied + ' later'));
 
     let promise = module.respondTo(new k.Query('Foo').waitFor({bar: 42, baz: 42}))
       .then(r => response = r);
@@ -122,14 +124,14 @@ describe('Responding to a Query', () => {
       .then(() => log.publish(new k.Record(new k.Event(), 'bar', 41)))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new k.Record(new k.Event(), 'baz', 42)))
+      .then(() => log.publish(new k.Record(new k.Event('food', 'one'), 'baz', 42)))
       .then(() => should.not.exist(response))
 
       .then(() => log.publish(new k.Record(new k.Event(), 'bar', 42)))
-      .then(() => promise.should.eventually.equal('later'))
+      .then(() => promise.should.eventually.equal('one later'))
   });
 
-  it('is not delayed if the Record is already applied', () => {
+  it('is not delayed if heads are already reached', () => {
     let log = new fake.EventLog();
     log.records = [new k.Record(new k.Event(), 'bar', 42)];
 

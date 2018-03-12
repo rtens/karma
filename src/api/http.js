@@ -46,6 +46,11 @@ class Response {
   }
 }
 
+class Handler {
+  handle(request) {
+  }
+}
+
 class RequestHandler {
   constructor() {
     this._matchers = [];
@@ -118,10 +123,8 @@ class RequestHandler {
 }
 
 class SlugHandler extends RequestHandler {
-  constructor(slugName) {
+  constructor() {
     super();
-    this._name = slugName;
-
     this._matchers.push(request => request.path.split('/').length == 2);
   }
 
@@ -140,10 +143,8 @@ class SlugHandler extends RequestHandler {
 }
 
 class SegmentHandler extends RequestHandler {
-  constructor(segmentName) {
+  constructor() {
     super();
-    this._name = segmentName;
-
     this._matchers.push(request => request.path.split('/').length > 2);
   }
 
@@ -161,10 +162,44 @@ class SegmentHandler extends RequestHandler {
   }
 }
 
+class QueryHandler extends Handler {
+  constructor(module, requestToQuery) {
+    super();
+    this._module = module;
+    this._query = requestToQuery;
+  }
+
+  handle(request) {
+    return this._module.respondTo(this._query(request))
+  }
+}
+
+class CommandHandler extends Handler {
+  constructor(module, requestToCommand) {
+    super();
+    this._module = module;
+    this._command = requestToCommand;
+  }
+
+  respondingWith(requestToQuery) {
+    this._query = requestToQuery;
+    return this
+  }
+
+  handle(request) {
+    return this._module.execute(this._command(request))
+      .then(records => this._query ? this._module.respondTo(this._query(request).waitFor({
+        [records[records.length - 1].streamId]: records[records.length - 1].sequence
+      })) : null)
+  }
+}
+
 module.exports = {
   Request,
   Response,
   RequestHandler,
   SlugHandler,
-  SegmentHandler
+  SegmentHandler,
+  QueryHandler,
+  CommandHandler
 };
