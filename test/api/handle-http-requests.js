@@ -95,6 +95,24 @@ describe('Handling HTTP requests', () => {
       .then(response => response.should.eql('Deep /foo'))
   });
 
+  it('matches request method', () => {
+    let handler = new http.RequestHandler()
+      .handling(new http.RequestHandler()
+        .matchingMethod('Foo')
+        .handling(req => 'food ' + req.path))
+      .handling(new http.RequestHandler()
+        .matchingMethod('baR')
+        .handling(req => 'bard ' + req.path));
+
+    return Promise.all([
+      handler.handle(new http.Request('FOO', '/foo'))
+        .then(response => response.should.eql('food /foo')),
+
+      handler.handle(new http.Request('BAR', '/foo'))
+        .then(response => response.should.eql('bard /foo')),
+    ])
+  });
+
   it('handles slug', () => {
     let handler = new http.RequestHandler()
       .handling(new http.SlugHandler()
@@ -115,9 +133,10 @@ describe('Handling HTTP requests', () => {
     ])
   });
 
-  it('handles matching slug', () => {
+  it('matches name of slug', () => {
     let handler = new http.RequestHandler()
-      .handling(new http.SlugHandler('foo')
+      .handling(new http.SlugHandler()
+        .matchingName('foo')
         .handling(req => 'Hello' + req.path));
 
     return Promise.all([
@@ -152,9 +171,10 @@ describe('Handling HTTP requests', () => {
     ])
   });
 
-  it('handles matching segment', () => {
+  it('matches name of segment', () => {
     let handler = new http.RequestHandler()
-      .handling(new http.SegmentHandler('foo')
+      .handling(new http.SegmentHandler()
+        .matchingName('foo')
         .handling(req => 'Hello ' + req.path));
 
     return Promise.all([
@@ -176,12 +196,19 @@ describe('Handling HTTP requests', () => {
         .beforeRequest(req => ({...req, foo: req.segment}))
         .afterResponse(res => 'in ' + res)
 
-        .handling(new http.SlugHandler('bar')
-          .handling(req => 'three ' + req.foo))
+        .handling(new http.SlugHandler()
+          .matchingName('bar')
+          .handling(new http.RequestHandler()
+            .matchingMethod('get')
+            .handling(req => 'got three ' + req.foo))
+          .handling(new http.RequestHandler()
+            .matchingMethod('post')
+            .handling(req => 'posted three ' + req.foo)))
 
         .handling(req => 'four ' + req.foo))
 
-      .handling(new http.SlugHandler('foo')
+      .handling(new http.SlugHandler()
+        .matchingName('foo')
         .handling(req => 'two'))
 
       .handling(req => 'one');
@@ -194,13 +221,20 @@ describe('Handling HTTP requests', () => {
         .then(response => response.should.eql('two')),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
-        .then(response => response.should.eql('in three foo')),
+        .then(response => response.should.eql('in got three foo')),
+
+      handler.handle(new http.Request('POST', '/foo/bar'))
+        .then(response => response.should.eql('in posted three foo')),
 
       handler.handle(new http.Request('GET', '/bar/bar'))
-        .then(response => response.should.eql('in three bar')),
+        .then(response => response.should.eql('in got three bar')),
 
       handler.handle(new http.Request('GET', '/bar/baz'))
         .then(response => response.should.eql('in four bar')),
     ])
-  })
+  });
+
+  it('receives and sends status codes');
+
+  it('receives and sends headers');
 });

@@ -7,10 +7,16 @@ class Request {
 
 class RequestHandler {
   constructor() {
+    this._matchers = [];
     this._befores = [];
     this._afters = [];
     this._handlers = [];
     this._errorHandlers = [];
+  }
+
+  matchingMethod(method) {
+    this._matchers.push(request => request.method.toLowerCase() == method.toLowerCase());
+    return this
   }
 
   beforeRequest(transformer) {
@@ -43,7 +49,7 @@ class RequestHandler {
   }
 
   matches(request) {
-    return true
+    return this._matchers.every(m=>m(request))
   }
 
   handle(request) {
@@ -74,11 +80,13 @@ class SlugHandler extends RequestHandler {
   constructor(slugName) {
     super();
     this._name = slugName;
+
+    this._matchers.push(request => request.path.split('/').length == 2);
   }
 
-  matches(request) {
-    let path = request.path.split('/');
-    return path.length == 2 && (!this._name || path[1] == this._name)
+  matchingName(string) {
+    this._matchers.push(request => request.path.split('/')[1] == string);
+    return this
   }
 
   handle(request) {
@@ -94,11 +102,13 @@ class SegmentHandler extends RequestHandler {
   constructor(segmentName) {
     super();
     this._name = segmentName;
+
+    this._matchers.push(request => request.path.split('/').length > 2);
   }
 
-  matches(request) {
-    let path = request.path.split('/');
-    return path.length > 2 && (!this._name || path[1] == this._name)
+  matchingName(string) {
+    this._matchers.push(request => request.path.split('/')[1] == string);
+    return this
   }
 
   handle(request) {
