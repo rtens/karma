@@ -115,6 +115,10 @@ class Command extends Message {
 }
 
 class Query extends Message {
+  waitFor(heads) {
+    this.heads = heads;
+    return this
+  }
 }
 
 //----- EVENTS ------//
@@ -525,6 +529,10 @@ class Projection extends Unit {
 }
 
 class ProjectionInstance extends UnitInstance {
+  constructor(id, definition, log, snapshots) {
+    super(id, definition, log, snapshots);
+    this._waiters = [];
+  }
   _loadSnapshot() {
     return super._loadSnapshot()
       .then(() => this._state = this._proxyState())
@@ -543,7 +551,32 @@ class ProjectionInstance extends UnitInstance {
   }
 
   respondTo(query) {
-    return Promise.resolve(this._definition._responders[query.name].call(this._state, query.payload));
+    let first = Promise.resolve();
+
+    if (query.heads) {
+      first = Promise.all(Object.keys(query.heads).map(streamId => {
+        if (this._heads[streamId] >= query.heads[streamId]) {
+          return Promise.resolve()
+        }
+
+        return new Promise(y =>
+          this._waiters.push({streamId, sequence: query.heads[streamId], resolve: y}))
+      }))
+    }
+
+    return first.then(() => this._definition._responders[query.name].call(this._state, query.payload));
+  }
+
+  apply(record) {
+    super.apply(record);
+
+    this._waiters = this._waiters.filter(w => {
+      if (w.streamId == record.streamId && w.sequence == record.sequence) {
+        w.resolve();
+        return false
+      }
+      return true;
+    })
   }
 }
 

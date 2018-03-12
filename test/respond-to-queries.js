@@ -1,8 +1,9 @@
 const chai = require('chai');
 const promised = require('chai-as-promised');
+const should = chai.should();
 chai.use(promised);
-chai.should();
 
+const fake = require('./common/fakes');
 const k = require('../src/karma');
 
 describe('Responding to a Query', () => {
@@ -101,5 +102,44 @@ describe('Responding to a Query', () => {
       .respondTo(new k.Query('Foo', 'bar'))
 
       .should.be.rejectedWith('Nope')
+  });
+
+  it('can be delayed until a Record is applied', () => {
+    let response = null;
+
+    let log = new fake.EventLog();
+
+    let module = Module({log})
+      .add(new k.Projection('One')
+        .respondingTo('Foo', ()=>'foo', ()=>'later'));
+
+    let promise = module.respondTo(new k.Query('Foo').waitFor({bar: 42, baz: 42}))
+      .then(r => response = r);
+
+    return new Promise(y => setTimeout(y, 0))
+      .then(() => should.not.exist(response))
+
+      .then(() => log.publish(new k.Record(new k.Event(), 'bar', 41)))
+      .then(() => should.not.exist(response))
+
+      .then(() => log.publish(new k.Record(new k.Event(), 'baz', 42)))
+      .then(() => should.not.exist(response))
+
+      .then(() => log.publish(new k.Record(new k.Event(), 'bar', 42)))
+      .then(() => promise.should.eventually.equal('later'))
+  });
+
+  it('is not delayed if the Record is already applied', () => {
+    let log = new fake.EventLog();
+    log.records = [new k.Record(new k.Event(), 'bar', 42)];
+
+    return Module({log})
+
+      .add(new k.Projection('One')
+        .respondingTo('Foo', ()=>'foo', ()=>'now'))
+
+      .respondTo(new k.Query('Foo').waitFor({bar: 42}))
+
+      .should.eventually.equal('now')
   });
 });
