@@ -6,9 +6,9 @@ const expressWs = require('express-ws');
 
 let strategy = {
   onAccess: unit => {
+    unit.takeSnapshot();
     if (unit.id == 'karma') return;
 
-    unit.takeSnapshot();
     unit.unload();
   }
 };
