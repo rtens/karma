@@ -21,6 +21,11 @@ class Request {
     this.query = query;
     return this
   }
+
+  withTraceId(traceId) {
+    this.traceId = traceId;
+    return this
+  }
 }
 
 class Response {
@@ -187,7 +192,7 @@ class CommandHandler extends Handler {
   }
 
   handle(request) {
-    return this._module.execute(this._command(request))
+    return this._module.execute(this._command(request).withTraceId(request.traceId))
       .then(records => this._query ? this._module.respondTo(this._query(request).waitFor({
         [records[records.length - 1].streamId]: records[records.length - 1].sequence
       })) : null)

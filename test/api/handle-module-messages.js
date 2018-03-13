@@ -30,25 +30,25 @@ describe('Handling Module Messages', () => {
   });
 
   it('executes a Command', () => {
+    let store = new fake.EventStore();
     let persistence = {
       eventLog: () => new k.EventLog(),
-      eventStore: () => new k.EventStore(),
+      eventStore: () => store,
       snapshotStore: () => new k.SnapshotStore()
     };
 
-    let executed = [];
     let module = new k.Module('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Aggregate('foo')
-        .executing('Foo', ()=>'foo', ({foo}) => executed.push(foo)));
+        .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
 
     return new http.CommandHandler(module, req => new k.Command('Foo', {foo: 'Bar'}))
 
-      .handle(new http.Request('ANY', '/'))
+      .handle(new http.Request('ANY', '/').withTraceId('trace'))
 
       .should.eventually.eql(null)
 
-      .then(() => executed.should.eql(['Bar']))
+      .then(() => store.recorded.map(r=>[r.events[0].payload, r.traceId]).should.eql([['Bar', 'trace']]))
   });
 
   it('responds with a Query after executing a Command', () => {
