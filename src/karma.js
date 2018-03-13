@@ -10,9 +10,9 @@ class BaseModule {
     this._snapshots = persistenceFactory.snapshotStore(name);
     this._store = persistenceFactory.eventStore(name);
 
+    this._aggregates = new AggregateRepository(this._log, this._snapshots, this._store);
     this._projections = new ProjectionRepository(this._log, this._snapshots);
     this._subscriptions = new SubscriptionRepository(this._log, this._snapshots);
-    this._aggregates = new AggregateRepository(this._log, this._snapshots, this._store);
   }
 
   addEventLog(eventLog) {
@@ -33,27 +33,27 @@ class BaseModule {
 
   execute(command) {
     return this._aggregates
-      .getInstance(command)
-      .then(instance => this._notifyAccess(instance,
-        instance.execute(command)))
+      .getAggregateExecuting(command)
+      .then(this._notifyAccess(aggregate =>
+        aggregate.execute(command)))
   }
 
   respondTo(query) {
     return this._projections
-      .getInstance(query)
-      .then(instance => this._notifyAccess(instance,
-        instance.respondTo(query)))
+      .getProjectionRespondingTo(query)
+      .then(this._notifyAccess(projection =>
+        projection.respondTo(query)))
   }
 
   subscribeTo(query, subscriber) {
     return this._subscriptions
-      .getInstance(query)
-      .then(instance => this._notifyAccess(instance,
-        instance.subscribeTo(query, subscriber)))
+      .getSubscriptionRespondingTo(query)
+      .then(this._notifyAccess(subscription =>
+        subscription.subscribeTo(query, subscriber)))
   }
 
-  _notifyAccess(instance, handler) {
-    return handler
+  _notifyAccess(handler) {
+    return instance => handler(instance)
       .then(value => {
         this._strategy.onAccess(instance);
         return value
@@ -102,19 +102,18 @@ class Module extends BaseModule {
 
   reactTo(record) {
     return this._sagas
-      .getInstances(record.event)
-      .then(instances => {
-        if (instances.length > 0) {
-          return Promise.all(instances.map(instance => this._notifyAccess(instance,
-            instance.reactTo(record))));
-        } else {
-          return this._meta.execute(new Command('consume-record', {
-            consumerKey: ['__Module', this._name, record.streamId].join('-'),
-            streamId: record.streamId,
-            sequence: record.sequence
-          }))
-        }
-      })
+      .getSagasReactingTo(record.event)
+      .then(instances => instances.length
+        ? Promise.all(instances.map(this._notifyAccess(instance => instance.reactTo(record))))
+        : this._consumeRecord(record))
+  }
+
+  _consumeRecord(record) {
+    return this._meta.execute(new Command('consume-record', {
+      consumerKey: ['__Module', this._name, record.streamId].join('-'),
+      streamId: record.streamId,
+      sequence: record.sequence
+    }));
   }
 }
 
@@ -126,9 +125,9 @@ class Message {
 }
 
 class Command extends Message {
-  constructor(name, payload, traceId) {
-    super(name, payload);
+  withTraceId(traceId) {
     this.traceId = traceId;
+    return this
   }
 }
 
@@ -301,8 +300,8 @@ class UnitInstance {
     this._state = {};
     this._subscription = null;
 
-    this._loading = false;
     this._loaded = false;
+    this._loading = false;
     this._onLoad = [];
     this._onUnload = [];
 
@@ -319,13 +318,13 @@ class UnitInstance {
 
   load() {
     if (this._loaded) return Promise.resolve(this);
-    if (this._loading) return new Promise(y => this._onLoad.push(y));
+    if (this._loading) return new Promise(y => this._onLoad.push(()=>y(this)));
     this._loading = true;
 
     return Promise.resolve()
       .then(() => this._loadSnapshot())
       .then(() => this._subscribeToLog())
-      .then(() => this._loadingFinished())
+      .then(() => this._finishLoading())
       .then(() => this);
   }
 
@@ -346,9 +345,9 @@ class UnitInstance {
       .then(subscription => this._subscription = subscription)
   }
 
-  _loadingFinished() {
+  _finishLoading() {
     this._loaded = true;
-    this._onLoad.forEach(l => l(this));
+    this._onLoad.forEach(fn=>fn());
   }
 
   onUnload(fn) {
@@ -390,20 +389,17 @@ class UnitRepository {
     this._definitions.push(definition);
   }
 
-  getInstances(message) {
-    return Promise.all(this._getHandlersFor(message).map(unitDefinition => {
+  _getUnitsHandling(message) {
+    return Promise.all(this._definitions
+      .filter(d => d.canHandle(message))
+      .map(unitDefinition => {
+        let unitId = unitDefinition.mapToId(message);
+        if (!unitId) {
+          throw new Error(`Cannot map [${message.name}]`)
+        }
 
-      var unitId = unitDefinition.mapToId(message);
-      if (!unitId) {
-        throw new Error(`Cannot map [${message.name}]`)
-      }
-
-      return this._getOrLoad(unitDefinition, unitId)
-    }))
-  }
-
-  _getHandlersFor(message) {
-    return this._definitions.filter(d => d.canHandle(message));
+        return this._getOrLoad(unitDefinition, unitId)
+      }))
   }
 
   _getOrLoad(definition, unitId) {
@@ -413,20 +409,19 @@ class UnitRepository {
 
     if (!instance) {
       debug('load', {name: definition.name, id: unitId});
-      instance = this._instances[definition.name][unitId] = this._createInstance(definition, unitId);
+      instance = this._instances[definition.name][unitId] = this._createInstance(unitId, definition);
       instance.onUnload(() => delete this._instances[definition.name][unitId])
     }
 
     return instance.load()
-      .then(() => instance)
   }
 
-  _createInstance(definition, unitId) {
+  _createInstance(unitId, definition) {
+    return new UnitInstance(unitId, definition, this._log, this._snapshots);
   }
 }
 
 class UnitStrategy {
-  //noinspection JSUnusedGlobalSymbols
   onAccess(unit) {
   }
 }
@@ -494,8 +489,8 @@ class AggregateRepository extends UnitRepository {
     this._store = store;
   }
 
-  getInstance(command) {
-    return this.getInstances(command)
+  getAggregateExecuting(command) {
+    return this._getUnitsHandling(command)
       .then(instances => {
 
         if (instances.length == 0) {
@@ -508,7 +503,7 @@ class AggregateRepository extends UnitRepository {
       })
   }
 
-  _createInstance(definition, aggregateId) {
+  _createInstance(aggregateId, definition) {
     return new AggregateInstance(aggregateId, definition, this._log, this._snapshots, this._store);
   }
 }
@@ -542,6 +537,60 @@ class ProjectionInstance extends UnitInstance {
     this._unloaded = false;
   }
 
+  respondTo(query) {
+    return this._waitFor(query.heads)
+      .then(() => this._definition._responders[query.name].call(this._state, query.payload));
+  }
+
+  _waitFor(heads) {
+    return Promise.all(Object.keys(heads || {})
+      .filter(streamId => (this._heads[streamId] || 0) < heads[streamId])
+      .map(streamId => new Promise(y =>
+        this._waiters.push({streamId, sequence: heads[streamId], resolve: y}))))
+  }
+
+  apply(record) {
+    super.apply(record);
+
+    this._waiters = this._waiters
+      .filter(w => w.streamId != record.streamId || w.sequence != record.sequence || w.resolve())
+  }
+
+  unload() {
+    if (this._waiters.length) return;
+    super.unload()
+  }
+}
+
+class ProjectionRepository extends UnitRepository {
+  getProjectionRespondingTo(query) {
+    return this._getUnitsHandling(query)
+      .then(instances => {
+
+        if (instances.length == 0) {
+          throw new Error(`Cannot handle Query [${query.name}]`)
+        } else if (instances.length > 1) {
+          throw new Error(`Too many handlers for Query [${query.name}]`)
+        }
+
+        return instances[0];
+      })
+  }
+
+  _createInstance(projectionId, definition) {
+    return new ProjectionInstance(projectionId, definition, this._log, this._snapshots);
+  }
+}
+
+//---- SUBSCRIPTION ---//
+
+class SubscriptionInstance extends ProjectionInstance {
+  constructor(id, definition, log, snapshots) {
+    super(id, definition, log, snapshots);
+    this._subscriptions = [];
+    this._unloaded = false;
+  }
+
   _loadSnapshot() {
     return super._loadSnapshot()
       .then(() => this._state = this._proxyState())
@@ -557,72 +606,6 @@ class ProjectionInstance extends UnitInstance {
           .forEach(({query, subscriber}) => this.respondTo(query).then(subscriber));
       }
     });
-  }
-
-  respondTo(query) {
-    let first = Promise.resolve();
-
-    if (query.heads) {
-      first = Promise.all(Object.keys(query.heads).map(streamId => {
-        if (this._heads[streamId] >= query.heads[streamId]) {
-          return Promise.resolve()
-        }
-
-        return new Promise(y =>
-          this._waiters.push({streamId, sequence: query.heads[streamId], resolve: y}))
-      }))
-    }
-
-    return first.then(() => this._definition._responders[query.name].call(this._state, query.payload));
-  }
-
-  apply(record) {
-    super.apply(record);
-
-    this._waiters = this._waiters.filter(w => {
-      if (w.streamId == record.streamId && w.sequence == record.sequence) {
-        w.resolve();
-        return false
-      }
-      return true;
-    })
-  }
-
-  unload() {
-    if (this._waiters.length) {
-      return
-    }
-    super.unload()
-  }
-}
-
-class ProjectionRepository extends UnitRepository {
-  getInstance(query) {
-    return this.getInstances(query)
-      .then(instances => {
-
-        if (instances.length == 0) {
-          throw new Error(`Cannot handle Query [${query.name}]`)
-        } else if (instances.length > 1) {
-          throw new Error(`Too many handlers for Query [${query.name}]`)
-        }
-
-        return instances[0];
-      })
-  }
-
-  _createInstance(definition, projectionId) {
-    return new ProjectionInstance(projectionId, definition, this._log, this._snapshots);
-  }
-}
-
-//---- SUBSCRIPTION ---//
-
-class SubscriptionInstance extends ProjectionInstance {
-  constructor(id, definition, log, snapshots) {
-    super(id, definition, log, snapshots);
-    this._subscriptions = [];
-    this._unloaded = false;
   }
 
   subscribeTo(query, subscriber) {
@@ -647,7 +630,11 @@ class SubscriptionInstance extends ProjectionInstance {
 }
 
 class SubscriptionRepository extends ProjectionRepository {
-  _createInstance(definition, projectionId) {
+  getSubscriptionRespondingTo(query) {
+    return this.getProjectionRespondingTo(query)
+  }
+
+  _createInstance(projectionId, definition) {
     return new SubscriptionInstance(projectionId, definition, this._log, this._snapshots);
   }
 }
@@ -749,7 +736,11 @@ class SagaRepository extends UnitRepository {
     this._meta = metaModule;
   }
 
-  _createInstance(definition, sagaId) {
+  getSagasReactingTo(event) {
+    return this._getUnitsHandling(event);
+  }
+
+  _createInstance(sagaId, definition) {
     return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._meta);
   }
 }
@@ -764,6 +755,15 @@ class ReactionLockAggregate extends Aggregate {
         this.locked = {};
       })
 
+      .applying('__reaction-locked', function ({streamId, sequence}) {
+        //noinspection JSUnusedAssignment
+        this.locked[JSON.stringify({streamId, sequence})] = true;
+      })
+
+      .applying('__reaction-unlocked', function ({streamId, sequence}) {
+        delete this.locked[JSON.stringify({streamId, sequence})];
+      })
+
       .executing('lock-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
         if (this.locked[JSON.stringify({streamId, sequence})]) {
           throw new Error('Reaction locked');
@@ -773,15 +773,6 @@ class ReactionLockAggregate extends Aggregate {
 
       .executing('unlock-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
         return [new Event('__reaction-unlocked', {sagaKey, streamId, sequence})]
-      })
-
-      .applying('__reaction-locked', function ({streamId, sequence}) {
-        //noinspection JSUnusedAssignment
-        this.locked[JSON.stringify({streamId, sequence})] = true;
-      })
-
-      .applying('__reaction-unlocked', function ({streamId, sequence}) {
-        delete this.locked[JSON.stringify({streamId, sequence})];
       });
   }
 }

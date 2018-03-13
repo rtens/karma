@@ -149,7 +149,7 @@ describe('Executing a Command', () => {
           new k.Event('bard', 'two')
         ]))
 
-      .execute(new k.Command('Foo', 'one', 'trace'))
+      .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
       .then(records => records.should.eql([
         new k.Record(new k.Event('food', 'one'), 'one', 1, 'trace'),
@@ -188,7 +188,7 @@ describe('Executing a Command', () => {
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', () => []))
 
-      .execute(new k.Command('Foo', null, 'trace'))
+      .execute(new k.Command('Foo').withTraceId('trace'))
 
       .then(() => store.recorded.should.eql([{
         events: [],
