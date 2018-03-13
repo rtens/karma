@@ -66,7 +66,11 @@ class RequestHandler {
   }
 
   matchingMethod(method) {
-    this._matchers.push(request => request.method.toLowerCase() == method.toLowerCase());
+    return this.matching(request => request.method.toLowerCase() == method.toLowerCase());
+  }
+
+  matching(requestMatcher) {
+    this._matchers.push(requestMatcher);
     return this
   }
 
@@ -127,35 +131,9 @@ class RequestHandler {
   }
 }
 
-class SlugHandler extends RequestHandler {
-  constructor() {
-    super();
-    this._matchers.push(request => request.path.split('/').length == 2);
-  }
-
-  matchingName(string) {
-    this._matchers.push(request => request.path.split('/')[1] == string);
-    return this
-  }
-
-  handle(request) {
-    return super.handle({
-      ...request,
-      path: '',
-      slug: request.path.split('/')[1]
-    })
-  }
-}
-
 class SegmentHandler extends RequestHandler {
-  constructor() {
-    super();
-    this._matchers.push(request => request.path.split('/').length > 2);
-  }
-
   matchingName(string) {
-    this._matchers.push(request => request.path.split('/')[1] == string);
-    return this
+    return this.matching(request => request.path.split('/')[1] == string)
   }
 
   handle(request) {
@@ -164,6 +142,13 @@ class SegmentHandler extends RequestHandler {
       path: '/' + request.path.split('/').slice(2).join('/'),
       segment: request.path.split('/')[1]
     })
+  }
+}
+
+class SlugHandler extends SegmentHandler {
+  constructor() {
+    super();
+    this.matching(request => request.path.split('/').length == 2)
   }
 }
 

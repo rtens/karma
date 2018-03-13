@@ -121,6 +121,24 @@ describe('Handling HTTP requests', () => {
       .should.eventually.eql('Deep /foo')
   });
 
+  it('delegates to matching handler', () => {
+    let handler = new http.RequestHandler()
+      .handling(new http.RequestHandler()
+        .matching(req => req.body == 'foo')
+        .handling(req => 'food'))
+      .handling(new http.RequestHandler()
+        .matching(req => req.body == 'bar')
+        .handling(req => 'bard'));
+
+    return Promise.all([
+      handler.handle(new http.Request().withBody('foo'))
+        .should.eventually.eql('food'),
+
+      handler.handle(new http.Request().withBody('bar'))
+        .should.eventually.eql('bard'),
+    ])
+  });
+
   it('matches request method', () => {
     let handler = new http.RequestHandler()
       .handling(new http.RequestHandler()
@@ -139,22 +157,59 @@ describe('Handling HTTP requests', () => {
     ])
   });
 
+  it('handles segment', () => {
+    let handler = new http.RequestHandler()
+      .handling(new http.SegmentHandler()
+        .beforeRequest(req => ({...req, foo: req.path}))
+        .afterResponse(res => 'Hello ' + res)
+        .handling(req => req.foo + ' from ' + req.segment));
+
+    return Promise.all([
+      handler.handle(new http.Request('GET', '/'))
+        .should.eventually.eql('Hello / from '),
+
+      handler.handle(new http.Request('GET', '/foo'))
+        .should.eventually.eql('Hello / from foo'),
+
+      handler.handle(new http.Request('GET', '/foo/bar'))
+        .should.eventually.eql('Hello /bar from foo'),
+    ])
+  });
+
+  it('matches name of segment', () => {
+    let handler = new http.RequestHandler()
+      .handling(new http.SegmentHandler()
+        .matchingName('foo')
+        .handling(req => 'Hello ' + req.path + ' from ' + req.segment));
+
+    return Promise.all([
+      handler.handle(new http.Request('GET', '/'))
+        .should.be.rejectedWith('Cannot handle Request [GET /]'),
+
+      handler.handle(new http.Request('GET', '/foo'))
+        .should.eventually.eql('Hello / from foo'),
+
+      handler.handle(new http.Request('GET', '/foo/bar'))
+        .should.eventually.eql('Hello /bar from foo'),
+    ])
+  });
+
   it('handles slug', () => {
     let handler = new http.RequestHandler()
       .handling(new http.SlugHandler()
         .beforeRequest(req => ({...req, foo: req.path}))
-        .afterResponse(res => 'Hello' + res)
-        .handling(req => req.foo + ' from ' + req.slug));
+        .afterResponse(res => 'Hello ' + res)
+        .handling(req => req.foo + ' from ' + req.segment));
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/'))
-        .should.eventually.eql('Hello from '),
+        .should.eventually.eql('Hello / from '),
 
       handler.handle(new http.Request('GET', '/foo'))
-        .should.eventually.eql('Hello from foo'),
+        .should.eventually.eql('Hello / from foo'),
 
       handler.handle(new http.Request('GET', '/bar'))
-        .should.eventually.eql('Hello from bar'),
+        .should.eventually.eql('Hello / from bar'),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
         .should.be.rejectedWith('Cannot handle Request [GET /foo/bar]')
@@ -165,11 +220,11 @@ describe('Handling HTTP requests', () => {
     let handler = new http.RequestHandler()
       .handling(new http.SlugHandler()
         .matchingName('foo')
-        .handling(req => 'Hello' + req.path));
+        .handling(req => 'Hello ' + req.path));
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/foo'))
-        .should.eventually.eql('Hello'),
+        .should.eventually.eql('Hello /'),
 
       handler.handle(new http.Request('GET', '/bar'))
         .should.be.rejectedWith('Cannot handle Request [GET /bar]'),
@@ -182,85 +237,53 @@ describe('Handling HTTP requests', () => {
     ])
   });
 
-  it('handles segment', () => {
-    let handler = new http.RequestHandler()
-      .handling(new http.SegmentHandler()
-        .beforeRequest(req => ({...req, foo: req.path}))
-        .afterResponse(res => 'Hello ' + res)
-        .handling(req => req.foo + ' from ' + req.segment));
-
-    return Promise.all([
-      handler.handle(new http.Request('GET', '/'))
-        .should.be.rejectedWith('Cannot handle Request [GET /]'),
-
-      handler.handle(new http.Request('GET', '/foo'))
-        .should.be.rejectedWith('Cannot handle Request [GET /foo]'),
-
-      handler.handle(new http.Request('GET', '/foo/bar'))
-        .should.eventually.eql('Hello /bar from foo'),
-    ])
-  });
-
-  it('matches name of segment', () => {
-    let handler = new http.RequestHandler()
-      .handling(new http.SegmentHandler()
-        .matchingName('foo')
-        .handling(req => 'Hello ' + req.path));
-
-    return Promise.all([
-      handler.handle(new http.Request('GET', '/'))
-        .should.be.rejectedWith('Cannot handle Request [GET /]'),
-
-      handler.handle(new http.Request('GET', '/foo'))
-        .should.be.rejectedWith('Cannot handle Request [GET /foo]'),
-
-      handler.handle(new http.Request('GET', '/foo/bar'))
-        .should.eventually.eql('Hello /bar'),
-    ])
-  });
-
   it('routes through handler tree', () => {
     let handler = new http.RequestHandler()
 
       .handling(new http.SegmentHandler()
-        .beforeRequest(req => ({...req, foo: req.segment}))
-        .afterResponse(res => 'in ' + res)
+        .matchingName('foo')
 
         .handling(new http.SlugHandler()
-          .matchingName('bar')
-          .handling(new http.RequestHandler()
+          .matchingMethod('get')
+          .handling(req => 'got foo'))
+
+        .handling(new http.SlugHandler()
+          .matchingMethod('post')
+          .handling(req => 'posted foo'))
+
+        .handling(new http.SegmentHandler()
+          .beforeRequest(req => ({...req, foo: req.segment}))
+          .afterResponse(res => 'finally ' + res)
+
+          .handling(new http.SlugHandler()
+            .matchingName('this')
             .matchingMethod('get')
-            .handling(req => 'got three ' + req.foo))
-          .handling(new http.RequestHandler()
-            .matchingMethod('post')
-            .handling(req => 'posted three ' + req.foo)))
+            .handling(req => 'got this of ' + req.foo))
 
-        .handling(req => 'four ' + req.foo))
+          .handling(new http.SlugHandler()
+            .matchingName('that')
+            .handling(req => 'got that of ' + req.foo))))
 
-      .handling(new http.SlugHandler()
-        .matchingName('foo')
-        .handling(req => 'two'))
-
-      .handling(req => 'one');
+      .handling(() => 'got none');
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/'))
-        .should.eventually.eql('one'),
+        .should.eventually.eql('got none'),
 
       handler.handle(new http.Request('GET', '/foo'))
-        .should.eventually.eql('two'),
+        .should.eventually.eql('got foo'),
 
-      handler.handle(new http.Request('GET', '/foo/bar'))
-        .should.eventually.eql('in got three foo'),
+      handler.handle(new http.Request('POST', '/foo'))
+        .should.eventually.eql('posted foo'),
 
-      handler.handle(new http.Request('POST', '/foo/bar'))
-        .should.eventually.eql('in posted three foo'),
+      handler.handle(new http.Request('GET', '/foo/bar/this'))
+        .should.eventually.eql('finally got this of bar'),
 
-      handler.handle(new http.Request('GET', '/bar/bar'))
-        .should.eventually.eql('in got three bar'),
+      handler.handle(new http.Request('POST', '/foo/bar/this'))
+        .should.be.rejectedWith('Cannot handle Request [POST /this]'),
 
-      handler.handle(new http.Request('GET', '/bar/baz'))
-        .should.eventually.eql('in four bar'),
+      handler.handle(new http.Request('ANY', '/foo/bar/that'))
+        .should.eventually.eql('finally got that of bar'),
     ])
   });
 });
