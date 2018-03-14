@@ -110,7 +110,7 @@ class Module extends BaseModule {
 
   _consumeRecord(record) {
     return this._meta.execute(new Command('consume-record', {
-      consumerKey: ['__Module', this._name, record.streamId, record.sequence].join('-'),
+      consumerKey: ['__Module', this._name, record.streamId].join('-'),
       streamId: record.streamId,
       sequence: record.sequence
     }));
