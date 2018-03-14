@@ -478,7 +478,8 @@ class AggregateInstance extends UnitInstance {
     return this._store.record(events, this.id, this._heads[this.id], command.traceId)
       .catch(e => {
         if (tries >= 10) throw e;
-        return new Promise(y => setTimeout(() => y(this._execute(command, tries + 1)), Math.pow(2, 1 + tries)))
+        return new Promise(y => setTimeout(() => y(this._execute(command, tries + 1)),
+          Math.round(10 + Math.random() * Math.pow(2, 1 + tries))))
       })
   }
 }

@@ -199,6 +199,9 @@ describe('Executing a Command', () => {
   });
 
   it('fails if Events cannot be recorded', () => {
+    let _random = Math.random;
+    Math.random = () => Math.PI / 3;
+
     let count = 0;
     let store = new fake.EventStore();
     store.record = () => {
@@ -215,9 +218,11 @@ describe('Executing a Command', () => {
 
       .should.be.rejectedWith(Error, 'Nope')
 
+      .then(() => Math.random = _random)
+
       .then(() => count.should.equal(11))
 
-      .then(() => waits.should.eql([1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n=>Math.pow(2, n))))
+      .then(() => waits.should.eql([12, 14, 18, 27, 44, 77, 144, 278, 546, 1082]))
   });
 
   it('retries recording if fails', () => {
