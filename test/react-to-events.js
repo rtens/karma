@@ -122,7 +122,7 @@ describe('Reacting to an Event', () => {
           streamId: 'foo',
           sequence: 23
         })],
-        streamId: '__Module-Test-foo',
+        streamId: '__Module-Test-foo-23',
         onSequence: undefined,
         traceId: undefined
       }]))
