@@ -58,7 +58,7 @@ describe('Applying Events', () => {
         log.records = [
           new k.Record(new k.Event('bard', 'one'), 'foo', 21),
           new k.Record(new k.Event('bard', 'two'), 'foo', 22),
-          new k.Record(new k.Event('nope', 'tre'), 'foo', 23)
+          new k.Record(new k.Event('not applied', 'tre'), 'foo', 23)
         ];
 
         let state = [];
@@ -68,7 +68,7 @@ describe('Applying Events', () => {
             .initializing(function () {
               this.bards = [];
             })
-            .applying('nothing', function () {
+            .applying('no event', function () {
               this.bards.push('never');
             })
             .applying('bard', function (payload) {

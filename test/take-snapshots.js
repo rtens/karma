@@ -53,10 +53,11 @@ describe('Taking a Snapshot', () => {
   Object.values(units).forEach(unit =>
     describe('of ' + unit.name, () => {
 
-      it('saves the Snapshot by key and version', () => {
+      it('saves the Snapshot with heads and state by key and version', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard', 'one'), 'foo', 21)
+          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
+          new k.Record(new k.Event('not applied', 'not'), 'bar', 22),
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -241,7 +242,7 @@ describe('Taking a Snapshot', () => {
           }]))
       });
 
-      if (unit.name != 'an Aggregate') {
+      if (unit.name != 'an Aggregate')
         it('reconstitutes from Snapshot and Events of multiple streams', () => {
           let log = new fake.EventLog();
           log.records = [
@@ -287,6 +288,7 @@ describe('Taking a Snapshot', () => {
             }]))
         });
 
+      if (unit.name != 'an Aggregate')
         it('saves a Snapshot with multiple heads', () => {
           let log = new fake.EventLog();
           log.records = [
@@ -318,6 +320,5 @@ describe('Taking a Snapshot', () => {
               snapshot: {heads: {foo: 21, bar: 42}, state: {bards: ['one', 'two']}}
             }]))
         });
-      }
     }))
 });

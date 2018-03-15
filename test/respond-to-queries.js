@@ -152,11 +152,12 @@ describe('Responding to a Query', () => {
 
   it('is not delayed if heads are already reached', () => {
     let log = new fake.EventLog();
-    log.records = [new k.Record(new k.Event(), 'bar', 42)];
+    log.records = [new k.Record(new k.Event('food'), 'bar', 42)];
 
     return Module({log})
 
       .add(new k.Projection('One')
+        .applying('food', ()=>null)
         .respondingTo('Foo', ()=>'foo', ()=>'now'))
 
       .respondTo(new k.Query('Foo').waitFor({bar: 42}))

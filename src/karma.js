@@ -366,11 +366,13 @@ class UnitInstance {
   }
 
   apply(record) {
-    debug('apply', {key: this._key, heads: this._heads, record});
+    let appliers = this._definition._appliers[record.event.name];
+    if (!appliers) return;
+
     if (record.sequence <= this._heads[record.streamId]) return;
 
-    (this._definition._appliers[record.event.name] || []).forEach(applier =>
-      applier.call(this._state, record.event.payload, record));
+    debug('apply', {key: this._key, heads: this._heads, record});
+    appliers.forEach(applier => applier.call(this._state, record.event.payload, record));
 
     this._heads[record.streamId] = record.sequence;
   }
@@ -457,7 +459,8 @@ class AggregateInstance extends UnitInstance {
 
   apply(record) {
     if (record.streamId != this.id) return;
-    return super.apply(record);
+    super.apply(record);
+    this._heads = {[this.id]: record.sequence};
   }
 
   execute(command) {

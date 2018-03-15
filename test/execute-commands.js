@@ -279,13 +279,13 @@ describe('Executing a Command', () => {
       }]))
   });
 
-  it('records Event with the last applied sequence', () => {
+  it('records Event with the sequence of the last event on stream', () => {
     let log = new fake.EventLog();
     log.records = [
       new k.Record(new k.Event('bard', 'one'), 'foo', 21),
       new k.Record(new k.Event('bard', 'two'), 'foo', 22),
       new k.Record(new k.Event('food', 'tre'), 'foo', 23),
-      new k.Record(new k.Event('nope', 'not'), 'bar', 24),
+      new k.Record(new k.Event('bard', 'not'), 'bar', 24),
     ];
 
     let store = new fake.EventStore();
@@ -293,6 +293,7 @@ describe('Executing a Command', () => {
     return Module({log, store})
 
       .add(new k.Aggregate('One')
+        .applying('bard', ()=>null)
         .executing('Foo', $=>'foo', function () {
           return [new k.Event('food')]
         }))
