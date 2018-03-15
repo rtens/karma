@@ -39,12 +39,9 @@ describe('Applying Events', () => {
 
   it('passes Module names to the EventLog', () => {
     let passedNames = [];
-    var persistence = new class extends k.PersistenceFactory {
-      //noinspection JSUnusedGlobalSymbols
-      eventLog(name) {
-        passedNames.push(name);
-      }
-    };
+    let persistence = new k.PersistenceFactory();
+    persistence.eventLog = name => passedNames.push(name);
+
     new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
 
     passedNames.should.eql(['Foo', '__admin', 'Foo__meta']);

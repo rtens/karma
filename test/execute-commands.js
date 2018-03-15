@@ -45,16 +45,13 @@ describe('Executing a Command', () => {
   });
 
   it('passes Module names to the EventStore', () => {
-    let oassedNames = [];
-    var persistence = new class extends k.PersistenceFactory {
-      //noinspection JSUnusedGlobalSymbols
-      eventStore(name) {
-        oassedNames.push(name);
-      }
-    };
+    let passedNames = [];
+    let persistence = new k.PersistenceFactory();
+    persistence.eventStore = name => passedNames.push(name);
+
     new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
 
-    oassedNames.should.eql(['Foo', 'Foo__meta']);
+    passedNames.should.eql(['Foo', 'Foo__meta']);
   });
 
   it('fails if no executer is defined', () => {

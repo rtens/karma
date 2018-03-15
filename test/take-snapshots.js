@@ -39,12 +39,9 @@ describe('Taking a Snapshot', () => {
 
   it('passes Module names to the SnapshotStore', () => {
     let passedNames = [];
-    var persistence = new class extends k.PersistenceFactory {
-      //noinspection JSUnusedGlobalSymbols
-      snapshotStore(name) {
-        passedNames.push(name);
-      }
-    };
+    let persistence = new k.PersistenceFactory();
+    persistence.snapshotStore = name => passedNames.push(name);
+
     new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
 
     passedNames.should.eql(['Foo', 'Foo__meta']);
