@@ -88,9 +88,10 @@ class Module extends BaseModule {
   start() {
     return this._meta.respondTo(new Query('last-record-time'))
       .then(lastRecordTime => {
+        let filter = this._log.filter().after(lastRecordTime);
         debug('subscribe module', {lastRecordTime});
         return Promise.all([
-          this._log.subscribe(lastRecordTime, record => this.reactTo(record)),
+          this._log.subscribe(filter, record => this.reactTo(record)),
           this._adminLog.subscribe(lastRecordTime, record => this.reactTo(record))
         ])
       })
@@ -161,8 +162,29 @@ class EventLog {
   }
 
   //noinspection JSUnusedLocalSymbols
-  subscribe(lastRecordTime, subscriber) {
+  subscribe(filter, subscriber) {
     return Promise.resolve({cancel: ()=>null})
+  }
+
+  filter() {
+    return new RecordFilter()
+  }
+}
+
+class RecordFilter {
+  //noinspection JSUnusedLocalSymbols
+  after(lastRecordTime) {
+    return this
+  }
+
+  //noinspection JSUnusedLocalSymbols
+  nameIn(eventNames) {
+    return this
+  }
+
+  //noinspection JSUnusedLocalSymbols
+  ofStream(streamId) {
+    return this
   }
 }
 
@@ -172,8 +194,8 @@ class CombinedEventLog extends EventLog {
     this._logs = eventLogs;
   }
 
-  subscribe(lastRecordTime, subscriber) {
-    return Promise.all(this._logs.map(log => log.subscribe(lastRecordTime, subscriber)))
+  subscribe(filter, subscriber) {
+    return Promise.all(this._logs.map(log => log.subscribe(filter, subscriber)))
       .then(subscriptions => ({cancel: () => subscriptions.forEach(s => s.cancel())}))
   }
 }
@@ -336,8 +358,14 @@ class UnitInstance {
 
   _subscribeToLog() {
     debug('subscribe', {key: this._key, lastRecordTime: this._lastRecordTime});
-    return this._log.subscribe(this._lastRecordTime, record => this.apply(record))
+    return this._log.subscribe(this._recordFilter(), record => this.apply(record))
       .then(subscription => this._subscription = subscription)
+  }
+
+  _recordFilter() {
+    return this._log.filter()
+      .after(this._lastRecordTime)
+      .nameIn(Object.keys(this._definition._appliers));
   }
 
   _finishLoading() {
@@ -453,6 +481,11 @@ class AggregateInstance extends UnitInstance {
   constructor(id, definition, log, snapshots, store) {
     super(id, definition, log, snapshots);
     this._store = store;
+  }
+
+  _recordFilter() {
+    return super._recordFilter()
+      .ofStream(this.id);
   }
 
   apply(record) {
@@ -816,6 +849,7 @@ module.exports = {
 
   Record,
   EventLog,
+  RecordFilter,
   CombinedEventLog,
   PersistenceFactory,
   SnapshotStore,

@@ -83,7 +83,11 @@ describe('Applying Events', () => {
 
           .then(() => state.should.eql([['a one', 'b one', 'a two', 'b two']]))
 
-          .then(() => log.subscribed.should.eql([{lastRecordTime: null}]))
+          .then(() => log.subscribed.map(r=>({...r, streamId: 'x'})).should.eql([{
+            lastRecordTime: null,
+            eventNames: ['no event', 'bard'],
+            streamId: 'x'
+          }]))
       });
 
       it('waits for the Unit to be loaded', () => {
@@ -268,7 +272,36 @@ describe('Applying Events', () => {
 
             .then(() => applied.should.eql(['one', 'two']))
 
-            .then(() => log.subscribed.should.eql([{lastRecordTime: null}]))
+            .then(() => log.subscribed.should.eql([{
+              lastRecordTime: null,
+              eventNames: ['bard']
+            }]))
+        });
+
+      if (unit.name == 'an Aggregate')
+        it('uses only Events of own stream', () => {
+          let log = new fake.EventLog();
+          log.records = [
+            new k.Record(new k.Event('bard', 'one'), 'foo', 21),
+            new k.Record(new k.Event('bard', 'two'), 'bar', 22),
+          ];
+
+          let applied = [];
+          return Module({log})
+
+            .add(new unit.Unit('One')
+              .applying('bard', (payload) => applied.push(payload))
+              [unit.handling]('Foo', $=>'foo', ()=>null))
+
+            [unit.handle](new unit.Message('Foo'))
+
+            .then(() => applied.should.eql(['one']))
+
+            .then(() => log.subscribed.should.eql([{
+              lastRecordTime: null,
+              eventNames: ['bard'],
+              streamId: 'foo'
+            }]))
         });
     }))
 });

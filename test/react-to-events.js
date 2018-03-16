@@ -64,10 +64,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.subscribed.should.eql([
-        {lastRecordTime: new Date()},
-        {lastRecordTime: null},
-      ]))
+      .then(() => log.subscribed.map(s=>s.lastRecordTime).should.eql([new Date(), null]))
 
       .then(() => reactions.should.eql(['one', 'two']))
   });

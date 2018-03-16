@@ -26,14 +26,35 @@ class FakeEventLog extends karma.EventLog {
       .map(s => s.subscriber(record)));
   }
 
-  subscribe(lastRecordTime, subscriber) {
-    this.subscribed.push({lastRecordTime});
+  subscribe(filter, subscriber) {
+    this.subscribed.push(filter);
 
     let subscription = {subscriber, active: true};
     this.subscriptions.push(subscription);
 
     return Promise.all(this.records.map(m => subscriber(m)))
       .then(() => ({cancel: () => subscription.active = false}))
+  }
+
+  filter() {
+    return new FakeRecordFilter()
+  }
+}
+
+class FakeRecordFilter extends karma.RecordFilter {
+  after(lastRecordTime) {
+    this.lastRecordTime = lastRecordTime;
+    return this
+  }
+
+  nameIn(eventNames) {
+    this.eventNames = eventNames;
+    return this
+  }
+
+  ofStream(streamId) {
+    this.streamId = streamId;
+    return this
   }
 }
 

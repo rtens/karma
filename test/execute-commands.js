@@ -271,7 +271,11 @@ describe('Executing a Command', () => {
         traceId: undefined
       }]))
 
-      .then(() => log.subscribed.should.eql([{lastRecordTime: null}]))
+      .then(() => log.subscribed.should.eql([{
+        lastRecordTime: null,
+        eventNames: ['bard'],
+        streamId: 'foo'
+      }]))
   });
 
   it('records Event with the sequence of the last event on stream', () => {
