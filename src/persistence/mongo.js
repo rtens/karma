@@ -184,7 +184,7 @@ class MongoSnapshotStore extends karma.SnapshotStore {
     return new mongodb.MongoClient(this._uri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
-      .then(() => this._db.createCollection(this._prefix + 'snapshots_' + this.module))
+      .then(() => this._db.collection(this._prefix + 'snapshots_' + this.module))
       .then(collection => collection.createIndex({k: 1, v: 1}))
       .catch(err => Promise.reject(new Error('SnapshotStore cannot connect to MongoDB database: ' + err)))
   }

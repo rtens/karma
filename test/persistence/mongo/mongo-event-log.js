@@ -56,11 +56,10 @@ describe('MongoDB Event Log', () => {
 
       .then(() => onDb(db => db.collection('bla_event_store').indexes()))
 
-      .then(indexes => indexes.map(i=>i.key).should.eql([
-        {_id: 1},
-        {d: 1, a: 1, _id: 1},
-        {d: 1, 'e.n': 1, _id: 1},
-      ]))
+      .then(indexes => {
+        indexes.map(i=>i.key).should.contain.deep({d: 1, a: 1, _id: 1});
+        indexes.map(i=>i.key).should.contain.deep({d: 1, 'e.n': 1, _id: 1});
+      })
   });
 
   it('replays stored Records of module', () => {

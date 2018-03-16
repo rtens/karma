@@ -54,10 +54,8 @@ describe('MongoDB Event Store', () => {
 
       .then(() => onDb(db => db.collection('bla_event_store').indexes()))
 
-      .then(indexes => indexes.map(i=>({key: i.key, unique: !!i.unique})).should.eql([
-        {key: {_id: 1}, unique: false},
-        {key: {d: 1, a: 1, v: 1}, unique: true}
-      ]))
+      .then(indexes => indexes.map(i=>({key: i.key, unique: !!i.unique})).should.contain.deep(
+        {key: {d: 1, a: 1, v: 1}, unique: true}))
   });
 
   it('stores Records in a Collection', () => {
