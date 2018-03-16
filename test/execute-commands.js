@@ -273,7 +273,6 @@ describe('Executing a Command', () => {
 
       .then(() => log.replayed.should.eql([{
         lastRecordTime: null,
-        eventNames: ['bard'],
         streamId: 'foo'
       }]))
   });
@@ -292,7 +291,6 @@ describe('Executing a Command', () => {
     return Module({log, store})
 
       .add(new k.Aggregate('One')
-        .applying('bard', ()=>null)
         .executing('Foo', $=>'foo', function () {
           return [new k.Event('food')]
         }))

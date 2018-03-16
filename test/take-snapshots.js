@@ -124,11 +124,7 @@ describe('Taking a Snapshot', () => {
             version: 'v1',
           }]))
 
-          .then(() => log.replayed.map(r=>({...r, streamId: 'x'})).should.eql([{
-            lastRecordTime: new Date('2011-12-13'),
-            eventNames: ['bard'],
-            streamId: 'x'
-          }]))
+          .then(() => log.replayed.map(r=>r.lastRecordTime).should.eql([new Date('2011-12-13')]))
       });
 
       it('catches itself if Snapshot fetching fails', () => {

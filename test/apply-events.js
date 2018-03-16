@@ -83,11 +83,7 @@ describe('Applying Events', () => {
 
           .then(() => state.should.eql([['a one', 'b one', 'a two', 'b two']]))
 
-          .then(() => log.replayed.map(r=>({...r, streamId: 'x'})).should.eql([{
-            lastRecordTime: null,
-            eventNames: ['no event', 'bard'],
-            streamId: 'x'
-          }]))
+          .then(() => log.replayed.map(r=>r.lastRecordTime).should.eql([null]))
       });
 
       it('waits for the Unit to be loaded', () => {
@@ -302,6 +298,7 @@ describe('Applying Events', () => {
           return Module({log})
 
             .add(new unit.Unit('One')
+              .applying('food', ()=>null)
               .applying('bard', (payload) => applied.push(payload))
               [unit.handling]('Foo', $=>'foo', ()=>null))
 
@@ -311,7 +308,7 @@ describe('Applying Events', () => {
 
             .then(() => log.replayed.should.eql([{
               lastRecordTime: null,
-              eventNames: ['bard']
+              eventNames: ['food', 'bard']
             }]))
         });
 
@@ -336,7 +333,6 @@ describe('Applying Events', () => {
 
             .then(() => log.replayed.should.eql([{
               lastRecordTime: null,
-              eventNames: ['bard'],
               streamId: 'foo'
             }]))
         });

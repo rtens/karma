@@ -98,6 +98,7 @@ class Module extends BaseModule {
   }
 
   reactTo(record) {
+    debug('reactTo', record);
     return this._sagas
       .getSagasReactingTo(record.event)
       .then(instances => instances.length
@@ -375,8 +376,9 @@ class UnitInstance {
   }
 
   _replayLog() {
-    debug('replay', {key: this._key, lastRecordTime: this._lastRecordTime});
-    return this._log.replay(this._recordFilter(), record => this.apply(record));
+    let filter = this._recordFilter();
+    debug('replay', {key: this._key, filter: filter});
+    return this._log.replay(filter, record => this.apply(record));
   }
 
   _recordFilter() {
@@ -505,8 +507,9 @@ class AggregateInstance extends UnitInstance {
   }
 
   _recordFilter() {
-    return super._recordFilter()
-      .ofStream(this.id);
+    return this._log.filter()
+      .after(this._lastRecordTime)
+      .ofStream(this.id)
   }
 
   apply(record) {
