@@ -56,7 +56,7 @@ describe('Subscribing to a Query', () => {
     snapshots.snapshots = [{
       key: 'Projection-One-foo',
       version: 'v1',
-      snapshot: new k.Snapshot({}, {foods: 'snap '})
+      snapshot: new k.Snapshot(new Date(), {}, {foods: 'snap '})
     }];
 
     return Module({log, snapshots})

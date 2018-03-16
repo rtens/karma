@@ -54,6 +54,7 @@ describe('Applying Events', () => {
         let log = new fake.EventLog();
         log.records = [
           new k.Record(new k.Event('bard', 'one'), 'foo', 21),
+          new k.Record(new k.Event('bard', 'duplicate'), 'foo', 21),
           new k.Record(new k.Event('bard', 'two'), 'foo', 22),
           new k.Record(new k.Event('not applied', 'tre'), 'foo', 23)
         ];
@@ -82,21 +83,21 @@ describe('Applying Events', () => {
 
           .then(() => state.should.eql([['a one', 'b one', 'a two', 'b two']]))
 
-          .then(() => log.replayed.should.eql([{streamHeads: {}}]))
+          .then(() => log.subscribed.should.eql([{lastRecordTime: null}]))
       });
 
       it('waits for the Unit to be loaded', () => {
         let history = [];
         let wait = 10;
         let log = new (class extends k.EventLog {
-          subscribe(streamHeads, subscriber) {
-            if (!wait) return super.subscribe(streamHeads, subscriber);
+          subscribe(lastRecordTime, subscriber) {
+            if (!wait) return super.subscribe(lastRecordTime, subscriber);
 
             history.push('loading');
             return new Promise(y => {
               setTimeout(() => {
                 history.push('loaded');
-                y(super.subscribe(streamHeads, subscriber))
+                y(super.subscribe(lastRecordTime, subscriber))
               }, wait);
               wait = 0;
             });
@@ -141,7 +142,7 @@ describe('Applying Events', () => {
 
           .then(() => module[unit.handle](new unit.Message('Foo', 'two')))
 
-          .then(() => log.replayed.length.should.equal(1))
+          .then(() => log.subscribed.length.should.equal(1))
 
           .then(() => state.should.eql(['a one', 'a two']))
       });
@@ -165,14 +166,12 @@ describe('Applying Events', () => {
           .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
       });
 
-      it('subscribes the Unit to multiple EventLogs', () => {
+      it('subscribes the Unit to combined EventLogs', () => {
         let log1 = new fake.EventLog();
         let log2 = new fake.EventLog();
 
         let applied = [];
-        return Module({log: log1})
-
-          .addEventLog(log2)
+        return Module({log: new k.CombinedEventLog([log1, log2])})
 
           .add(new unit.Unit('One')
             .applying('bard', (payload) => applied.push(payload))
@@ -245,7 +244,7 @@ describe('Applying Events', () => {
 
             .then(() => applied.should.eql(['one', 'one']))
 
-            .then(() => log.replayed.length.should.equal(2))
+            .then(() => log.subscribed.length.should.equal(2))
 
             .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
         });
@@ -269,7 +268,7 @@ describe('Applying Events', () => {
 
             .then(() => applied.should.eql(['one', 'two']))
 
-            .then(() => log.replayed.should.eql([{streamHeads: {}}]))
+            .then(() => log.subscribed.should.eql([{lastRecordTime: null}]))
         });
     }))
 });

@@ -271,9 +271,7 @@ describe('Executing a Command', () => {
         traceId: undefined
       }]))
 
-      .then(() => log.replayed.should.eql([{
-        streamHeads: {}
-      }]))
+      .then(() => log.subscribed.should.eql([{lastRecordTime: null}]))
   });
 
   it('records Event with the sequence of the last event on stream', () => {

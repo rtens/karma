@@ -12,8 +12,8 @@ describe('Taking a Snapshot', () => {
 
   before(() => {
     _Date = Date;
-    Date = function () {
-      return new _Date('2011-12-13T14:15:16Z');
+    Date = function (time) {
+      return new _Date(time || '2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
 
@@ -50,11 +50,11 @@ describe('Taking a Snapshot', () => {
   Object.values(units).forEach(unit =>
     describe('of ' + unit.name, () => {
 
-      it('saves the Snapshot with heads and state by key and version', () => {
+      it('stores the Snapshot by key and version', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-          new k.Record(new k.Event('not applied', 'not'), 'bar', 22),
+          new k.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
+          new k.Record(new k.Event('not applied', 'not'), 'bar', 22, null, new Date('2011-12-13')),
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -78,7 +78,11 @@ describe('Taking a Snapshot', () => {
           .then(() => snapshots.stored.should.eql([{
             key: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: {heads: {foo: 21}, state: {bards: ['one']}}
+            snapshot: {
+              lastRecordTime: new Date('2011-12-13'),
+              heads: {foo: 21},
+              state: {bards: ['one']}
+            }
           }]))
       });
 
@@ -93,7 +97,7 @@ describe('Taking a Snapshot', () => {
         snapshots.snapshots = [{
           key: unit.Unit.name + '-One-foo',
           version: 'v1',
-          snapshot: new k.Snapshot({foo: 21}, {bards: ['snap']})
+          snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21}, {bards: ['snap']})
         }];
 
         let state = [];
@@ -120,8 +124,8 @@ describe('Taking a Snapshot', () => {
             version: 'v1',
           }]))
 
-          .then(() => log.replayed.should.eql([{
-            streamHeads: {foo: 21}
+          .then(() => log.subscribed.should.eql([{
+            lastRecordTime: new Date('2011-12-13')
           }]))
       });
 
@@ -193,19 +197,19 @@ describe('Taking a Snapshot', () => {
           .then(() => snapshots.stored.should.eql([{
             key: unit.Unit.name + '-One-foo',
             version: 'b16fcb72b0dfffc93af957c61bf1105b',
-            snapshot: {heads: {}, state: {foo: 'one'}}
+            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'one'}}
           }, {
             key: unit.Unit.name + '-Two-bar',
             version: 'b16fcb72b0dfffc93af957c61bf1105b',
-            snapshot: {heads: {}, state: {foo: 'one'}}
+            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'one'}}
           }, {
             key: unit.Unit.name + '-Three-baz',
             version: 'e0deac31cb640f25e89614c48a0f370e',
-            snapshot: {heads: {}, state: {foo: 'two'}}
+            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'two'}}
           }, {
             key: unit.Unit.name + '-Four-ban',
             version: '05f2c32b673bbd8641329a4866ea54bf',
-            snapshot: {heads: {}, state: {foo: 'two'}}
+            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'two'}}
           }]))
       });
 
@@ -235,7 +239,7 @@ describe('Taking a Snapshot', () => {
           .then(() => snapshots.stored.should.eql([{
             key: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: {heads: {}, state: {}}
+            snapshot: {lastRecordTime: null, heads: {}, state: {}}
           }]))
       });
 
@@ -253,7 +257,7 @@ describe('Taking a Snapshot', () => {
           snapshots.snapshots = [{
             key: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: new k.Snapshot({foo: 21, bar: 22}, {bards: ['snap']})
+            snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21, bar: 22}, {bards: ['snap']})
           }];
 
           let state = [];
@@ -280,8 +284,8 @@ describe('Taking a Snapshot', () => {
               version: 'v1',
             }]))
 
-            .then(() => log.replayed.should.eql([{
-              streamHeads: {foo: 21, bar: 22}
+            .then(() => log.subscribed.should.eql([{
+              lastRecordTime: new Date('2011-12-13')
             }]))
         });
 
@@ -289,8 +293,8 @@ describe('Taking a Snapshot', () => {
         it('saves a Snapshot with multiple heads', () => {
           let log = new fake.EventLog();
           log.records = [
-            new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-            new k.Record(new k.Event('bard', 'two'), 'bar', 42),
+            new k.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
+            new k.Record(new k.Event('bard', 'two'), 'bar', 42, null, new Date('2011-12-14')),
           ];
 
           let snapshots = new fake.SnapshotStore();
@@ -314,7 +318,11 @@ describe('Taking a Snapshot', () => {
             .then(() => snapshots.stored.should.eql([{
               key: unit.Unit.name + '-One-foo',
               version: 'v1',
-              snapshot: {heads: {foo: 21, bar: 42}, state: {bards: ['one', 'two']}}
+              snapshot: {
+                lastRecordTime: new Date('2011-12-14'),
+                heads: {foo: 21, bar: 42},
+                state: {bards: ['one', 'two']}
+              }
             }]))
         });
     }))

@@ -16,7 +16,7 @@ class FakeEventLog extends karma.EventLog {
   constructor() {
     super();
     this.records = [];
-    this.replayed = [];
+    this.subscribed = [];
     this.subscriptions = [];
   }
 
@@ -26,8 +26,8 @@ class FakeEventLog extends karma.EventLog {
       .map(s => s.subscriber(record)));
   }
 
-  subscribe(streamHeads, subscriber) {
-    this.replayed.push({streamHeads: Object.assign({}, streamHeads)});
+  subscribe(lastRecordTime, subscriber) {
+    this.subscribed.push({lastRecordTime});
 
     let subscription = {subscriber, active: true};
     this.subscriptions.push(subscription);

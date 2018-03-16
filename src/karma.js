@@ -6,18 +6,13 @@ class BaseModule {
   constructor(name, unitStrategy, persistenceFactory) {
     this._strategy = unitStrategy;
 
-    this._log = new MultiEventLog().add(persistenceFactory.eventLog(name));
+    this._log = persistenceFactory.eventLog(name);
     this._snapshots = persistenceFactory.snapshotStore(name);
     this._store = persistenceFactory.eventStore(name);
 
     this._aggregates = new AggregateRepository(this._log, this._snapshots, this._store);
     this._projections = new ProjectionRepository(this._log, this._snapshots);
     this._subscriptions = new SubscriptionRepository(this._log, this._snapshots);
-  }
-
-  addEventLog(eventLog) {
-    this._log.add(eventLog);
-    return this;
   }
 
   add(unit) {
@@ -70,15 +65,14 @@ class Module extends BaseModule {
     super(name, unitStrategy, persistenceFactory);
     this._name = name;
 
-    this._log.add(metaPersistenceFactory.eventLog('__admin'));
+    this._adminLog = metaPersistenceFactory.eventLog('__admin');
 
     this._meta = new BaseModule(name + '__meta', unitStrategy, metaPersistenceFactory);
     this._sagas = new SagaRepository(this._log, this._snapshots, this._meta);
 
     this._meta._aggregates.add(new ReactionLockAggregate());
-    this._meta._aggregates.add(new ReactionFailuresAggregate());
-    this._meta._aggregates.add(new StreamHeadsAggregate());
-    this._meta._projections.add(new StreamHeadsProjection());
+    this._meta._aggregates.add(new ModuleSubscriptionAggregate());
+    this._meta._projections.add(new ModuleSubscriptionProjection(name));
   }
 
   add(unit) {
@@ -92,10 +86,13 @@ class Module extends BaseModule {
   }
 
   start() {
-    return this._meta.respondTo(new Query('stream-heads'))
-      .then(heads => {
-        debug('subscribe module', {heads});
-        return this._log.subscribe(heads, record => this.reactTo(record))
+    return this._meta.respondTo(new Query('last-record-time'))
+      .then(lastRecordTime => {
+        debug('subscribe module', {lastRecordTime});
+        return Promise.all([
+          this._log.subscribe(lastRecordTime, record => this.reactTo(record)),
+          this._adminLog.subscribe(lastRecordTime, record => this.reactTo(record))
+        ])
       })
       .then(() => this)
   }
@@ -110,9 +107,8 @@ class Module extends BaseModule {
 
   _consumeRecord(record) {
     return this._meta.execute(new Command('consume-record', {
-      consumerKey: ['__Module', this._name, record.streamId].join('-'),
-      streamId: record.streamId,
-      sequence: record.sequence
+      moduleName: this._name,
+      recordTime: record.time
     }));
   }
 }
@@ -148,7 +144,8 @@ class Event extends Message {
 }
 
 class Record {
-  constructor(event, streamId, sequence, traceId) {
+  constructor(event, streamId, sequence, traceId, time = new Date()) {
+    this.time = time;
     this.event = event;
     this.streamId = streamId;
     this.sequence = sequence;
@@ -164,24 +161,19 @@ class EventLog {
   }
 
   //noinspection JSUnusedLocalSymbols
-  subscribe(streamHeads, subscriber) {
-    return Promise.resolve({cancel: () => null})
+  subscribe(lastRecordTime, subscriber) {
+    return Promise.resolve({cancel: ()=>null})
   }
 }
 
-class MultiEventLog extends EventLog {
-  constructor() {
+class CombinedEventLog extends EventLog {
+  constructor(eventLogs) {
     super();
-    this._logs = [];
+    this._logs = eventLogs;
   }
 
-  add(eventLog) {
-    this._logs.push(eventLog);
-    return this
-  }
-
-  subscribe(streamHeads, subscriber) {
-    return Promise.all(this._logs.map(log => log.subscribe(streamHeads, subscriber)))
+  subscribe(lastRecordTime, subscriber) {
+    return Promise.all(this._logs.map(log => log.subscribe(lastRecordTime, subscriber)))
       .then(subscriptions => ({cancel: () => subscriptions.forEach(s => s.cancel())}))
   }
 }
@@ -214,7 +206,8 @@ class PersistenceFactory {
 //------ SNAPSHOT -----//
 
 class Snapshot {
-  constructor(heads, state) {
+  constructor(lastRecordTime, heads, state) {
+    this.lastRecordTime = lastRecordTime;
     this.heads = heads;
     this.state = state;
   }
@@ -296,6 +289,7 @@ class UnitInstance {
     this._log = log;
     this._snapshots = snapshots;
 
+    this._lastRecordTime = null;
     this._heads = {};
     this._state = {};
     this._subscription = null;
@@ -333,6 +327,7 @@ class UnitInstance {
     return this._snapshots.fetch(this._key, this._definition.version)
       .then(snapshot => {
         debug('fetched', {key: this._key, snapshot});
+        this._lastRecordTime = snapshot.lastRecordTime;
         this._state = snapshot.state;
         this._heads = snapshot.heads;
       })
@@ -340,8 +335,8 @@ class UnitInstance {
   }
 
   _subscribeToLog() {
-    debug('subscribe', {key: this._key, heads: this._heads});
-    return this._log.subscribe(this._heads, record => this.apply(record))
+    debug('subscribe', {key: this._key, lastRecordTime: this._lastRecordTime});
+    return this._log.subscribe(this._lastRecordTime, record => this.apply(record))
       .then(subscription => this._subscription = subscription)
   }
 
@@ -362,10 +357,13 @@ class UnitInstance {
 
   takeSnapshot() {
     debug('store', {key: this._key, version: this._definition.version, heads: this._heads});
-    this._snapshots.store(this._key, this._definition.version, new Snapshot(this._heads, this._state));
+    this._snapshots.store(this._key, this._definition.version,
+      new Snapshot(this._lastRecordTime, this._heads, this._state));
   }
 
   apply(record) {
+    this._lastRecordTime = record.time;
+
     let appliers = this._definition._appliers[record.event.name];
     if (!appliers) return;
 
@@ -675,37 +673,33 @@ class SagaInstance extends UnitInstance {
 
   reactTo(record) {
     if (record.event.name == '__reaction-retry-requested') {
-      return this._reactTo(record.event.payload.record, [], 0);
+      record = record.event.payload.record;
     }
 
-    return this._reactTo(record, [], 4);
+    return this._reactTo(record);
   }
 
-  _reactTo(record, errors, triesLeft) {
+  _reactTo(record, triesLeft) {
     debug('reactTo', {key: this._key, record});
 
     return this._lockReaction(record)
-      .then(locked => locked ? this._tryToReactTo(record, errors, triesLeft) : null)
+      .then(locked => locked ? this._tryToReactTo(record, triesLeft) : null)
   }
 
-  _tryToReactTo(record, errors, triesLeft) {
+  _tryToReactTo(record) {
     let reactor = this._definition._reactors[record.event.name];
 
     return new Promise(y => y(reactor.call(this._state, record.event.payload)))
       .catch(err => {
-        errors.push(err.stack);
-        debug('failed', {key: this._key, record, triesLeft, errors});
-
-        return this._unlockReaction(record)
-          .then(() => triesLeft
-            ? setTimeout(() => this._reactTo(record, errors, triesLeft - 1), Math.pow(10, errors.length - 1))
-            : this._markReactionFailed(record, errors))
+        debug('failed', {key: this._key, record, err});
+        return this._markReactionFailed(record, err.stack || err)
       })
   }
 
   _lockReaction(record) {
     return this._meta.execute(new Command('lock-reaction', {
       sagaKey: '__' + this._key,
+      recordTime: record.time,
       streamId: record.streamId,
       sequence: record.sequence
     }))
@@ -716,20 +710,12 @@ class SagaInstance extends UnitInstance {
       })
   }
 
-  _unlockReaction(record) {
-    return this._meta.execute(new Command('unlock-reaction', {
-      sagaKey: '__' + this._key,
-      streamId: record.streamId,
-      sequence: record.sequence
-    }))
-  }
-
-  _markReactionFailed(record, errors) {
+  _markReactionFailed(record, error) {
     return this._meta.execute(new Command('mark-reaction-as-failed', {
       sagaId: this.id,
       sagaKey: '__' + this._key,
       record,
-      errors
+      error
     }))
   }
 }
@@ -764,73 +750,53 @@ class ReactionLockAggregate extends Aggregate {
         this.locked[JSON.stringify({streamId, sequence})] = true;
       })
 
-      .applying('__reaction-unlocked', function ({streamId, sequence}) {
+      .applying('__reaction-failed', function ({streamId, sequence}) {
         delete this.locked[JSON.stringify({streamId, sequence})];
       })
 
-      .executing('lock-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
+      .executing('lock-reaction', $=>$.sagaKey, function ({sagaKey, recordTime, streamId, sequence}) {
         if (this.locked[JSON.stringify({streamId, sequence})]) {
           throw new Error('Reaction locked');
         }
-        return [new Event('__reaction-locked', {sagaKey, streamId, sequence})]
+        return [new Event('__reaction-locked', {sagaKey, recordTime, streamId, sequence})]
       })
 
-      .executing('unlock-reaction', $=>$.sagaKey, function ({sagaKey, streamId, sequence}) {
-        return [new Event('__reaction-unlocked', {sagaKey, streamId, sequence})]
+      .executing('mark-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, error}) {
+        return [new Event('__reaction-failed', {sagaId, sagaKey, record, error})]
       });
   }
 }
 
-class ReactionFailuresAggregate extends Aggregate {
+class ModuleSubscriptionAggregate extends Aggregate {
   constructor() {
-    super('ReactionFailures');
+    super('ModuleSubscription');
 
-    this.executing('mark-reaction-as-failed', $=>$.sagaKey, function ({sagaId, sagaKey, record, errors}) {
-      return [new Event('__reaction-failed', {sagaId, sagaKey, record, errors})]
-    });
-  }
-}
-
-class StreamHeadsAggregate extends Aggregate {
-  constructor() {
-    super('StreamHeads');
-
-    this.executing('consume-record', $=>$.consumerKey, function ({streamId, sequence}) {
-      return [new Event('__record-consumed', {streamId, sequence})]
+    this.executing('consume-record', $=>`__Module-${$.moduleName}`, function ({recordTime}) {
+      return [new Event('__record-consumed', {recordTime})]
     })
   }
 }
 
-class StreamHeadsProjection extends Projection {
-  constructor() {
-    super('StreamHeads');
+class ModuleSubscriptionProjection extends Projection {
+  constructor(moduleName) {
+    super('ModuleSubscription');
 
     this
 
       .initializing(function () {
-        this.heads = {};
+        this.lastRecordTime = null;
       })
 
-      .applying('__record-consumed', function ({streamId, sequence}) {
-        this.heads[streamId] = this.heads[streamId] || {};
-        this.heads[streamId][sequence] = sequence;
+      .applying('__record-consumed', function ({recordTime}) {
+        if (recordTime > this.lastRecordTime) this.lastRecordTime = recordTime
       })
 
-      .applying('__reaction-locked', function ({streamId, sequence}) {
-        this.heads[streamId] = this.heads[streamId] || {};
-        this.heads[streamId][sequence] = sequence;
+      .applying('__reaction-locked', function ({recordTime}) {
+        if (recordTime > this.lastRecordTime) this.lastRecordTime = recordTime
       })
 
-      .applying('__reaction-unlocked', function ({streamId, sequence}) {
-        delete this.heads[streamId][sequence];
-      })
-
-      .respondingTo('stream-heads', $=>'karma', function () {
-        return Object.keys(this.heads).reduce((heads, streamId) => {
-          let lastHead = Object.keys(this.heads[streamId]).pop();
-          heads[streamId] = this.heads[streamId][lastHead];
-          return heads
-        }, {})
+      .respondingTo('last-record-time', $=>moduleName, function () {
+        return this.lastRecordTime || new Date()
       })
   }
 }
@@ -850,6 +816,7 @@ module.exports = {
 
   Record,
   EventLog,
+  CombinedEventLog,
   PersistenceFactory,
   SnapshotStore,
   EventStore,
