@@ -10,7 +10,7 @@ const k = require('../../../src/karma');
 const mongo = require('../../../src/persistence/mongo');
 const mongodb = require('mongodb');
 
-describe('MongoDB Event Log', () => {
+describe.skip('MongoDB Event Log', () => {
   let log, onDb;
 
   beforeEach(() => {

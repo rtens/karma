@@ -53,7 +53,8 @@ describe('MongoDB Snapshot Store', () => {
   });
 
   it('stores Snapshots in a collection', () => {
-    return snapshots.store('foo', 'v1', new k.Snapshot({foo: 42}, {foo: 'bar'}))
+    return snapshots.store('foo', 'v1',
+      new k.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'}))
 
       .then(() => onDb(db => db.collection('bla_snapshots_Test').find().toArray()))
 
@@ -63,6 +64,7 @@ describe('MongoDB Snapshot Store', () => {
           _id: 'ObjectID',
           k: 'foo',
           v: 'v1',
+          t: new Date('2011-12-13T14:15:16Z'),
           h: {foo: 42},
           s: {foo: 'bar'}
         }]))
@@ -70,21 +72,25 @@ describe('MongoDB Snapshot Store', () => {
 
   it('fetches Snapshots from a collection', () => {
     return onDb(db => db.collection('bla_snapshots_Test').insertOne({
-        k: 'foo',
-        v: 'v1',
-        h: {foo: 42},
-        s: {foo: 'bar'}
-      }))
+      k: 'foo',
+      v: 'v1',
+      t: new Date('2011-12-13T14:15:16Z'),
+      h: {foo: 42},
+      s: {foo: 'bar'}
+    }))
 
       .then(() => snapshots.fetch('foo', 'v1'))
 
-      .then(snapshot => snapshot.should.eql(new k.Snapshot({foo: 42}, {foo: 'bar'})))
+      .then(snapshot => snapshot.should.eql(
+        new k.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'})))
   });
 
   it('updates existing Snapshots in a collection', () => {
-    return snapshots.store('foo', 'v1', new k.Snapshot({foo: 21}, {foo: 'bar'}))
+    return snapshots.store('foo', 'v1',
+      new k.Snapshot(new Date('2011-12-13'), {foo: 21}, {foo: 'bar'}))
 
-      .then(() => snapshots.store('foo', 'v1', new k.Snapshot({foo: 42}, {foo: 'baz', bar: 'bam'})))
+      .then(() => snapshots.store('foo', 'v1',
+        new k.Snapshot(new Date('2011-12-14'), {foo: 42}, {foo: 'baz', bar: 'bam'})))
 
       .then(() => onDb(db => db.collection('bla_snapshots_Test').find().toArray()))
 
@@ -94,6 +100,7 @@ describe('MongoDB Snapshot Store', () => {
           _id: 'ObjectID',
           k: 'foo',
           v: 'v1',
+          t: new Date('2011-12-14'),
           h: {foo: 42},
           s: {foo: 'baz', bar: 'bam'}
         }]))
@@ -101,11 +108,9 @@ describe('MongoDB Snapshot Store', () => {
 
   it('fails if the Snapshot does not exist', () => {
     return onDb(db => db.collection('bla_snapshots_Test').insertOne({
-        k: 'foo',
-        v: 'v1',
-        h: {foo: 42},
-        s: {foo: 'bar'}
-      }))
+      k: 'foo',
+      v: 'v1'
+    }))
 
       .then(() => snapshots.fetch('foo', 'v2'))
 

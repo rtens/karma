@@ -169,6 +169,7 @@ class MongoSnapshotStore extends karma.SnapshotStore {
       $set: {
         k: key,
         v: version,
+        t: snapshot.lastRecordTime,
         h: snapshot.heads,
         s: snapshot.state
       }
@@ -182,7 +183,7 @@ class MongoSnapshotStore extends karma.SnapshotStore {
     return this.connect().then(() => this._db
       .collection(this._prefix + 'snapshots_' + this.module)
       .findOne({k: key, v: version})
-      .then(doc => doc ? new karma.Snapshot(doc.h, doc.s) : Promise.reject('No snapshot')))
+      .then(doc => doc ? new karma.Snapshot(doc.t, doc.h, doc.s) : Promise.reject('No snapshot')))
   }
 
   close() {
