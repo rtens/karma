@@ -20,7 +20,7 @@ class MongoEventStore extends karma.EventStore {
     return new mongodb.MongoClient(this._uri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
-      .then(() => this._db.createCollection(this._collection))
+      .then(() => this._db.collection(this._collection))
       .then(collection => collection.createIndex({d: 1, a: 1, v: 1}, {unique: true}))
       .catch(err => Promise.reject(new Error('EventStore cannot connect to MongoDB database: ' + err)))
   }
@@ -71,7 +71,7 @@ class MongoEventLog extends karma.EventLog {
     return new mongodb.MongoClient(this._dbUri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
-      .then(() => this._db.createCollection(this._collection))
+      .then(() => this._db.collection(this._collection))
       .then(collection => Promise.all([
         collection.createIndex({d: 1, a: 1, _id: 1}),
         collection.createIndex({d: 1, 'e.n': 1, _id: 1})
