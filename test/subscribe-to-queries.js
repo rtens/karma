@@ -9,7 +9,7 @@ const k = require('../src/karma');
 describe('Subscribing to a Query', () => {
   let Module;
 
-  before(() => {
+  beforeEach(() => {
     Module = (args = {}) =>
       new k.Module(
         args.name || 'Test',

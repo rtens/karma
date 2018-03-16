@@ -9,7 +9,7 @@ const k = require('../src/karma');
 describe('Reacting to an Event', () => {
   let _Date, Module;
 
-  before(() => {
+  beforeEach(() => {
     _Date = Date;
     Date = function (time) {
       return new _Date(time || '2013-12-11T10:09:08Z');
@@ -34,7 +34,7 @@ describe('Reacting to an Event', () => {
         })
   });
 
-  after(() => {
+  afterEach(() => {
     Date = _Date;
   });
 

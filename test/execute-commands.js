@@ -9,10 +9,10 @@ const k = require('../src/karma');
 describe('Executing a Command', () => {
   let _Date, _setTimeout, waits, Module;
 
-  before(() => {
+  beforeEach(() => {
     _Date = Date;
-    Date = function () {
-      return new _Date('2011-12-13T14:15:16Z');
+    Date = function (time) {
+      return new _Date(time || '2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
 
@@ -39,7 +39,7 @@ describe('Executing a Command', () => {
         })
   });
 
-  after(() => {
+  afterEach(() => {
     Date = _Date;
     setTimeout = _setTimeout;
   });

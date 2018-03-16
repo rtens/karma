@@ -10,7 +10,7 @@ const k = require('../src/karma');
 describe('Taking a Snapshot', () => {
   let _Date, Module;
 
-  before(() => {
+  beforeEach(() => {
     _Date = Date;
     Date = function (time) {
       return new _Date(time || '2011-12-13T14:15:16Z');
@@ -33,7 +33,7 @@ describe('Taking a Snapshot', () => {
         })
   });
 
-  after(() => {
+  afterEach(() => {
     Date = _Date;
   });
 
