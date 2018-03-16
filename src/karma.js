@@ -90,10 +90,9 @@ class Module extends BaseModule {
       .then(lastRecordTime => {
         let filter = this._log.filter().after(lastRecordTime);
         debug('subscribe module', {lastRecordTime});
-        return Promise.all([
-          this._log.subscribe(filter, record => this.reactTo(record)),
-          this._adminLog.subscribe(lastRecordTime, record => this.reactTo(record))
-        ])
+        return this._log.replay(filter, record => this.reactTo(record))
+          .then(() => this._log.subscribe(record => this.reactTo(record)))
+          .then(() => this._adminLog.subscribe(record => this.reactToAdmin(record)))
       })
       .then(() => this)
   }
@@ -104,6 +103,12 @@ class Module extends BaseModule {
       .then(instances => instances.length
         ? Promise.all(instances.map(this._notifyAccess(instance => instance.reactTo(record))))
         : this._consumeRecord(record))
+  }
+
+  reactToAdmin(record) {
+    if (record.event.name == '__reaction-retry-requested') {
+      return this.reactTo(record.event.payload.record)
+    }
   }
 
   _consumeRecord(record) {
@@ -162,8 +167,13 @@ class EventLog {
   }
 
   //noinspection JSUnusedLocalSymbols
-  subscribe(filter, subscriber) {
+  subscribe(applier) {
     return Promise.resolve({cancel: ()=>null})
+  }
+
+  //noinspection JSUnusedLocalSymbols
+  replay(filter, applier) {
+    return Promise.resolve()
   }
 
   filter() {
@@ -320,6 +330,7 @@ class UnitInstance {
     this._loading = false;
     this._onLoad = [];
     this._onUnload = [];
+    this._buffer = [];
 
     definition._initializers.forEach(i => i.call(this._state));
   }
@@ -340,6 +351,7 @@ class UnitInstance {
     return Promise.resolve()
       .then(() => this._loadSnapshot())
       .then(() => this._subscribeToLog())
+      .then(() => this._replayLog())
       .then(() => this._finishLoading())
       .then(() => this);
   }
@@ -357,9 +369,14 @@ class UnitInstance {
   }
 
   _subscribeToLog() {
-    debug('subscribe', {key: this._key, lastRecordTime: this._lastRecordTime});
-    return this._log.subscribe(this._recordFilter(), record => this.apply(record))
+    debug('subscribe', {key: this._key});
+    return this._log.subscribe(record => this._loaded ? this.apply(record) : this._buffer.push(record))
       .then(subscription => this._subscription = subscription)
+  }
+
+  _replayLog() {
+    debug('replay', {key: this._key, lastRecordTime: this._lastRecordTime});
+    return this._log.replay(this._recordFilter(), record => this.apply(record));
   }
 
   _recordFilter() {
@@ -370,6 +387,10 @@ class UnitInstance {
 
   _finishLoading() {
     this._loaded = true;
+
+    this._buffer.forEach(record => this.apply(record));
+    this._buffer = null;
+
     this._onLoad.forEach(fn=>fn());
   }
 
@@ -705,18 +726,10 @@ class SagaInstance extends UnitInstance {
   }
 
   reactTo(record) {
-    if (record.event.name == '__reaction-retry-requested') {
-      record = record.event.payload.record;
-    }
-
-    return this._reactTo(record);
-  }
-
-  _reactTo(record, triesLeft) {
     debug('reactTo', {key: this._key, record});
 
     return this._lockReaction(record)
-      .then(locked => locked ? this._tryToReactTo(record, triesLeft) : null)
+      .then(locked => locked ? this._tryToReactTo(record) : null)
   }
 
   _tryToReactTo(record) {

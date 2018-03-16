@@ -64,7 +64,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.subscribed.map(s=>s.lastRecordTime).should.eql([new Date(), null]))
+      .then(() => log.replayed.map(s=>s.lastRecordTime).should.eql([new Date(), null]))
 
       .then(() => reactions.should.eql(['one', 'two']))
   });
@@ -142,7 +142,7 @@ describe('Reacting to an Event', () => {
 
     return Module({log, metaLog}).start()
 
-      .then(() => log.subscribed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
+      .then(() => log.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
   });
 
   it('subscribes to EventLog using time of last consumed Record', () => {
@@ -157,7 +157,7 @@ describe('Reacting to an Event', () => {
 
     return Module({log, metaLog}).start()
 
-      .then(() => log.subscribed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
+      .then(() => log.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
   });
 
   it('invokes the reactor for published Events', () => {

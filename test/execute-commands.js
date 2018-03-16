@@ -271,7 +271,7 @@ describe('Executing a Command', () => {
         traceId: undefined
       }]))
 
-      .then(() => log.subscribed.should.eql([{
+      .then(() => log.replayed.should.eql([{
         lastRecordTime: null,
         eventNames: ['bard'],
         streamId: 'foo'

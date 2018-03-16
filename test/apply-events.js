@@ -83,7 +83,7 @@ describe('Applying Events', () => {
 
           .then(() => state.should.eql([['a one', 'b one', 'a two', 'b two']]))
 
-          .then(() => log.subscribed.map(r=>({...r, streamId: 'x'})).should.eql([{
+          .then(() => log.replayed.map(r=>({...r, streamId: 'x'})).should.eql([{
             lastRecordTime: null,
             eventNames: ['no event', 'bard'],
             streamId: 'x'
@@ -146,7 +146,7 @@ describe('Applying Events', () => {
 
           .then(() => module[unit.handle](new unit.Message('Foo', 'two')))
 
-          .then(() => log.subscribed.length.should.equal(1))
+          .then(() => log.replayed.length.should.equal(1))
 
           .then(() => state.should.eql(['a one', 'a two']))
       });
@@ -192,6 +192,43 @@ describe('Applying Events', () => {
           .then(() => log1.subscriptions.map(s => s.active).should.eql([true]))
 
           .then(() => log2.subscriptions.map(s => s.active).should.eql([true]))
+      });
+
+      it('combines Events from replaying and subscribing', () => {
+        let history = [];
+        let log = new class extends fake.EventLog {
+          subscribe(applier) {
+            history.push('subscribe');
+            applier(new k.Record(new k.Event('bard', 'not'), 'foo', 22));
+            applier(new k.Record(new k.Event('bard', 'tre'), 'foo', 23));
+
+            return super.subscribe(applier);
+          }
+
+          replay(filter, applier) {
+            history.push('replay');
+            return super.replay(filter, applier);
+          }
+        };
+        log.records = [
+          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
+          new k.Record(new k.Event('bard', 'two'), 'foo', 22),
+        ];
+
+        let state = [];
+        return Module({log})
+
+          .add(new unit.Unit('One')
+            .applying('bard', payload => state.push(payload))
+            [unit.handling]('Foo', $=>$, ()=>null))
+
+          [unit.handle](new unit.Message('Foo', 'foo'))
+
+          .then(() => log.publish(new k.Record(new k.Event('bard', 'for'), 'foo', 24)))
+
+          .then(() => history.should.eql(['subscribe', 'replay']))
+
+          .then(() => state.should.eql(['one', 'two', 'tre', 'for']))
       });
 
       it('notifies the UnitStrategy', () => {
@@ -248,7 +285,7 @@ describe('Applying Events', () => {
 
             .then(() => applied.should.eql(['one', 'one']))
 
-            .then(() => log.subscribed.length.should.equal(2))
+            .then(() => log.replayed.length.should.equal(2))
 
             .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
         });
@@ -272,7 +309,7 @@ describe('Applying Events', () => {
 
             .then(() => applied.should.eql(['one', 'two']))
 
-            .then(() => log.subscribed.should.eql([{
+            .then(() => log.replayed.should.eql([{
               lastRecordTime: null,
               eventNames: ['bard']
             }]))
@@ -297,7 +334,7 @@ describe('Applying Events', () => {
 
             .then(() => applied.should.eql(['one']))
 
-            .then(() => log.subscribed.should.eql([{
+            .then(() => log.replayed.should.eql([{
               lastRecordTime: null,
               eventNames: ['bard'],
               streamId: 'foo'

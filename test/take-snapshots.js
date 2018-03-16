@@ -124,7 +124,7 @@ describe('Taking a Snapshot', () => {
             version: 'v1',
           }]))
 
-          .then(() => log.subscribed.map(r=>({...r, streamId: 'x'})).should.eql([{
+          .then(() => log.replayed.map(r=>({...r, streamId: 'x'})).should.eql([{
             lastRecordTime: new Date('2011-12-13'),
             eventNames: ['bard'],
             streamId: 'x'
@@ -286,7 +286,7 @@ describe('Taking a Snapshot', () => {
               version: 'v1',
             }]))
 
-            .then(() => log.subscribed.should.eql([{
+            .then(() => log.replayed.should.eql([{
               lastRecordTime: new Date('2011-12-13'),
               eventNames: ['bard']
             }]))
