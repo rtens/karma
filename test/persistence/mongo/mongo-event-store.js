@@ -43,7 +43,7 @@ describe('MongoDB Event Store', () => {
 
   it('fails if it cannot connect', () => {
     return new mongo.EventStore('Test', 'mongodb://foo', null, null, {reconnectTries: 0})
-      
+
       .record([])
 
       .should.be.rejectedWith('EventStore cannot connect to MongoDB database')
@@ -54,17 +54,17 @@ describe('MongoDB Event Store', () => {
 
       .then(() => onDb(db => db.collection('bla_event_store').indexes()))
 
-      .then(indexes => {
-        indexes[1].key.should.eql({a: 1, v: 1});
-        indexes[1].unique.should.eql(true)
-      })
+      .then(indexes => indexes.map(i=>({key: i.key, unique: !!i.unique})).should.eql([
+        {key: {_id: 1}, unique: false},
+        {key: {d: 1, a: 1, v: 1}, unique: true}
+      ]))
   });
 
   it('stores Records in a Collection', () => {
     return store.record([
-        new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
-        new k.Event('bard', {c: 421}, new Date('2013-12-11')),
-      ], 'foo', null, 'trace')
+      new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
+      new k.Event('bard', {c: 421}, new Date('2013-12-11')),
+    ], 'foo', null, 'trace')
 
       .then(records => records.should.eql([
         new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 1, 'trace'),
@@ -90,6 +90,7 @@ describe('MongoDB Event Store', () => {
 
   it('rejects Records on occupied heads', () => {
     return onDb(db => db.collection('bla_event_store').insertOne({
+      d: 'Test',
       a: 'foo',
       v: 42
     }))

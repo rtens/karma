@@ -21,7 +21,7 @@ class MongoEventStore extends karma.EventStore {
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
       .then(() => this._db.createCollection(this._collection))
-      .then(collection => collection.createIndex({a: 1, v: 1}, {unique: true}))
+      .then(collection => collection.createIndex({d: 1, a: 1, v: 1}, {unique: true}))
       .catch(err => Promise.reject(new Error('EventStore cannot connect to MongoDB database: ' + err)))
   }
 
@@ -54,9 +54,9 @@ class MongoEventLog extends karma.EventLog {
     this._dbUri = databaseConnectionUri;
     this._oplogUri = oplogConnectionUri;
     this._dbName = database;
-    this._prefix = collectionPrefix;
     this._options = connectionOptions;
 
+    this._collection = collectionPrefix + 'event_store';
     this._subscriptions = [];
 
     this._client = null;
@@ -71,9 +71,15 @@ class MongoEventLog extends karma.EventLog {
     return new mongodb.MongoClient(this._dbUri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
+      .then(() => this._db.createCollection(this._collection))
+      .then(collection => Promise.all([
+        collection.createIndex({d: 1, a: 1, _id: 1}),
+        collection.createIndex({d: 1, 'e.n': 1, _id: 1})
+      ]))
+
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB database: ' + err)))
 
-      .then(() => this._oplog = mongoOplog(this._oplogUri, {ns: this._dbName + '.' + this._prefix + 'event_store'}))
+      .then(() => this._oplog = mongoOplog(this._oplogUri, {ns: this._dbName + '.' + this._collection}))
       .then(() => this._oplog.on('error', err => this._oplogError = err))
       .then(() => this._oplog.on('insert', doc => this._notifySubscribers(doc.o, this._subscriptions)))
       .then(() => this._oplog.tail())
@@ -81,44 +87,39 @@ class MongoEventLog extends karma.EventLog {
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB oplog: ' + err)))
   }
 
-  subscribe(streamHeads, subscriber) {
-    let subscription = {subscriber};
+  subscribe(applier) {
+    let subscription = {applier};
 
     return this.connect()
-      .then(() => this._readRecords(streamHeads, subscriber))
       .then(() => this._subscriptions.push(subscription))
       .then(() => ({
-        cancel: () => Promise.resolve(subscription.subscriber = null)
-          .then(() => this._subscriptions = this._subscriptions.filter(s=>s.subscriber))
+        cancel: () => Promise.resolve(subscription.applier = null)
+          .then(() => this._subscriptions = this._subscriptions.filter(s=>s.applier))
       }))
   }
 
-  _readRecords(streamHeads, subscriber) {
-    let query = {d: this.module};
-    let greaterHeads = Object.keys(streamHeads)
-      .map(streamId => ({a: streamId, v: {$gt: streamHeads[streamId]}}));
+  replay(filter, applier) {
+    return this.connect()
+      .then(() => this._db
+        .collection(this._collection)
+        .find(filter.query)
+        .sort({_id: 1})
+      )
+      .then(cursor => new Promise(y => cursor.forEach(recordSet =>
+        this._notifySubscribers(recordSet, [{applier}]), y)))
+  }
 
-    if (greaterHeads.length) {
-      greaterHeads.push({a: {$nin: Object.keys(streamHeads)}});
-      query.$or = greaterHeads;
-    }
-
-    let cursor = this._db
-      .collection(this._prefix + 'event_store')
-      .find(query)
-      .sort({v: 1});
-
-    return new Promise(y => cursor.forEach(recordSet =>
-      this._notifySubscribers(recordSet, [{subscriber}]), y));
+  filter() {
+    return new MongoRecordFilter(this.module)
   }
 
   _notifySubscribers(recordSet, subscriptions) {
     if (recordSet.d != this.module) return;
 
     subscriptions.forEach(s => recordSet.e.forEach((event, i) =>
-      Promise.resolve(s.subscriber(new karma.Record(
+      Promise.resolve(s.applier(new karma.Record(
         new karma.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
-        recordSet.a, recordSet.v + i, recordSet.c)))
+        recordSet.a, recordSet.v + i, recordSet.c, recordSet._id.getTimestamp())))
         .catch(err => console.error(err))))
   }
 
@@ -134,6 +135,30 @@ class MongoEventLog extends karma.EventLog {
         .then(() => this._oplog = null)
         : Promise.resolve()
     ])
+  }
+}
+
+class MongoRecordFilter extends karma.RecordFilter {
+  constructor(moduleName) {
+    super();
+    this.query = {d: moduleName}
+  }
+
+  after(lastRecordTime) {
+    if (lastRecordTime) {
+      this.query._id = {$gte: mongodb.ObjectID.createFromTime(lastRecordTime.getTime() / 1000 - 10)};
+    }
+    return this
+  }
+
+  nameIn(eventNames) {
+    this.query['e.n'] = {$in: eventNames};
+    return this
+  }
+
+  ofStream(streamId) {
+    this.query.a = streamId;
+    return this
   }
 }
 
