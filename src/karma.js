@@ -444,7 +444,7 @@ class UnitRepository {
       .map(unitDefinition => {
         let unitId = unitDefinition.mapToId(message);
         if (!unitId) {
-          throw new Error(`Cannot map [${message.name}]`)
+          return Promise.reject(new Error(`Cannot map [${message.name}]`))
         }
 
         return this._getOrLoad(unitDefinition, unitId)

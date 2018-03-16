@@ -59,14 +59,14 @@ describe('Responding to a Query', () => {
   });
 
   it('fails if the Query cannot be mapped to a Projection instance', () => {
-    (() => Module()
+    return Module()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>null))
 
-      .respondTo(new k.Query('Foo')))
+      .respondTo(new k.Query('Foo'))
 
-      .should.throw(Error, 'Cannot map [Foo]')
+      .should.be.rejectedWith('Cannot map [Foo]')
   });
 
   it('returns a value', () => {

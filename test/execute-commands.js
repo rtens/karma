@@ -95,14 +95,14 @@ describe('Executing a Command', () => {
   });
 
   it('fails if the Command cannot be mapped to an Aggregate', () => {
-    (() => Module()
+    return Module()
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>null))
 
-      .execute(new k.Command('Foo')))
+      .execute(new k.Command('Foo'))
 
-      .should.throw(Error, 'Cannot map [Foo]')
+      .should.be.rejectedWith(Error, 'Cannot map [Foo]')
   });
 
   it('executes the Command', () => {
