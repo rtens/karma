@@ -62,26 +62,26 @@ describe('MongoDB Event Store', () => {
 
   it('stores Records in a Collection', () => {
     return store.record([
-      new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
+      new k.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')),
       new k.Event('bard', {c: 421}, new Date('2013-12-11')),
     ], 'foo', null, 'trace')
 
       .then(records => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')), 'foo', 1, 'trace'),
+        new k.Record(new k.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')), 'foo', 1, 'trace'),
         new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 2, 'trace')
       ]))
 
       .then(() => onDb(db => db.collection('bla_event_store').find().toArray()))
 
       .then(docs => docs
-        .map(d=>({...d, _id: d._id.constructor.name})).should
+        .map(d=>({...d, _id: d._id.getTimestamp()})).should
         .eql([{
-          _id: 'ObjectID',
+          _id: new Date(),
           d: 'Test',
           a: 'foo',
           v: 1,
           e: [
-            {n: 'food', a: {a: 'b'}, t: new Date('2011-12-13')},
+            {n: 'food', a: {a: 'b'}, t: null},
             {n: 'bard', a: {c: 421}, t: new Date('2013-12-11')}
           ],
           c: 'trace'

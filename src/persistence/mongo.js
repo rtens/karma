@@ -32,7 +32,7 @@ class MongoEventStore extends karma.EventStore {
       d: this.module,
       a: streamId,
       v: sequence,
-      e: events.map(e => ({n: e.name, a: e.payload, t: e.time})),
+      e: events.map(e => ({n: e.name, a: e.payload, t: this._aboutNow(e.time) ? null : e.time})),
       c: traceId
     };
 
@@ -45,6 +45,10 @@ class MongoEventStore extends karma.EventStore {
   close() {
     if (this._client) this._client.close();
     this._client = null;
+  }
+
+  _aboutNow(time) {
+    return Math.abs(time.getTime() - Date.now()) <= 500
   }
 }
 
