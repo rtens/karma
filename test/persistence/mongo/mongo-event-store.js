@@ -11,9 +11,16 @@ const mongo = require('../../../src/persistence/mongo');
 const mongodb = require('mongodb');
 
 describe('MongoDB Event Store', () => {
-  let store, onDb;
+  let _Date, store, onDb;
 
   beforeEach(() => {
+    _Date = Date;
+    Date = function (time) {
+      return new _Date(time || '2001-02-03T12:00:00Z');
+    };
+    Date.now = () => new Date().getTime();
+    Date.prototype = _Date.prototype;
+
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
     store = new mongo.EventStore('Test', process.env.MONGODB_URI_TEST, db, 'bla_');
 
@@ -29,6 +36,7 @@ describe('MongoDB Event Store', () => {
   });
 
   afterEach(() => {
+    Date = _Date;
     return onDb(db => db.dropDatabase())
       .then(store.close())
   });
