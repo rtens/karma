@@ -85,7 +85,13 @@ class MongoEventLog extends karma.EventLog {
 
       .then(() => this._oplog = mongoOplog(this._oplogUri, {ns: this._dbName + '.' + this._collection}))
       .then(() => this._oplog.on('error', err => this._oplogError = err))
-      .then(() => this._oplog.on('insert', doc => this._notifySubscribers(doc.o, this._subscriptions)))
+      .then(() => this._oplog.on('insert', doc => {
+        try {
+          this._notifySubscribers(doc.o, this._subscriptions)
+        } catch (err) {
+          console.error(err.stack ? err.stack : err)
+        }
+      }))
       .then(() => this._oplog.tail())
       .then(() => this._oplogError ? Promise.reject(this._oplogError) : null)
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB oplog: ' + err)))
@@ -109,8 +115,13 @@ class MongoEventLog extends karma.EventLog {
         .find(filter.query)
         .sort({_id: 1})
       )
-      .then(cursor => new Promise(y => cursor.forEach(recordSet =>
-        this._notifySubscribers(recordSet, [{applier}]), y)))
+      .then(cursor => new Promise((y, n) => cursor.forEach(recordSet => {
+        try {
+          this._notifySubscribers(recordSet, [{applier}])
+        } catch (err) {
+          n(err)
+        }
+      }, y)))
   }
 
   filter() {
@@ -120,11 +131,14 @@ class MongoEventLog extends karma.EventLog {
   _notifySubscribers(recordSet, subscriptions) {
     if (recordSet.d != this.module) return;
 
-    subscriptions.forEach(s => recordSet.e.forEach((event, i) =>
-      Promise.resolve(s.applier(new karma.Record(
-        new karma.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
-        recordSet.a, recordSet.v + i, recordSet.c, recordSet._id.getTimestamp())))
-        .catch(err => console.error(err))))
+    return subscriptions.forEach(s => recordSet.e.forEach((event, i) =>
+      s.applier(this._inflate(recordSet, event, i))))
+  }
+
+  _inflate(recordSet, event, i) {
+    return new karma.Record(
+      new karma.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
+      recordSet.a, recordSet.v + i, recordSet.c, recordSet._id.getTimestamp());
   }
 
   close() {

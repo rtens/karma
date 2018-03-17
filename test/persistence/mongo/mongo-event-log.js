@@ -91,6 +91,22 @@ describe('MongoDB Event Log', () => {
       ]))
   });
 
+  it('fails if an applier fails during replay', () => {
+    return Promise.resolve()
+      .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
+        d: 'Test',
+        a: 'foo',
+        v: 21,
+        e: [{n: 'food'}],
+      }])))
+
+      .then(() => log.replay(log.filter(), () => {
+        throw new Error('Nope')
+      }))
+
+      .should.be.rejectedWith('Nope')
+  });
+
   it('sorts replayed Records by their time', () => {
     let records = [];
 
@@ -169,7 +185,11 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
 
-      .then(() => log.subscribe(() => Promise.reject(new Error('Nope'))))
+      .then(() => log.subscribe(() => {
+        let error = new Error('Nope');
+        error.stack = 'An Error';
+        throw error
+      }))
 
       .then(() => onDb(db => db.collection('bla_event_store').insertOne({
         d: 'Test',
@@ -180,7 +200,7 @@ describe('MongoDB Event Log', () => {
 
       .then(() => console.error = _error)
 
-      .then(() => logged.should.eql(['Error: Nope']))
+      .then(() => logged.should.eql(['An Error']))
   });
 
   it('stops notifying when cancelled', () => {
