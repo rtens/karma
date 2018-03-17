@@ -98,7 +98,6 @@ class Module extends BaseModule {
   }
 
   reactTo(record) {
-    debug('reactTo', record);
     return this._sagas
       .getSagasReactingTo(record.event)
       .then(instances => instances.length
@@ -361,7 +360,7 @@ class UnitInstance {
     debug('fetch', {key: this._key, version: this._definition.version});
     return this._snapshots.fetch(this._key, this._definition.version)
       .then(snapshot => {
-        debug('fetched', {key: this._key, snapshot});
+        debug('fetched', {key: this._key, lastRecordTime: snapshot.lastRecordTime});
         this._lastRecordTime = snapshot.lastRecordTime;
         this._state = snapshot.state;
         this._heads = snapshot.heads;
@@ -407,7 +406,7 @@ class UnitInstance {
   }
 
   takeSnapshot() {
-    debug('store', {key: this._key, version: this._definition.version, heads: this._heads});
+    debug('store', {key: this._key, version: this._definition.version});
     this._snapshots.store(this._key, this._definition.version,
       new Snapshot(this._lastRecordTime, this._heads, this._state));
   }
@@ -420,8 +419,14 @@ class UnitInstance {
 
     if (record.sequence <= this._heads[record.streamId]) return;
 
-    debug('apply', {key: this._key, heads: this._heads, record});
-    appliers.forEach(applier => applier.call(this._state, record.event.payload, record));
+    debug('apply', {key: this._key, record});
+
+    try {
+      appliers.forEach(applier => applier.call(this._state, record.event.payload, record));
+    } catch (err) {
+      this.unload();
+      throw err
+    }
 
     this._heads[record.streamId] = record.sequence;
   }
@@ -669,22 +674,36 @@ class SubscriptionInstance extends ProjectionInstance {
 
   subscribeTo(query, subscriber) {
     let subscription = {query, subscriber, active: true};
-    this._subscriptions.push(subscription);
 
     return this.respondTo(query)
       .then(subscriber)
+      .then(() => this._subscriptions.push(subscription))
       .then(() => ({
         cancel: () => {
           subscription.active = false;
-          if (this._unloaded && this._subscriptions.filter(s=>s.active).length == 0) {
-            super.unload()
-          }
+          if (this._unloaded) this.unload()
         }
       }));
   }
 
+  apply(record) {
+    try {
+      super.apply(record)
+    } catch (err) {
+      this._subscriptions.forEach(s => s.active = false);
+      this.unload();
+      throw err
+    }
+  }
+
   unload() {
     this._unloaded = true;
+
+    this._subscriptions = this._subscriptions.filter(s=>s.active);
+    if (this._subscriptions.length) {
+      return Promise.resolve()
+    }
+    super.unload()
   }
 }
 

@@ -257,6 +257,68 @@ describe('Applying Events', () => {
           ]))
       });
 
+      it('unloads the Unit if failing during replay', () => {
+        let log = new fake.EventLog();
+        log.records = [
+          new k.Record(new k.Event('bard'), 'foo', 21),
+        ];
+
+        let notified = [];
+        let strategy = {onAccess: (unit) => notified.push('access')};
+
+        let fail = true;
+        let module = Module({log, strategy})
+
+          .add(new unit.Unit('One')
+            .applying('bard', function () {
+              if (fail) throw new Error('Nope');
+            })
+            [unit.handling]('Foo', $=>'foo', () => notified.push('handle')));
+
+        return module[unit.handle](new unit.Message('Foo'))
+
+          .should.be.rejectedWith('Nope')
+
+          .then(() => fail = false)
+
+          .then(() => module[unit.handle](new unit.Message('Foo')))
+
+          .then(() => notified.slice(-2).should.eql(['handle', 'access']))
+
+          .then(() => log.replayed.length.should.equal(2))
+
+          .then(() => log.subscriptions.map(s => s.active).should.eql([false, true]))
+      });
+
+      it('unloads the Unit if failing during subscribed Event', () => {
+        let log = new fake.EventLog();
+
+        let notified = [];
+        let strategy = {onAccess: (unit) => notified.push('access')};
+
+        let module = Module({log, strategy})
+
+          .add(new unit.Unit('One')
+            .applying('bard', function () {
+              throw new Error('Nope');
+            })
+            [unit.handling]('Foo', $=>'foo', () => notified.push('handle')));
+
+        return module[unit.handle](new unit.Message('Foo'))
+
+          .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+
+          .should.be.rejectedWith('Nope')
+
+          .then(() => module[unit.handle](new unit.Message('Foo')))
+
+          .then(() => notified.slice(-2).should.eql(['handle', 'access']))
+
+          .then(() => log.replayed.length.should.equal(2))
+
+          .then(() => log.subscriptions.map(s => s.active).should.eql([false, true]))
+      });
+
       if (unit.name != 'a subscribed Projection')
         it('is redone if Unit is unloaded', () => {
           let log = new fake.EventLog();

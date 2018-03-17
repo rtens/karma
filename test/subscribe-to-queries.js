@@ -190,9 +190,7 @@ describe('Subscribing to a Query', () => {
   it('does not un-subscribes projection if not removed and all subscriptions are cancelled', () => {
     let log = new fake.EventLog();
 
-    let strategy = {onAccess: unit => unit.unload()};
-
-    let domain = Module({log, strategy});
+    let domain = Module({log});
 
     return domain
 
@@ -207,6 +205,6 @@ describe('Subscribing to a Query', () => {
 
       .then(subscription => subscription.cancel())
 
-      .then(() => log.subscriptions.map(s => s.active).should.eql([false, false]))
+      .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
   });
 });
