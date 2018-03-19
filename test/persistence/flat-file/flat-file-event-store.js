@@ -27,7 +27,7 @@ describe('Flat file Event Store', () => {
       .record([
         new karma.Event('One', 'foo', new Date('2011-12-13')),
         new karma.Event('Two', 'bar', new Date('2011-12-14'))
-      ], 'one', undefined, 'trace')
+      ], 'one', undefined, 'trace', new Date('2011-12-11T14:15:16.000Z'))
 
       .then(() => fs.readFileAsync(directory + '/Test/records/one.1').then(JSON.parse)
         .then(c => c.should.eql({
@@ -38,6 +38,7 @@ describe('Flat file Event Store', () => {
           },
           streamId: 'one',
           sequence: 1,
+          time: '2011-12-11T14:15:16.000Z',
           traceId: 'trace'
         })))
 
@@ -50,6 +51,7 @@ describe('Flat file Event Store', () => {
           },
           streamId: 'one',
           sequence: 2,
+          time: '2011-12-11T14:15:16.000Z',
           traceId: 'trace'
         })))
 

@@ -21,12 +21,13 @@ describe('Flat file Snapshot store', () => {
   it('stores Snapshots in files', () => {
     return new flatFile.SnapshotStore(directory, 'Test')
 
-      .store('foo', 'v1', new karma.Snapshot({foo: 42}, 'bar'))
+      .store('foo', 'v1', new karma.Snapshot(new Date('2011-12-13'), {foo: 42}, 'bar'))
 
       .then(() => new Promise(y => {
         fs.readFile(directory + '/Test/snapshots/foo/v1', (e, c) =>
           y(JSON.parse(c).should.eql({
             heads: {foo: 42},
+            lastRecordTime: '2011-12-13T00:00:00.000Z',
             state: 'bar'
           })))
       }))
@@ -39,13 +40,14 @@ describe('Flat file Snapshot store', () => {
       fs.mkdirSync(directory + '/Test/snapshots/foo');
       fs.writeFile(directory + '/Test/snapshots/foo/v1', JSON.stringify({
         heads: {foo: 42},
+        lastRecordTime: '2011-12-13T00:00:00.000Z',
         state: 'bar'
       }), y)
     })
 
       .then(() => snapshotStore.fetch('foo', 'v1'))
 
-      .then(snapshot => snapshot.should.eql(new karma.Snapshot({foo: 42}, 'bar')))
+      .then(snapshot => snapshot.should.eql(new karma.Snapshot(new Date('2011-12-13'), {foo: 42}, 'bar')))
   });
 
   it('fails if Snapshot does not exist', () => {

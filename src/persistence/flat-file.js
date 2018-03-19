@@ -36,13 +36,13 @@ class FlatFileEventStore extends karma.EventStore {
     _mkdir(this._paths.records);
   }
 
-  record(events, streamId, onSequence, traceId) {
+  record(events, streamId, onSequence, traceId, recordTime) {
     onSequence = onSequence || 0;
 
     return Promise.resolve()
       .then(() => this._acquireLock(streamId))
       .then(() => this._guardSequence(streamId, onSequence))
-      .then(() => this._writeRecords(events, streamId, onSequence, traceId))
+      .then(() => this._writeRecords(events, streamId, onSequence, traceId, recordTime))
       .then(() => this._writeWriteFile(streamId, onSequence + events.length))
       .then(() => this._releaseLock(streamId))
       .catch(e => this._releaseLock(streamId).then(() => Promise.reject(e)))
@@ -66,9 +66,9 @@ class FlatFileEventStore extends karma.EventStore {
         : Promise.resolve())
   }
 
-  _writeRecords(events, streamId, onSequence, traceId) {
+  _writeRecords(events, streamId, onSequence, traceId, recordTime) {
     var files = events
-      .map((event, i) => new karma.Record(event, streamId, onSequence + 1 + i, traceId))
+      .map((event, i) => new karma.Record(event, streamId, onSequence + 1 + i, traceId, recordTime))
       .map(record => ({
         path: this._paths.record(streamId, record.sequence),
         content: JSON.stringify(record, null, 2)
@@ -100,12 +100,14 @@ class FlatFileEventLog extends karma.EventLog {
     this._notificationQueue = queue({concurrency: 1, autostart: true});
   }
 
-  subscribe(streamHeads, subscriber) {
+  replay(filter, applier) {
+    return this._readStreams(filter, {subscriber: applier})
+  }
+
+  subscribe(subscriber) {
     let subscription = {subscriber, active: true, heads: {}};
 
     return this._startWatching()
-
-      .then(() => this._readStreams(streamHeads, subscription))
 
       .then(() => this._subscriptions.push(subscription))
 
@@ -203,6 +205,7 @@ class FlatFileSnapshotStore extends karma.SnapshotStore {
 
     return fs.readFileAsync(file)
       .then(content => JSON.parse(content))
+      .then(snapshot => new karma.Snapshot(new Date(snapshot.lastRecordTime), snapshot.heads, snapshot.state))
   }
 
   _clear(directory) {
