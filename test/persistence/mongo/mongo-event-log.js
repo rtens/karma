@@ -67,12 +67,12 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
       .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
-        _id: objectId('2013-12-11'),
+        _id: objectId('2017-12-11'),
         d: 'Test',
         a: 'foo',
         v: 21,
         e: [
-          {n: 'food', a: {a: 'b'}, t: new Date('2011-12-13')},
+          {n: 'food', a: {a: 'b'}, t: new Date('2017-12-13')},
           {n: 'bard', a: {c: 421}}
         ],
         c: 'trace'
@@ -84,10 +84,10 @@ describe('MongoDB Event Log', () => {
       .then(() => log.replay(log.filter().after(null), record => records.push(record)))
 
       .then(() => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
-          'foo', 21, 'trace', new Date('2013-12-11')),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')),
-          'foo', 22, 'trace', new Date('2013-12-11'))
+        new k.Record(new k.Event('food', {a: 'b'}, new Date('2017-12-13')),
+          'foo', 21, 'trace', new Date('2017-12-11')),
+        new k.Record(new k.Event('bard', {c: 421}, new Date('2017-12-11')),
+          'foo', 21.5, 'trace', new Date('2017-12-11'))
       ]))
   });
 
@@ -154,12 +154,12 @@ describe('MongoDB Event Log', () => {
       .then(() => log.subscribe(record => records.push(record)))
 
       .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
-        _id: objectId('2013-12-11'),
+        _id: objectId('2017-12-11'),
         d: 'Test',
         a: 'foo',
         v: 23,
         e: [
-          {n: 'food', a: {a: 'b'}, t: new Date('2011-12-13')},
+          {n: 'food', a: {a: 'b'}, t: new Date('2017-12-13')},
           {n: 'bard', a: {c: 421}}
         ],
         c: 'trace'
@@ -171,10 +171,10 @@ describe('MongoDB Event Log', () => {
       .then(() => new Promise(y => setTimeout(y, 100)))
 
       .then(() => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
-          'foo', 23, 'trace', new Date('2013-12-11')),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')),
-          'foo', 24, 'trace', new Date('2013-12-11'))
+        new k.Record(new k.Event('food', {a: 'b'}, new Date('2017-12-13')),
+          'foo', 23, 'trace', new Date('2017-12-11')),
+        new k.Record(new k.Event('bard', {c: 421}, new Date('2017-12-11')),
+          'foo', 23.5, 'trace', new Date('2017-12-11'))
       ]))
   });
 
@@ -218,4 +218,41 @@ describe('MongoDB Event Log', () => {
 
       .then(() => records.should.eql([]))
   });
+
+  it('infers sequence from Record time for "old" Events since correlation was not kept during migration', () => {
+    let records = [];
+
+    return Promise.resolve()
+      .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
+        _id: mongodb.ObjectID('56719a3b0000000000000000'),
+        d: 'Test', a: 'foo', v: 21, e: [{n: 'food'}, {n: 'bard'}],
+      }, {
+        _id: mongodb.ObjectID('56719a3b0000000000000123'),
+        d: 'Test', a: 'foo', v: 12, e: [{n: 'food'}, {n: 'bard'}]
+      }, {
+        _id: mongodb.ObjectID('56719a3c0000000000000000'),
+        d: 'Test', a: 'foo', v: 11, e: [{n: 'food'}, {n: 'bard'}],
+      }, {
+        _id: mongodb.ObjectID('59bd3ae60000000000000099'),
+        d: 'Test', a: 'foo', v: 73, e: [{n: 'food'}, {n: 'bard'}],
+      }, {
+        _id: mongodb.ObjectID('59bd3ae70000000000000000'),
+        d: 'Test', a: 'foo', v: 42, e: [{n: 'food'}, {n: 'bard'}],
+      }])))
+
+      .then(() => log.replay(log.filter().after(null), record => records.push(record)))
+
+      .then(() => records.map(r=>r.sequence).should.eql([
+        0 / 5528798000,
+        0.5 / 5528798000,
+        23 / 5528798000,
+        23.5 / 5528798000,
+        100 / 5528798000,
+        100.5 / 5528798000,
+        5528797999 / 5528798000,
+        5528797999.5 / 5528798000,
+        42,
+        42.5,
+      ]))
+  })
 });

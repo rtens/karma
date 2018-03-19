@@ -98,13 +98,13 @@ describe('MongoDB Event Store', () => {
       .should.be.rejectedWith('Out of sequence')
   });
 
-  it('allows gaps in sequence', () => {
+  it('allows gaps and fractions in sequence', () => {
     return onDb(db => Promise.all([
       db.collection('bla_event_store').insertOne({a: 'foo', v: 21}),
       db.collection('bla_event_store').insertOne({a: 'bar', v: 42}),
     ]))
 
-      .then(() => store.record([], 'foo', 46))
+      .then(() => store.record([], 'foo', 46.7))
 
       .then(() => onDb(db => db.collection('bla_event_store').find().toArray()))
 

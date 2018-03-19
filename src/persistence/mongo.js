@@ -26,7 +26,7 @@ class MongoEventStore extends karma.EventStore {
   }
 
   record(events, streamId, onSequence, traceId) {
-    let sequence = (onSequence || 0) + 1;
+    let sequence = Math.floor(onSequence || 0) + 1;
 
     let document = {
       d: this.module,
@@ -136,9 +136,17 @@ class MongoEventLog extends karma.EventLog {
   }
 
   _inflate(recordSet, event, i) {
+    let sequence = recordSet.v + i / recordSet.e.length;
+
+    let time = recordSet._id.getTimestamp().getTime() / 10;
+    if (time < 150557360700) {
+      let rest = parseInt(recordSet._id.toHexString().substr(8));
+      sequence = (time + (rest % 100) + i / recordSet.e.length - 145028562700) / 5528798000
+    }
+
     return new karma.Record(
       new karma.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
-      recordSet.a, recordSet.v + i, recordSet.c, recordSet._id.getTimestamp());
+      recordSet.a, sequence, recordSet.c, recordSet._id.getTimestamp());
   }
 
   close() {
