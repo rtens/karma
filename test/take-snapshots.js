@@ -65,11 +65,11 @@ describe('Taking a Snapshot', () => {
 
           .add(new unit.Unit('One')
             .initializing(function () {
-              this.bards = [];
+              this.state = [];
             })
             .withVersion('v1')
             .applying('bard', function (payload) {
-              this.bards.push(payload);
+              this.state.push(payload);
             })
             [unit.handling]('Foo', ()=>'foo', ()=>null))
 
@@ -81,7 +81,7 @@ describe('Taking a Snapshot', () => {
             snapshot: {
               lastRecordTime: new Date('2011-12-13'),
               heads: {foo: 21},
-              state: {bards: ['one']}
+              state: ['one']
             }
           }]))
       });
@@ -97,7 +97,7 @@ describe('Taking a Snapshot', () => {
         snapshots.snapshots = [{
           key: unit.Unit.name + '-One-foo',
           version: 'v1',
-          snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21}, {bards: ['snap']})
+          snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21}, ['snap'])
         }];
 
         let state = [];
@@ -106,13 +106,13 @@ describe('Taking a Snapshot', () => {
           .add(new unit.Unit('One')
             .withVersion('v1')
             .initializing(function () {
-              this.bards = ['gone'];
+              this.state = ['gone'];
             })
             .applying('bard', function (payload) {
-              this.bards.push(payload)
+              this.state.push(payload)
             })
             [unit.handling]('Foo', ()=>'foo', function () {
-            state.push(this.bards)
+            state.push(this.state)
           }))
 
           [unit.handle](new unit.Message('Foo'))
@@ -150,37 +150,37 @@ describe('Taking a Snapshot', () => {
 
           .add(new unit.Unit('One')
             .initializing(function () {
-              this.foo = 'one';
+              this.state = 'one';
             })
             .applying('bard', function () {
-              this.foo = 'one'
+              this.state = 'one'
             })
             [unit.handling]('Foo', ()=>'foo', ()=>null))
 
           .add(new unit.Unit('Two')
             .initializing(function () {
-              this.foo = 'one';
+              this.state = 'one';
             })
             .applying('bard', function () {
-              this.foo = 'one'
+              this.state = 'one'
             })
             [unit.handling]('Bar', ()=>'bar', ()=>null))
 
           .add(new unit.Unit('Three')
             .initializing(function () {
-              this.foo = 'two';
+              this.state = 'two';
             })
             .applying('bard', function () {
-              this.foo = 'one'
+              this.state = 'one'
             })
             [unit.handling]('Baz', ()=>'baz', ()=>null))
 
           .add(new unit.Unit('Four')
             .initializing(function () {
-              this.foo = 'two';
+              this.state = 'two';
             })
             .applying('bard', function () {
-              this.foo = 'two'
+              this.state = 'two'
             })
             [unit.handling]('Ban', ()=>'ban', ()=>null))
 
@@ -194,20 +194,20 @@ describe('Taking a Snapshot', () => {
 
           .then(() => snapshots.stored.should.eql([{
             key: unit.Unit.name + '-One-foo',
-            version: 'b16fcb72b0dfffc93af957c61bf1105b',
-            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'one'}}
+            version: '291e2ac4a7d46552cb02fdf71f132f7c',
+            snapshot: {lastRecordTime: null, heads: {}, state: 'one'}
           }, {
             key: unit.Unit.name + '-Two-bar',
-            version: 'b16fcb72b0dfffc93af957c61bf1105b',
-            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'one'}}
+            version: '291e2ac4a7d46552cb02fdf71f132f7c',
+            snapshot: {lastRecordTime: null, heads: {}, state: 'one'}
           }, {
             key: unit.Unit.name + '-Three-baz',
-            version: 'e0deac31cb640f25e89614c48a0f370e',
-            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'two'}}
+            version: '3c47bcfe065e01cf7bf92fc63df63fb8',
+            snapshot: {lastRecordTime: null, heads: {}, state: 'two'}
           }, {
             key: unit.Unit.name + '-Four-ban',
-            version: '05f2c32b673bbd8641329a4866ea54bf',
-            snapshot: {lastRecordTime: null, heads: {}, state: {foo: 'two'}}
+            version: '31502f324858e9b8b5bec31feaca68ad',
+            snapshot: {lastRecordTime: null, heads: {}, state: 'two'}
           }]))
       });
 
@@ -255,7 +255,7 @@ describe('Taking a Snapshot', () => {
           snapshots.snapshots = [{
             key: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21, bar: 22}, {bards: ['snap']})
+            snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21, bar: 22}, ['snap'])
           }];
 
           let state = [];
@@ -264,13 +264,13 @@ describe('Taking a Snapshot', () => {
             .add(new unit.Unit('One')
               .withVersion('v1')
               .initializing(function () {
-                this.bards = ['gone'];
+                this.state = ['gone'];
               })
               .applying('bard', function (payload) {
-                this.bards.push(payload)
+                this.state.push(payload)
               })
               [unit.handling]('Foo', ()=>'foo', function () {
-              state.push(this.bards)
+              state.push(this.state)
             }))
 
             [unit.handle](new unit.Message('Foo'))
@@ -304,11 +304,11 @@ describe('Taking a Snapshot', () => {
 
             .add(new unit.Unit('One')
               .initializing(function () {
-                this.bards = [];
+                this.state = [];
               })
               .withVersion('v1')
               .applying('bard', function (payload) {
-                this.bards.push(payload);
+                this.state.push(payload);
               })
               [unit.handling]('Foo', ()=>'foo', ()=>null))
 
@@ -320,7 +320,7 @@ describe('Taking a Snapshot', () => {
               snapshot: {
                 lastRecordTime: new Date('2011-12-14'),
                 heads: {foo: 21, bar: 42},
-                state: {bards: ['one', 'two']}
+                state: ['one', 'two']
               }
             }]))
         });

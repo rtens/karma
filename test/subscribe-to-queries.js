@@ -56,7 +56,7 @@ describe('Subscribing to a Query', () => {
     snapshots.snapshots = [{
       key: 'Projection-One-foo',
       version: 'v1',
-      snapshot: new k.Snapshot(new Date(), {}, {foods: 'snap '})
+      snapshot: new k.Snapshot(new Date(), {}, 'snap ')
     }];
 
     return Module({log, snapshots})
@@ -64,13 +64,13 @@ describe('Subscribing to a Query', () => {
       .add(new k.Projection('One')
         .withVersion('v1')
         .initializing(function () {
-          this.foods = ''
+          this.state = ''
         })
         .applying('food', function (payload) {
-          this.foods += payload
+          this.state += payload
         })
         .respondingTo('Foo', ()=>'foo', function () {
-          return this.foods
+          return this.state
         }))
 
       .subscribeTo(new k.Query('Foo'), response => responses.push(response))
@@ -80,7 +80,7 @@ describe('Subscribing to a Query', () => {
       .then(() => responses.should.eql(['snap ', 'snap one']))
   });
 
-  it('does not send value if state has not changed', () => {
+  it('does not send value if Projection is not applying Event', () => {
     let responses = [];
 
     let log = new fake.EventLog();
@@ -89,17 +89,17 @@ describe('Subscribing to a Query', () => {
 
       .add(new k.Projection('One')
         .initializing(function () {
-          this.foods = 'one'
+          this.state = 'one'
         })
         .applying('food', function (payload) {
         })
         .respondingTo('Foo', ()=>'foo', function () {
-          return this.foods
+          return this.state
         }))
 
       .subscribeTo(new k.Query('Foo'), response => responses.push(response))
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'two'))))
+      .then(() => log.publish(new k.Record(new k.Event('not food', 'two'))))
 
       .then(() => responses.should.eql(['one']))
   });
@@ -129,13 +129,13 @@ describe('Subscribing to a Query', () => {
 
       .add(new k.Projection('One')
         .initializing(function () {
-          this.foods = ''
+          this.state = ''
         })
         .applying('food', function (payload) {
-          this.foods += payload
+          this.state += payload
         })
         .respondingTo('Foo', ()=>'foo', function () {
-          return this.foods
+          return this.state
         }))
 
       .subscribeTo(new k.Query('Foo'), response => responses.push(response))

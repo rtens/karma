@@ -64,19 +64,19 @@ describe('Applying Events', () => {
 
           .add(new unit.Unit('One')
             .initializing(function () {
-              this.bards = [];
+              this.state = [];
             })
             .applying('no event', function () {
-              this.bards.push('never');
+              this.state.push('never');
             })
             .applying('bard', function (payload) {
-              this.bards.push('a ' + payload);
+              this.state.push('a ' + payload);
             })
             .applying('bard', function (payload, record) {
-              this.bards.push('b ' + record.event.payload);
+              this.state.push('b ' + record.event.payload);
             })
             [unit.handling]('Foo', $=>$, function () {
-            state.push(this.bards)
+            state.push(this.state)
           }))
 
           [unit.handle](new unit.Message('Foo', 'foo'))
@@ -129,13 +129,13 @@ describe('Applying Events', () => {
 
           .add(new unit.Unit('One')
             .initializing(function () {
-              this.bards = [];
+              this.state = [];
             })
             .applying('bard', function (payload) {
-              this.bards.push(payload);
+              this.state.push(payload);
             })
             [unit.handling]('Foo', ()=>'foo', function (payload) {
-            state.push(this.bards + payload)
+            state.push(this.state + payload)
           }))
 
           [unit.handle](new unit.Message('Foo', 'one'))

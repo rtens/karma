@@ -253,13 +253,13 @@ describe('Executing a Command', () => {
 
       .add(new k.Aggregate('One')
         .initializing(function () {
-          this.bards = [];
+          this.state = [];
         })
         .applying('bard', function (payload) {
-          this.bards.push(payload);
+          this.state.push(payload);
         })
         .executing('Foo', $=>$, function () {
-          return [new k.Event('food', this.bards)]
+          return [new k.Event('food', this.state)]
         }))
 
       .execute(new k.Command('Foo', 'foo'))

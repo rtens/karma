@@ -350,14 +350,14 @@ class Unit {
 class UnitInstance {
   constructor(id, definition, log, snapshots) {
     this.id = id;
+    this.definition = definition;
+    this.state = {};
 
-    this._definition = definition;
     this._log = log;
     this._snapshots = snapshots;
 
     this._lastRecordTime = null;
     this._heads = {};
-    this._state = {};
     this._subscription = null;
 
     this._loaded = false;
@@ -366,13 +366,13 @@ class UnitInstance {
     this._onUnload = [];
     this._buffer = [];
 
-    definition._initializers.forEach(i => i.call(this._state));
+    definition._initializers.forEach(i => i.call(this));
   }
 
   get _key() {
     return [
-      this._definition.constructor.name,
-      this._definition.name,
+      this.definition.constructor.name,
+      this.definition.name,
       this.id
     ].join('-')
   }
@@ -391,13 +391,13 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
-    debug('fetch', {key: this._key, version: this._definition.version});
-    return this._snapshots.fetch(this._key, this._definition.version)
+    debug('fetch', {key: this._key, version: this.definition.version});
+    return this._snapshots.fetch(this._key, this.definition.version)
       .then(snapshot => {
         debug('fetched', {key: this._key, lastRecordTime: snapshot.lastRecordTime});
         this._lastRecordTime = snapshot.lastRecordTime;
-        this._state = snapshot.state;
         this._heads = snapshot.heads;
+        this.state = snapshot.state;
       })
       .catch(()=>null)
   }
@@ -417,7 +417,7 @@ class UnitInstance {
   _recordFilter() {
     return this._log.filter()
       .after(this._lastRecordTime)
-      .nameIn(Object.keys(this._definition._appliers));
+      .nameIn(Object.keys(this.definition._appliers));
   }
 
   _finishLoading() {
@@ -440,15 +440,15 @@ class UnitInstance {
   }
 
   takeSnapshot() {
-    debug('store', {key: this._key, version: this._definition.version});
-    this._snapshots.store(this._key, this._definition.version,
-      new Snapshot(this._lastRecordTime, this._heads, this._state));
+    debug('store', {key: this._key, version: this.definition.version});
+    this._snapshots.store(this._key, this.definition.version,
+      new Snapshot(this._lastRecordTime, this._heads, this.state));
   }
 
   apply(record) {
     this._lastRecordTime = record.time;
 
-    let appliers = this._definition._appliers[record.event.name];
+    let appliers = this.definition._appliers[record.event.name];
     if (!appliers) return;
 
     if (record.sequence <= this._heads[record.streamId]) return;
@@ -456,7 +456,7 @@ class UnitInstance {
     debug('apply', {key: this._key, record});
 
     try {
-      appliers.forEach(applier => applier.call(this._state, record.event.payload, record));
+      appliers.forEach(applier => applier.call(this, record.event.payload, record));
     } catch (err) {
       this.unload();
       throw err
@@ -567,7 +567,7 @@ class AggregateInstance extends UnitInstance {
   }
 
   _execute(command, tries = 0) {
-    let events = this._definition._executers[command.name].call(this._state, command.payload);
+    let events = this.definition._executers[command.name].call(this, command.payload);
 
     if (!Array.isArray(events)) return Promise.resolve([]);
 
@@ -637,7 +637,7 @@ class ProjectionInstance extends UnitInstance {
 
   respondTo(query) {
     return this._waitFor(query.heads)
-      .then(() => this._definition._responders[query.name].call(this._state, query.payload));
+      .then(() => this.definition._responders[query.name].call(this, query.payload));
   }
 
   _waitFor(heads) {
@@ -689,23 +689,6 @@ class SubscriptionInstance extends ProjectionInstance {
     this._unloaded = false;
   }
 
-  _loadSnapshot() {
-    return super._loadSnapshot()
-      .then(() => this._state = this._proxyState())
-      .then(() => this)
-  }
-
-  _proxyState() {
-    return new Proxy(this._state, {
-      ['set']: (target, name, value) => {
-        target[name] = value;
-        this._subscriptions
-          .filter((subscription) => subscription.active)
-          .forEach(({query, subscriber}) => this.respondTo(query).then(subscriber));
-      }
-    });
-  }
-
   subscribeTo(query, subscriber) {
     let subscription = {query, subscriber, active: true};
 
@@ -722,7 +705,14 @@ class SubscriptionInstance extends ProjectionInstance {
 
   apply(record) {
     try {
-      super.apply(record)
+      super.apply(record);
+
+      if (this.definition._appliers[record.event.name]) {
+        this._subscriptions
+          .filter((subscription) => subscription.active)
+          .forEach(({query, subscriber}) => this.respondTo(query).then(subscriber));
+      }
+
     } catch (err) {
       this._subscriptions.forEach(s => s.active = false);
       this.unload();
@@ -789,9 +779,9 @@ class SagaInstance extends UnitInstance {
   }
 
   _tryToReactTo(record) {
-    let reactor = this._definition._reactors[record.event.name];
+    let reactor = this.definition._reactors[record.event.name];
 
-    return new Promise(y => y(reactor.call(this._state, record.event.payload)))
+    return new Promise(y => y(reactor.call(this, record.event.payload)))
       .catch(err => {
         debug('failed', {key: this._key, record, err});
         return this._markReactionFailed(record, err.stack || err)
