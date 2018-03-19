@@ -130,6 +130,34 @@ describe('Reacting to an Event', () => {
       }]))
   });
 
+  it('does not record time of last Record already recorded', () => {
+    let log = new fake.EventLog();
+    log.records = [
+      new k.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:15Z'))
+    ];
+
+    let metaLog = new fake.EventLog();
+    metaLog.records = [
+      new k.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-13T14:15:16Z')}),
+        '__Module-Test')
+    ];
+
+    let metaStore = new fake.EventStore();
+
+    let reactions = [];
+
+    return Module({log, metaStore, metaLog})
+
+      .add(new k.Saga('One')
+        .reactingTo('not food', ()=>'foo', (payload) => reactions.push(payload)))
+
+      .start()
+
+      .then(() => reactions.should.eql([]))
+
+      .then(() => metaStore.recorded.should.eql([]))
+  });
+
   it('subscribes to EventLog using Record time of last locked Reaction', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
@@ -167,7 +195,7 @@ describe('Reacting to an Event', () => {
       .then(() => log.replayed.should.eql([
         {lastRecordTime: new Date('2011-12-13')},
         {lastRecordTime: new Date('2011-12-13')}
-        ]))
+      ]))
   });
 
   it('subscribes to EventLog using time of last consumed Record', () => {

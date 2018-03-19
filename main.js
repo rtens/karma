@@ -6,10 +6,10 @@ const expressWs = require('express-ws');
 
 let strategy = {
   onAccess: unit => {
-    unit.takeSnapshot();
-    if (unit.id == '__Module-Demo') return;
-
-    unit.unload();
+    // unit.takeSnapshot();
+    // if (unit.id == '__Module-Demo') return;
+    //
+    // unit.unload();
   }
 };
 

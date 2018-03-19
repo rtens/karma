@@ -867,9 +867,25 @@ class ModuleSubscriptionAggregate extends Aggregate {
   constructor() {
     super('ModuleSubscription');
 
-    this.executing('consume-record', $=>`__Module-${$.moduleName}`, function ({recordTime}) {
-      return [new Event('__record-consumed', {recordTime})]
-    })
+    this
+
+      .initializing(function () {
+        this.state = {
+          lastConsumed: null
+        };
+      })
+
+      .executing('consume-record', $=>`__Module-${$.moduleName}`, function ({recordTime}) {
+        if (this.state.lastConsumed >= recordTime) {
+          return
+        }
+
+        return [new Event('__record-consumed', {recordTime})]
+      })
+
+      .applying('__record-consumed', function ({recordTime}) {
+        this.state.lastConsumed = recordTime
+      })
   }
 }
 
