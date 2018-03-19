@@ -204,9 +204,43 @@ class CombinedEventLog extends EventLog {
     this._logs = eventLogs;
   }
 
-  subscribe(filter, subscriber) {
-    return Promise.all(this._logs.map(log => log.subscribe(filter, subscriber)))
+  subscribe(subscriber) {
+    return Promise.all(this._logs.map(log => log.subscribe(subscriber)))
       .then(subscriptions => ({cancel: () => subscriptions.forEach(s => s.cancel())}))
+  }
+
+  replay(filter, applier) {
+    return Promise.all(this._logs.map((log, i) => log.replay(filter.at(i), applier)))
+  }
+
+  filter() {
+    return new CombinedRecordFilter(this._logs.map(l=>l.filter()))
+  }
+}
+
+class CombinedRecordFilter extends RecordFilter {
+  constructor(filters) {
+    super();
+    this._filters = filters;
+  }
+
+  at(index) {
+    return this._filters[index];
+  }
+
+  after(lastRecordTime) {
+    this._filters.forEach(f=>f.after(lastRecordTime));
+    return this
+  }
+
+  nameIn(eventNames) {
+    this._filters.forEach(f=>f.nameIn(eventNames));
+    return this
+  }
+
+  ofStream(streamId) {
+    this._filters.forEach(f=>f.ofStream(streamId));
+    return this
   }
 }
 

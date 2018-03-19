@@ -166,9 +166,14 @@ describe('Applying Events', () => {
           .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
       });
 
-      it('subscribes the Unit to combined EventLogs', () => {
+      it('uses Events from combined EventLogs', () => {
         let log1 = new fake.EventLog();
+        log1.records = [new k.Record(new k.Event('bard', '1a'), 'foo')];
+        log1.filter = () => new fake.RecordFilter().named('one');
+
         let log2 = new fake.EventLog();
+        log2.records = [new k.Record(new k.Event('bard', '2a'), 'foo')];
+        log2.filter = () => new fake.RecordFilter().named('two');
 
         let applied = [];
         return Module({log: new k.CombinedEventLog([log1, log2])})
@@ -179,14 +184,27 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => log1.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+          .then(() => applied.should.eql(['1a', '2a']))
 
-          .then(() => log2.publish(new k.Record(new k.Event('bard', 'two'), 'foo')))
+          .then(() => log1.replayed.should.eql([{
+            ...{name: 'one', lastRecordTime: null},
+            ...(unit.name == 'an Aggregate'
+              ? {streamId: 'foo'}
+              : {eventNames: ['bard']}),
+          }]))
+          .then(() => log2.replayed.should.eql([{
+            ...{name: 'two', lastRecordTime: null},
+            ...(unit.name == 'an Aggregate'
+              ? {streamId: 'foo'}
+              : {eventNames: ['bard']}),
+          }]))
 
-          .then(() => applied.should.eql(['one', 'two']))
+          .then(() => log1.publish(new k.Record(new k.Event('bard', '1b'), 'foo')))
+          .then(() => log2.publish(new k.Record(new k.Event('bard', '2b'), 'foo')))
+
+          .then(() => applied.should.eql(['1a', '2a', '1b', '2b']))
 
           .then(() => log1.subscriptions.map(s => s.active).should.eql([true]))
-
           .then(() => log2.subscriptions.map(s => s.active).should.eql([true]))
       });
 

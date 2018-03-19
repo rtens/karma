@@ -44,6 +44,11 @@ class FakeEventLog extends karma.EventLog {
 }
 
 class FakeRecordFilter extends karma.RecordFilter {
+  named(name) {
+    this.name = name;
+    return this
+  }
+
   after(lastRecordTime) {
     this.lastRecordTime = lastRecordTime;
     return this
@@ -85,5 +90,6 @@ class FakeSnapshotStore extends karma.SnapshotStore {
 module.exports = {
   EventStore: FakeEventStore,
   EventLog: FakeEventLog,
+  RecordFilter: FakeRecordFilter,
   SnapshotStore: FakeSnapshotStore
 };
