@@ -60,13 +60,13 @@ describe('Reacting to an Event', () => {
     return Module({log})
 
       .add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', (payload) => reactions.push(payload)))
+        .reactingTo('food', ()=>'foo', (payload, record) => reactions.push([payload, record.sequence])))
 
       .start()
 
       .then(() => log.replayed.map(s=>s.lastRecordTime).should.eql([new Date(), null]))
 
-      .then(() => reactions.should.eql(['one', 'two']))
+      .then(() => reactions.should.eql([['one', 23], ['two', 21]]))
   });
 
   it('locks Reactions', () => {

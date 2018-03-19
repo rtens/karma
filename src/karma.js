@@ -781,7 +781,7 @@ class SagaInstance extends UnitInstance {
   _tryToReactTo(record) {
     let reactor = this.definition._reactors[record.event.name];
 
-    return new Promise(y => y(reactor.call(this, record.event.payload)))
+    return new Promise(y => y(reactor.call(this, record.event.payload, record)))
       .catch(err => {
         debug('failed', {key: this._key, record, err});
         return this._markReactionFailed(record, err.stack || err)
