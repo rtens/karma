@@ -145,6 +145,31 @@ describe('Reacting to an Event', () => {
       .then(() => log.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
   });
 
+  it('keeps state of last Record time', () => {
+    let metaLog = new fake.EventLog();
+    metaLog.records = [
+      new k.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-13')})),
+    ];
+
+    let log = new fake.EventLog();
+
+    let strategy = {onAccess: unit => unit.takeSnapshot().then(() => unit.unload())};
+
+    let metaSnapshots = new fake.SnapshotStore();
+
+    let module = Module({log, metaLog, strategy, metaSnapshots});
+    return module.start()
+
+      .then(() => metaLog.records = [])
+
+      .then(() => module.start())
+
+      .then(() => log.replayed.should.eql([
+        {lastRecordTime: new Date('2011-12-13')},
+        {lastRecordTime: new Date('2011-12-13')}
+        ]))
+  });
+
   it('subscribes to EventLog using time of last consumed Record', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
@@ -307,6 +332,36 @@ describe('Reacting to an Event', () => {
         onSequence: 3,
         traceId: undefined
       }]))
+  });
+
+  it('keeps state of locked Reactions', () => {
+    let metaLog = new fake.EventLog();
+    metaLog.records = [
+      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
+    ];
+
+    let log = new fake.EventLog();
+
+    let strategy = {onAccess: unit => unit.takeSnapshot().then(() => unit.unload())};
+
+    let metaSnapshots = new fake.SnapshotStore();
+
+    let reactions = [];
+
+    return Module({metaLog, log, strategy, metaSnapshots})
+
+      .add(new k.Saga('One')
+        .reactingTo('food', ()=>'bar', (payload) => reactions.push(payload)))
+
+      .start()
+
+      .then(() => log.publish(new k.Record(new k.Event('food', 'not'), 'foo', 22)))
+
+      .then(() => metaLog.records = [])
+
+      .then(() => log.publish(new k.Record(new k.Event('food', 'not'), 'foo', 22)))
+
+      .then(() => reactions.should.eql([]))
   });
 
   it('invokes reactor if reaction has failed after being locked', () => {

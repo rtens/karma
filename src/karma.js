@@ -836,20 +836,22 @@ class ReactionLockAggregate extends Aggregate {
     this
 
       .initializing(function () {
-        this.locked = {};
+        this.state = {
+          locked: {}
+        };
       })
 
       .applying('__reaction-locked', function ({streamId, sequence}) {
         //noinspection JSUnusedAssignment
-        this.locked[JSON.stringify({streamId, sequence})] = true;
+        this.state.locked[JSON.stringify({streamId, sequence})] = true;
       })
 
       .applying('__reaction-failed', function ({streamId, sequence}) {
-        delete this.locked[JSON.stringify({streamId, sequence})];
+        delete this.state.locked[JSON.stringify({streamId, sequence})];
       })
 
       .executing('lock-reaction', $=>$.sagaKey, function ({sagaKey, recordTime, streamId, sequence}) {
-        if (this.locked[JSON.stringify({streamId, sequence})]) {
+        if (this.state.locked[JSON.stringify({streamId, sequence})]) {
           throw new Error('Reaction locked');
         }
         return [new Event('__reaction-locked', {sagaKey, recordTime, streamId, sequence})]
@@ -878,19 +880,21 @@ class ModuleSubscriptionProjection extends Projection {
     this
 
       .initializing(function () {
-        this.lastRecordTime = null;
+        this.state = {
+          lastRecordTime: null
+        };
       })
 
       .applying('__record-consumed', function ({recordTime}) {
-        if (recordTime > this.lastRecordTime) this.lastRecordTime = recordTime
+        if (recordTime > this.state.lastRecordTime) this.state.lastRecordTime = recordTime
       })
 
       .applying('__reaction-locked', function ({recordTime}) {
-        if (recordTime > this.lastRecordTime) this.lastRecordTime = recordTime
+        if (recordTime > this.state.lastRecordTime) this.state.lastRecordTime = recordTime
       })
 
       .respondingTo('last-record-time', $=>moduleName, function () {
-        return this.lastRecordTime || new Date()
+        return this.state.lastRecordTime || new Date()
       })
   }
 }

@@ -75,14 +75,13 @@ class FakeSnapshotStore extends karma.SnapshotStore {
 
   store(key, version, snapshot) {
     this.stored.push({key, version, snapshot});
+    this.snapshots.push({key, version, snapshot});
     return super.store(key, version, snapshot);
   }
 
   fetch(key, version) {
     this.fetched.push({key, version});
-    var found = this.snapshots.find(s =>
-    JSON.stringify(s.key) == JSON.stringify(key) && s.version == version);
-
+    let found = this.snapshots.find(s => s.key == key && s.version == version);
     if (!found) return Promise.reject(new Error('No snapshot'));
     return new Promise(y => process.nextTick(() => y(found.snapshot)))
   }
