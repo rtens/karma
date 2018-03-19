@@ -441,7 +441,7 @@ class UnitInstance {
 
   takeSnapshot() {
     debug('store', {key: this._key, version: this.definition.version});
-    this._snapshots.store(this._key, this.definition.version,
+    return this._snapshots.store(this._key, this.definition.version,
       new Snapshot(this._lastRecordTime, this._heads, this.state));
   }
 
@@ -826,6 +826,8 @@ class SagaRepository extends UnitRepository {
     return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._meta);
   }
 }
+
+//---- META UNITS -----//
 
 class ReactionLockAggregate extends Aggregate {
   constructor() {

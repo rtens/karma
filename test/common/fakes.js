@@ -75,6 +75,7 @@ class FakeSnapshotStore extends karma.SnapshotStore {
 
   store(key, version, snapshot) {
     this.stored.push({key, version, snapshot});
+    return super.store(key, version, snapshot);
   }
 
   fetch(key, version) {

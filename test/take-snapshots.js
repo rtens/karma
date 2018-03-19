@@ -59,7 +59,8 @@ describe('Taking a Snapshot', () => {
 
         let snapshots = new fake.SnapshotStore();
 
-        let strategy = {onAccess: unit => unit.takeSnapshot()};
+        let taken = false;
+        let strategy = {onAccess: unit => unit.takeSnapshot().then(() => taken = true)};
 
         return Module({log, snapshots, strategy})
 
@@ -74,6 +75,8 @@ describe('Taking a Snapshot', () => {
             [unit.handling]('Foo', ()=>'foo', ()=>null))
 
           [unit.handle](new unit.Message('Foo'))
+
+          .then(() => taken.should.eql(true))
 
           .then(() => snapshots.stored.should.eql([{
             key: unit.Unit.name + '-One-foo',
