@@ -147,9 +147,12 @@ describe('MongoDB Event Log', () => {
   it('subscribes to new Records', () => {
     let records = [];
 
+    log._bufferWindow = 0;
     return Promise.resolve()
 
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
+
+      .then(() => new Promise(y => setTimeout(y, 10)))
 
       .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
         _id: objectId('2017-12-11'),
@@ -162,6 +165,11 @@ describe('MongoDB Event Log', () => {
         ],
         c: 'trace'
       }, {
+        _id: objectId('2017-12-12'),
+        d: 'Test',
+        a: 'foo',
+        e: [{n: 'food'}]
+      }, {
         d: 'Not Test',
         e: [{n: 'food'}]
       }])))
@@ -172,7 +180,9 @@ describe('MongoDB Event Log', () => {
         new k.Record(new k.Event('food', {a: 'b'}, new Date('2017-12-13')),
           'foo', 23, 'trace', new Date('2017-12-11')),
         new k.Record(new k.Event('bard', {c: 421}, new Date('2017-12-11')),
-          'foo', 23.5, 'trace', new Date('2017-12-11'))
+          'foo', 23.5, 'trace', new Date('2017-12-11')),
+        new k.Record(new k.Event('food', undefined, new Date('2017-12-12')),
+          'foo', 0, undefined, new Date('2017-12-12'))
       ]))
   });
 
@@ -181,6 +191,7 @@ describe('MongoDB Event Log', () => {
     let _error = console.error;
     console.error = err => logged.push(err.toString());
 
+    log._bufferWindow = 0;
     return Promise.resolve()
 
       .then(() => log.subscribe(log.filter(), () => {
@@ -189,12 +200,14 @@ describe('MongoDB Event Log', () => {
         throw error
       }))
 
+      .then(() => new Promise(y => setTimeout(y, 10)))
+
       .then(() => onDb(db => db.collection('bla_event_store').insertOne({
         d: 'Test',
         e: [{n: 'food'}]
       })))
 
-      .then(() => new Promise(y => setTimeout(y, 100)))
+      .then(() => new Promise(y => setTimeout(y, 10)))
 
       .then(() => console.error = _error)
 
@@ -226,13 +239,13 @@ describe('MongoDB Event Log', () => {
         d: 'Test', a: 'foo', v: 21, e: [{n: 'food'}, {n: 'bard'}],
       }, {
         _id: mongodb.ObjectID('56719a3b0000000000000123'),
-        d: 'Test', a: 'foo', v: 12, e: [{n: 'food'}, {n: 'bard'}]
+        d: 'Test', a: 'foo', v: 22, e: [{n: 'food'}, {n: 'bard'}]
       }, {
         _id: mongodb.ObjectID('56719a3c0000000000000000'),
-        d: 'Test', a: 'foo', v: 11, e: [{n: 'food'}, {n: 'bard'}],
+        d: 'Test', a: 'foo', v: 23, e: [{n: 'food'}, {n: 'bard'}],
       }, {
         _id: mongodb.ObjectID('59bd3ae60000000000000099'),
-        d: 'Test', a: 'foo', v: 73, e: [{n: 'food'}, {n: 'bard'}],
+        d: 'Test', a: 'foo', v: 24, e: [{n: 'food'}, {n: 'bard'}],
       }, {
         _id: mongodb.ObjectID('59bd3ae70000000000000000'),
         d: 'Test', a: 'foo', v: 42, e: [{n: 'food'}, {n: 'bard'}],
@@ -260,16 +273,18 @@ describe('MongoDB Event Log', () => {
     let i = -1;
     let interval = setInterval(() => onDb(db => db.collection('bla_event_store').insertOne({
       d: 'Test', a: 'foo', v: i++, e: [{n: 'food', a: i}]
-    })), 10);
+    })), 1);
+
+    log._bufferWindow = 0;
 
     let firstLength = 0;
-    return new Promise(y => setTimeout(y, 100))
+    return new Promise(y => setTimeout(y, 500))
 
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => firstLength = records.length)
 
-      .then(() => new Promise(y => setTimeout(y, 100)))
+      .then(() => new Promise(y => setTimeout(y, 200)))
 
       .then(() => clearInterval(interval))
 
@@ -277,4 +292,40 @@ describe('MongoDB Event Log', () => {
 
       .then(() => records.map(r=>r.event.payload).should.eql([...new Array(records.length).keys()]))
   });
+
+  it('sorts Events within window by sequence', () => {
+    let records = [];
+
+    return Promise.resolve()
+      .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
+        _id: mongodb.ObjectID('6789abcc0000000000000000'),
+        d: 'Test', a: 'foo', v: 24, e: [{n: 'foo tre'}],
+      }, {
+        _id: mongodb.ObjectID('6789abcc0000000000000001'),
+        d: 'Test', a: 'bar', v: 23, e: [{n: 'bar two'}],
+      }, {
+        _id: mongodb.ObjectID('6789abcc0000000000000002'),
+        d: 'Test', a: 'bar', v: 20, e: [{n: 'bar one'}],
+      }, {
+        _id: mongodb.ObjectID('6789abcd0000000000000000'),
+        d: 'Test', a: 'foo', v: 22, e: [{n: 'foo two'}],
+      }, {
+        _id: mongodb.ObjectID('6789abce0000000000000000'),
+        d: 'Test', a: 'foo', v: 21, e: [{n: 'foo one'}],
+      }, {
+        _id: mongodb.ObjectID('6789abcf0000000000000000'),
+        d: 'Test', a: 'foo', v: 19, e: [{n: 'foo for'}],
+      }])))
+
+      .then(() => log.subscribe(log.filter(), record => records.push(record)))
+
+      .then(() => records.map(r=>r.event.name).should.eql([
+        'bar one',
+        'foo one',
+        'foo two',
+        'bar two',
+        'foo tre',
+        'foo for'
+      ]))
+  })
 });

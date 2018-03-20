@@ -62,6 +62,8 @@ class MongoEventLog extends karma.EventLog {
 
     this._collection = collectionPrefix + 'event_store';
     this._subscriptions = [];
+    this._bufferWindow = 2000;
+    this._buffer = [];
 
     this._client = null;
     this._db = null;
@@ -86,11 +88,16 @@ class MongoEventLog extends karma.EventLog {
       .then(() => this._oplog = mongoOplog(this._oplogUri, {ns: this._dbName + '.' + this._collection}))
       .then(() => this._oplog.on('error', err => this._oplogError = err))
       .then(() => this._oplog.on('insert', doc => {
-        try {
-          this._notifySubscribers(doc.o, this._subscriptions)
-        } catch (err) {
-          console.error(err.stack ? err.stack : err)
-        }
+        this._notifySubscribers(doc.o, this._subscriptions);
+
+        if (this._flusher) clearTimeout(this._flusher);
+        this._flusher = setTimeout(() => {
+          try {
+            this._flushBuffer()
+          } catch (err) {
+            console.error(err.stack ? err.stack : err)
+          }
+        }, this._bufferWindow);
       }))
       .then(() => this._oplog.tail())
       .then(() => this._oplogError ? Promise.reject(this._oplogError) : null)
@@ -98,10 +105,17 @@ class MongoEventLog extends karma.EventLog {
   }
 
   subscribe(filter, applier) {
+    let heads = {};
     let subscription = {applier};
 
     return this.connect()
-      .then(() => this._replay(filter, applier))
+      .then(() => this._replay(filter, record => {
+        heads[record.streamId] = record.sequence;
+        applier(record)
+      }))
+      .then(() => subscription.applier = record => record.sequence > (heads[record.streamId] || -1)
+        ? applier(record)
+        : null)
       .then(() => this._subscriptions.push(subscription))
       .then(() => ({
         cancel: () => Promise.resolve(subscription.applier = null)
@@ -122,6 +136,7 @@ class MongoEventLog extends karma.EventLog {
           n(err)
         }
       }, y)))
+      .then(() => this._flushBuffer())
   }
 
   filter() {
@@ -131,12 +146,32 @@ class MongoEventLog extends karma.EventLog {
   _notifySubscribers(recordSet, subscriptions) {
     if (recordSet.d != this.module) return;
 
-    return subscriptions.forEach(s => recordSet.e.forEach((event, i) =>
-      s.applier(this._inflate(recordSet, event, i))))
+    this._buffer.push({recordSet, subscriptions});
+    let times = this._buffer.map(({recordSet}) => recordSet._id.getTimestamp().getTime());
+    let first = Math.min(...times);
+    let last = Math.max(...times);
+
+    if (last - first > this._bufferWindow) {
+      this._flushBuffer(first + this._bufferWindow);
+    }
+  }
+
+  _flushBuffer(until) {
+    this._buffer.sort((a, b) => a.recordSet.v - b.recordSet.v);
+    this._buffer = this._buffer.filter(({recordSet, subscriptions}) => {
+      if (recordSet._id.getTimestamp().getTime() > until) return true;
+
+      recordSet.e.forEach((event, i) => {
+        let record = this._inflate(recordSet, event, i);
+        subscriptions.forEach(subscription =>
+          subscription.applier(record))
+      });
+      return false
+    })
   }
 
   _inflate(recordSet, event, i) {
-    let sequence = recordSet.v + i / recordSet.e.length;
+    let sequence = (recordSet.v || 0) + i / recordSet.e.length;
 
     let time = recordSet._id.getTimestamp().getTime() / 10;
     if (time < 150557360700) {
