@@ -17,6 +17,7 @@ class FakeEventLog extends karma.EventLog {
     super();
     this.records = [];
     this.replayed = [];
+    this.subscribed = [];
     this.subscriptions = [];
   }
 
@@ -26,16 +27,18 @@ class FakeEventLog extends karma.EventLog {
       .map(s => s.applier(record)));
   }
 
-  subscribe(applier) {
-    let subscription = {applier, active: true};
-    this.subscriptions.push(subscription);
-
-    return Promise.resolve({cancel: () => subscription.active = false})
-  }
-
-  replay(filter, applier) {
+  subscribe(filter, applier) {
     this.replayed.push(filter);
-    return Promise.all(this.records.map(m => applier(m)))
+    let subscription = {applier, active: true};
+    this.subscribed.push({filter, subscription});
+
+    try {
+      return Promise.all(this.records.map(m => applier(m)))
+        .then(() => this.subscriptions.push(subscription))
+        .then(() => ({cancel: () => subscription.active = false}))
+    } catch (err) {
+      return Promise.reject(err)
+    }
   }
 
   filter() {

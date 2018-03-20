@@ -60,7 +60,7 @@ describe('Reacting to an Event', () => {
     return Module({log})
 
       .add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', (payload, record) => reactions.push([payload, record.sequence])))
+        .reactingTo('food', ()=>'baz', (payload, record) => reactions.push([payload, record.sequence])))
 
       .start()
 
@@ -206,11 +206,15 @@ describe('Reacting to an Event', () => {
       new k.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-12')})),
     ];
 
+    let adminLog = new fake.EventLog();
+
     let log = new fake.EventLog();
 
-    return Module({log, metaLog}).start()
+    return Module({log, metaLog, adminLog}).start()
 
       .then(() => log.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
+
+      .then(() => adminLog.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
   });
 
   it('invokes the reactor for published Events', () => {

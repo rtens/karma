@@ -88,11 +88,13 @@ class Module extends BaseModule {
   start() {
     return this._meta.respondTo(new Query('last-record-time'))
       .then(lastRecordTime => {
-        let filter = this._log.filter().after(lastRecordTime);
         debug('subscribe module', {lastRecordTime});
-        return this._log.replay(filter, record => this.reactTo(record))
-          .then(() => this._log.subscribe(record => this.reactTo(record)))
-          .then(() => this._adminLog.subscribe(record => this.reactToAdmin(record)))
+        return Promise.all([
+          this._log.subscribe(this._log.filter().after(lastRecordTime),
+            record => this.reactTo(record)),
+          this._adminLog.subscribe(this._adminLog.filter().after(lastRecordTime),
+            record => this.reactToAdmin(record))
+        ])
       })
       .then(() => this)
   }
@@ -167,13 +169,8 @@ class EventLog {
   }
 
   //noinspection JSUnusedLocalSymbols
-  subscribe(applier) {
+  subscribe(filter, applier) {
     return Promise.resolve({cancel: ()=>null})
-  }
-
-  //noinspection JSUnusedLocalSymbols
-  replay(filter, applier) {
-    return Promise.resolve()
   }
 
   filter() {
@@ -204,13 +201,9 @@ class CombinedEventLog extends EventLog {
     this._logs = eventLogs;
   }
 
-  subscribe(subscriber) {
-    return Promise.all(this._logs.map(log => log.subscribe(subscriber)))
+  subscribe(filter, applier) {
+    return Promise.all(this._logs.map((log, i) => log.subscribe(filter.at(i), applier)))
       .then(subscriptions => ({cancel: () => subscriptions.forEach(s => s.cancel())}))
-  }
-
-  replay(filter, applier) {
-    return Promise.all(this._logs.map((log, i) => log.replay(filter.at(i), applier)))
   }
 
   filter() {
@@ -385,7 +378,6 @@ class UnitInstance {
     return Promise.resolve()
       .then(() => this._loadSnapshot())
       .then(() => this._subscribeToLog())
-      .then(() => this._replayLog())
       .then(() => this._finishLoading())
       .then(() => this);
   }
@@ -403,15 +395,10 @@ class UnitInstance {
   }
 
   _subscribeToLog() {
-    debug('subscribe', {key: this._key});
-    return this._log.subscribe(record => this._loaded ? this.apply(record) : this._buffer.push(record))
-      .then(subscription => this._subscription = subscription)
-  }
-
-  _replayLog() {
     let filter = this._recordFilter();
-    debug('replay', {key: this._key, filter: filter});
-    return this._log.replay(filter, record => this.apply(record));
+    debug('subscribe', {key: this._key, filter});
+    return this._log.subscribe(filter, record => this.apply(record))
+      .then(subscription => this._subscription = subscription)
   }
 
   _recordFilter() {
@@ -436,7 +423,7 @@ class UnitInstance {
   unload() {
     debug('unload', {key: this._key});
     this._onUnload.forEach(fn=>fn());
-    this._subscription.cancel();
+    if (this._subscription) this._subscription.cancel();
   }
 
   takeSnapshot() {

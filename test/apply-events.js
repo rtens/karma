@@ -208,43 +208,6 @@ describe('Applying Events', () => {
           .then(() => log2.subscriptions.map(s => s.active).should.eql([true]))
       });
 
-      it('combines Events from replaying and subscribing', () => {
-        let history = [];
-        let log = new class extends fake.EventLog {
-          subscribe(applier) {
-            history.push('subscribe');
-            applier(new k.Record(new k.Event('bard', 'not'), 'foo', 22));
-            applier(new k.Record(new k.Event('bard', 'tre'), 'foo', 23));
-
-            return super.subscribe(applier);
-          }
-
-          replay(filter, applier) {
-            history.push('replay');
-            return super.replay(filter, applier);
-          }
-        };
-        log.records = [
-          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-          new k.Record(new k.Event('bard', 'two'), 'foo', 22),
-        ];
-
-        let state = [];
-        return Module({log})
-
-          .add(new unit.Unit('One')
-            .applying('bard', payload => state.push(payload))
-            [unit.handling]('Foo', $=>$, ()=>null))
-
-          [unit.handle](new unit.Message('Foo', 'foo'))
-
-          .then(() => log.publish(new k.Record(new k.Event('bard', 'for'), 'foo', 24)))
-
-          .then(() => history.should.eql(['subscribe', 'replay']))
-
-          .then(() => state.should.eql(['one', 'two', 'tre', 'for']))
-      });
-
       it('notifies the UnitStrategy', () => {
         let log = new fake.EventLog('Foobar');
         log.records = [
@@ -305,7 +268,7 @@ describe('Applying Events', () => {
 
           .then(() => log.replayed.length.should.equal(2))
 
-          .then(() => log.subscriptions.map(s => s.active).should.eql([false, true]))
+          .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
       });
 
       it('unloads the Unit if failing during subscribed Event', () => {
