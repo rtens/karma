@@ -81,7 +81,7 @@ describe('MongoDB Event Log', () => {
         e: [{n: 'food'},],
       }])))
 
-      .then(() => log.subscribe(log.filter().after(null), record => records.push(record)))
+      .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => records.should.eql([
         new k.Record(new k.Event('food', {a: 'b'}, new Date('2017-12-13')),
@@ -238,7 +238,7 @@ describe('MongoDB Event Log', () => {
         d: 'Test', a: 'foo', v: 42, e: [{n: 'food'}, {n: 'bard'}],
       }])))
 
-      .then(() => log.subscribe(log.filter().after(null), record => records.push(record)))
+      .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => records.map(r=>r.sequence).should.eql([
         0 / 5528798000,
@@ -254,7 +254,27 @@ describe('MongoDB Event Log', () => {
       ]))
   });
 
-  it('sorts replayed Records within time window by sequence');
+  it('moves seamless from replay to subscription', () => {
+    let records = [];
 
-  it('moves seamless from replay to subscription');
+    let i = -1;
+    let interval = setInterval(() => onDb(db => db.collection('bla_event_store').insertOne({
+      d: 'Test', a: 'foo', v: i++, e: [{n: 'food', a: i}]
+    })), 10);
+
+    let firstLength = 0;
+    return new Promise(y => setTimeout(y, 100))
+
+      .then(() => log.subscribe(log.filter(), record => records.push(record)))
+
+      .then(() => firstLength = records.length)
+
+      .then(() => new Promise(y => setTimeout(y, 100)))
+
+      .then(() => clearInterval(interval))
+
+      .then(() => firstLength.should.be.within(10, records.length - 5))
+
+      .then(() => records.map(r=>r.event.payload).should.eql([...new Array(records.length).keys()]))
+  });
 });
