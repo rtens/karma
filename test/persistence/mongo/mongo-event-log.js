@@ -38,7 +38,7 @@ describe('MongoDB Event Log', () => {
   it('fails if it cannot connect to the database', () => {
     return new mongo.EventLog('Test', 'mongodb://foo', null, null, null, {reconnectTries: 0})
 
-      .subscribe({})
+      .subscribe()
 
       .should.be.rejectedWith('EventLog cannot connect to MongoDB database')
   });
@@ -46,7 +46,7 @@ describe('MongoDB Event Log', () => {
   it('fails if it cannot connect to the oplog', () => {
     return (log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, 'mongodb://foo', null, {reconnectTries: 0}))
 
-      .subscribe({})
+      .subscribe()
 
       .should.be.rejectedWith('EventLog cannot connect to MongoDB oplog')
   });
@@ -81,7 +81,7 @@ describe('MongoDB Event Log', () => {
         e: [{n: 'food'},],
       }])))
 
-      .then(() => log.replay(log.filter().after(null), record => records.push(record)))
+      .then(() => log.subscribe(log.filter().after(null), record => records.push(record)))
 
       .then(() => records.should.eql([
         new k.Record(new k.Event('food', {a: 'b'}, new Date('2017-12-13')),
@@ -100,7 +100,7 @@ describe('MongoDB Event Log', () => {
         e: [{n: 'food'}],
       }])))
 
-      .then(() => log.replay(log.filter(), () => {
+      .then(() => log.subscribe(log.filter(), () => {
         throw new Error('Nope')
       }))
 
@@ -117,12 +117,10 @@ describe('MongoDB Event Log', () => {
         {_id: objectId('2013-12-12'), d: 'Test', a: 'foo', v: 23, e: [{n: 'two'}]}
       ])))
 
-      .then(() => log.replay({}, record => records.push(record)))
+      .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => records.map(r=>r.event.name).should.eql(['one', 'two', 'tre']))
   });
-
-  it('sorts replayed Records within time window by sequence');
 
   it('filters Records by last Record time, Event names and stream ID', () => {
     let records = [];
@@ -141,7 +139,7 @@ describe('MongoDB Event Log', () => {
         {_id: objectId('2013-12-13T14:15:16Z'), d: 'Test', a: 'foo', e: [{n: 'bard', a: 'two'}, {n: 'not', a: 'tre'}]},
       ])))
 
-      .then(() => log.replay(filter, record => records.push(record)))
+      .then(() => log.subscribe(filter, record => records.push(record)))
 
       .then(() => records.map(r=>r.event.payload).should.eql(['one', 'two', 'tre']))
   });
@@ -151,7 +149,7 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
 
-      .then(() => log.subscribe(record => records.push(record)))
+      .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
         _id: objectId('2017-12-11'),
@@ -185,7 +183,7 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
 
-      .then(() => log.subscribe(() => {
+      .then(() => log.subscribe(log.filter(), () => {
         let error = new Error('Nope');
         error.stack = 'An Error';
         throw error
@@ -208,7 +206,7 @@ describe('MongoDB Event Log', () => {
 
     return Promise.resolve()
 
-      .then(() => log.subscribe(record => records.push(record)))
+      .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(subscription => subscription.cancel())
 
@@ -240,7 +238,7 @@ describe('MongoDB Event Log', () => {
         d: 'Test', a: 'foo', v: 42, e: [{n: 'food'}, {n: 'bard'}],
       }])))
 
-      .then(() => log.replay(log.filter().after(null), record => records.push(record)))
+      .then(() => log.subscribe(log.filter().after(null), record => records.push(record)))
 
       .then(() => records.map(r=>r.sequence).should.eql([
         0 / 5528798000,
@@ -254,5 +252,9 @@ describe('MongoDB Event Log', () => {
         42,
         42.5,
       ]))
-  })
+  });
+
+  it('sorts replayed Records within time window by sequence');
+
+  it('moves seamless from replay to subscription');
 });

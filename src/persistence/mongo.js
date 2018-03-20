@@ -97,10 +97,11 @@ class MongoEventLog extends karma.EventLog {
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB oplog: ' + err)))
   }
 
-  subscribe(applier) {
+  subscribe(filter, applier) {
     let subscription = {applier};
 
     return this.connect()
+      .then(() => this._replay(filter, applier))
       .then(() => this._subscriptions.push(subscription))
       .then(() => ({
         cancel: () => Promise.resolve(subscription.applier = null)
@@ -108,13 +109,12 @@ class MongoEventLog extends karma.EventLog {
       }))
   }
 
-  replay(filter, applier) {
-    return this.connect()
-      .then(() => this._db
-        .collection(this._collection)
-        .find(filter.query)
-        .sort({_id: 1})
-      )
+  _replay(filter, applier) {
+    return Promise.resolve(this._db
+      .collection(this._collection)
+      .find(filter.query)
+      .sort({_id: 1}))
+
       .then(cursor => new Promise((y, n) => cursor.forEach(recordSet => {
         try {
           this._notifySubscribers(recordSet, [{applier}])
