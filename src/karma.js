@@ -299,6 +299,7 @@ class Unit {
     this.name = name;
     this._version = null;
     this._initializers = [];
+    this._consolidators = [];
     this._appliers = {};
     this._mappers = {};
   }
@@ -313,6 +314,11 @@ class Unit {
 
   initializing(initializer) {
     this._initializers.push(initializer);
+    return this
+  }
+
+  consolidating(consolidator) {
+    this._consolidators.push(consolidator);
     return this
   }
 
@@ -357,7 +363,6 @@ class UnitInstance {
     this._loading = false;
     this._onLoad = [];
     this._onUnload = [];
-    this._buffer = [];
 
     definition._initializers.forEach(i => i.call(this));
   }
@@ -378,6 +383,7 @@ class UnitInstance {
     return Promise.resolve()
       .then(() => this._loadSnapshot())
       .then(() => this._subscribeToLog())
+      .then(() => this._consolidate())
       .then(() => this._finishLoading())
       .then(() => this);
   }
@@ -401,6 +407,10 @@ class UnitInstance {
       .then(subscription => this._subscription = subscription)
   }
 
+  _consolidate() {
+    this.definition._consolidators.forEach(fn=>fn.call(this));
+  }
+
   _recordFilter() {
     return this._log.filter()
       .after(this._lastRecordTime)
@@ -409,9 +419,6 @@ class UnitInstance {
 
   _finishLoading() {
     this._loaded = true;
-
-    this._buffer.forEach(record => this.apply(record));
-    this._buffer = null;
 
     this._onLoad.forEach(fn=>fn());
   }
@@ -444,6 +451,7 @@ class UnitInstance {
 
     try {
       appliers.forEach(applier => applier.call(this, record.event.payload, record));
+      this._consolidate();
     } catch (err) {
       this.unload();
       throw err

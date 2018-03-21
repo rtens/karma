@@ -64,6 +64,10 @@ describe('Applying Events', () => {
 
           .add(new unit.Unit('One')
             .initializing(function () {
+              state.push('first')
+            })
+            .initializing(function () {
+              state.push('second');
               this.state = [];
             })
             .applying('no event', function () {
@@ -81,9 +85,42 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo', 'foo'))
 
-          .then(() => state.should.eql([['a one', 'b one', 'a two', 'b two']]))
+          .then(() => state.should.eql(['first', 'second', ['a one', 'b one', 'a two', 'b two']]))
 
           .then(() => log.replayed.map(r=>r.lastRecordTime).should.eql([null]))
+      });
+
+      it('consolidates when loaded', () => {
+        let log = new fake.EventLog();
+        log.records = [
+          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
+          new k.Record(new k.Event('bard', 'two'), 'foo', 22),
+        ];
+
+        let state;
+        return Module({log})
+
+          .add(new unit.Unit('One')
+            .initializing(function () {
+              this.state = [];
+              this.foo = [];
+            })
+            .applying('bard', function (payload) {
+              this.state.push(payload)
+            })
+            .consolidating(function () {
+              this.foo = this.state.map(s => s.toUpperCase())
+            })
+            .consolidating(function () {
+              this.foo = this.foo.map(s => s + '!')
+            })
+            [unit.handling]('Foo', $=>$, function () {
+            state = this.foo
+          }))
+
+          [unit.handle](new unit.Message('Foo', 'foo'))
+
+          .then(() => state.should.eql(['ONE!', 'TWO!']))
       });
 
       it('waits for the Unit to be loaded', () => {
@@ -162,6 +199,35 @@ describe('Applying Events', () => {
           .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
 
           .then(() => applied.should.eql(['one']))
+
+          .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
+      });
+
+      it('consolidates on new Records', () => {
+        let log = new fake.EventLog();
+
+        let consolidated = [];
+        return Module({log})
+
+          .add(new unit.Unit('One')
+            .initializing(function () {
+              this.state = 'Zero';
+            })
+            .applying('bard', function (payload) {
+              this.state += payload
+            })
+            .consolidating(function () {
+              consolidated.push(this.state)
+            })
+            [unit.handling]('Foo', $=>'foo', ()=>null))
+
+          [unit.handle](new unit.Message('Foo'))
+
+          .then(() => log.publish(new k.Record(new k.Event('bard', 'One'), 'foo')))
+
+          .then(() => log.publish(new k.Record(new k.Event('bard', 'Two'), 'foo')))
+
+          .then(() => consolidated.should.eql(['Zero', 'ZeroOne', 'ZeroOneTwo']))
 
           .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
       });
