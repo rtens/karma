@@ -451,7 +451,7 @@ class UnitInstance {
 
     try {
       appliers.forEach(applier => applier.call(this, record.event.payload, record));
-      this._consolidate();
+      if (this._loaded) this._consolidate();
     } catch (err) {
       this.unload();
       throw err

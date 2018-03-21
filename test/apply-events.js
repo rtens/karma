@@ -97,7 +97,7 @@ describe('Applying Events', () => {
           new k.Record(new k.Event('bard', 'two'), 'foo', 22),
         ];
 
-        let state;
+        let consolidated = [];
         return Module({log})
 
           .add(new unit.Unit('One')
@@ -112,15 +112,13 @@ describe('Applying Events', () => {
               this.foo = this.state.map(s => s.toUpperCase())
             })
             .consolidating(function () {
-              this.foo = this.foo.map(s => s + '!')
+              consolidated.push(this.foo.map(s => s + '!'))
             })
-            [unit.handling]('Foo', $=>$, function () {
-            state = this.foo
-          }))
+            [unit.handling]('Foo', $=>$, ()=>null))
 
           [unit.handle](new unit.Message('Foo', 'foo'))
 
-          .then(() => state.should.eql(['ONE!', 'TWO!']))
+          .then(() => consolidated.should.eql([['ONE!', 'TWO!']]))
       });
 
       it('waits for the Unit to be loaded', () => {
