@@ -16,7 +16,7 @@ describe('MongoDB Event Log', () => {
   let log, onDb;
 
   beforeEach(() => {
-    let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
+    let db = 'karma3_' + Date.now() + Math.round(Math.random() * 10000);
     log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, process.env.MONGODB_OPLOG_URI_TEST, db, 'bla_');
 
     onDb = execute => {
@@ -147,7 +147,6 @@ describe('MongoDB Event Log', () => {
   it('subscribes to new Records', () => {
     let records = [];
 
-    log._bufferWindow = 0;
     return Promise.resolve()
 
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
@@ -191,7 +190,6 @@ describe('MongoDB Event Log', () => {
     let _error = console.error;
     console.error = err => logged.push(err.toString());
 
-    log._bufferWindow = 0;
     return Promise.resolve()
 
       .then(() => log.subscribe(log.filter(), () => {
@@ -207,7 +205,7 @@ describe('MongoDB Event Log', () => {
         e: [{n: 'food'}]
       })))
 
-      .then(() => new Promise(y => setTimeout(y, 10)))
+      .then(() => new Promise(y => setTimeout(y, 100)))
 
       .then(() => console.error = _error)
 
@@ -271,27 +269,41 @@ describe('MongoDB Event Log', () => {
     let records = [];
 
     let i = -1;
-    let interval = setInterval(() => onDb(db => db.collection('bla_event_store').insertOne({
-      d: 'Test', a: 'foo', v: i++, e: [{n: 'food', a: i}]
-    })), 1);
 
-    log._bufferWindow = 0;
+    let waitForRecords;
+    let stopInserting;
+
+    onDb(db => {
+      let keepInserting = setInterval(() => db.collection('bla_event_store').insertOne({
+        d: 'Test', a: 'foo', v: i++, e: [{n: 'food', a: i}]
+      }), 1);
+
+      return new Promise(y => stopInserting = () => {
+        clearInterval(keepInserting);
+        y();
+      })
+    });
 
     let firstLength = 0;
-    return new Promise(y => setTimeout(y, 500))
+    return new Promise(y => setTimeout(y, 1000))
 
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => firstLength = records.length)
 
-      .then(() => new Promise(y => setTimeout(y, 200)))
+      .then(() => new Promise(y => waitForRecords = setInterval(() => {
+        if (records.length > firstLength) {
+          clearInterval(waitForRecords);
+          y()
+        }
+      }, 100)))
 
-      .then(() => clearInterval(interval))
+      .then(() => stopInserting())
 
-      .then(() => firstLength.should.be.within(10, records.length - 5))
+      .then(() => firstLength.should.be.within(1, records.length - 1))
 
       .then(() => records.map(r=>r.event.payload).should.eql([...new Array(records.length).keys()]))
-  });
+  }).timeout(10000);
 
   it('sorts Events within window by sequence', () => {
     let records = [];

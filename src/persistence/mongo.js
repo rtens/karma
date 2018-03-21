@@ -62,7 +62,6 @@ class MongoEventLog extends karma.EventLog {
 
     this._collection = collectionPrefix + 'event_store';
     this._subscriptions = [];
-    this._bufferWindow = 2000;
     this._buffer = [];
 
     this._client = null;
@@ -90,14 +89,13 @@ class MongoEventLog extends karma.EventLog {
       .then(() => this._oplog.on('insert', doc => {
         this._notifySubscribers(doc.o, this._subscriptions);
 
-        if (this._flusher) clearTimeout(this._flusher);
-        this._flusher = setTimeout(() => {
+        setTimeout(() => {
           try {
             this._flushBuffer()
           } catch (err) {
             console.error(err.stack ? err.stack : err)
           }
-        }, this._bufferWindow);
+        }, 10);
       }))
       .then(() => this._oplog.tail())
       .then(() => this._oplogError ? Promise.reject(this._oplogError) : null)
@@ -151,8 +149,8 @@ class MongoEventLog extends karma.EventLog {
     let first = Math.min(...times);
     let last = Math.max(...times);
 
-    if (last - first > this._bufferWindow) {
-      this._flushBuffer(first + this._bufferWindow);
+    if (last - first > 2000) {
+      this._flushBuffer(first + 2000);
     }
   }
 
