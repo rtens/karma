@@ -236,13 +236,13 @@ describe('MongoDB Event Log', () => {
         _id: mongodb.ObjectID('56719a3b0000000000000000'),
         d: 'Test', a: 'foo', v: 21, e: [{n: 'food'}, {n: 'bard'}],
       }, {
-        _id: mongodb.ObjectID('56719a3b0000000000000123'),
+        _id: mongodb.ObjectID('56719a3b0000000000000fff'),
         d: 'Test', a: 'foo', v: 22, e: [{n: 'food'}, {n: 'bard'}]
       }, {
         _id: mongodb.ObjectID('56719a3c0000000000000000'),
         d: 'Test', a: 'foo', v: 23, e: [{n: 'food'}, {n: 'bard'}],
       }, {
-        _id: mongodb.ObjectID('59bd3ae60000000000000099'),
+        _id: mongodb.ObjectID('59bd3ae600000000000003e7'),
         d: 'Test', a: 'foo', v: 24, e: [{n: 'food'}, {n: 'bard'}],
       }, {
         _id: mongodb.ObjectID('59bd3ae70000000000000000'),
@@ -252,14 +252,14 @@ describe('MongoDB Event Log', () => {
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => records.map(r=>r.sequence).should.eql([
-        0 / 5528798000,
-        0.5 / 5528798000,
-        23 / 5528798000,
-        23.5 / 5528798000,
-        100 / 5528798000,
-        100.5 / 5528798000,
-        5528797999 / 5528798000,
-        5528797999.5 / 5528798000,
+        0 / 55287980000,
+        0.5 / 55287980000,
+        95 / 55287980000,
+        95.5 / 55287980000,
+        1000 / 55287980000,
+        1000.5 / 55287980000,
+        55287979999 / 55287980000,
+        55287979999.5 / 55287980000,
         42,
         42.5,
       ]))

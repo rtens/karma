@@ -171,10 +171,10 @@ class MongoEventLog extends karma.EventLog {
   _inflate(recordSet, event, i) {
     let sequence = (recordSet.v || 0) + i / recordSet.e.length;
 
-    let time = recordSet._id.getTimestamp().getTime() / 10;
-    if (time < 150557360700) {
-      let rest = parseInt(recordSet._id.toHexString().substr(8));
-      sequence = (time + (rest % 100) + i / recordSet.e.length - 145028562700) / 5528798000
+    let time = recordSet._id.getTimestamp().getTime();
+    if (time < 1505573607000) {
+      let rest = parseInt(recordSet._id.toHexString().substr(21), 16);
+      sequence = (time + (rest % 1000) + i / recordSet.e.length - 1450285627000) / 55287980000
     }
 
     return new karma.Record(
