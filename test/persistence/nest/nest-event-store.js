@@ -6,7 +6,6 @@ chai.should();
 const k = require('../../../src/karma');
 const nest = require('../../../src/persistence/nest');
 const Datastore = require('nestdb');
-const KSUID = require('ksuid');
 
 describe('NestDB Event Store', () => {
   let _Date, db, store;
@@ -18,6 +17,11 @@ describe('NestDB Event Store', () => {
     };
     Date.now = () => new Date().getTime();
     Date.prototype = _Date.prototype;
+
+    db = new Datastore();
+    store = new nest.EventStore('Test', db);
+
+    return store.load()
   });
 
   afterEach(() => {
@@ -25,9 +29,6 @@ describe('NestDB Event Store', () => {
   });
 
   it('stores records', () => {
-    db = new Datastore();
-    store = new nest.EventStore('Test', db);
-
     let events = [
       new k.Event('food', {a: 'b'}, new Date('2011-12-13T14:15:16Z')),
       new k.Event('bard', {c: 123}, new Date('2016-12-06')),
@@ -43,17 +44,56 @@ describe('NestDB Event Store', () => {
       .then(() => new Promise((y, n) => db.find({}, (err, docs) => err ? n(err) : y(docs))))
 
       .then(docs => docs
-        .map(d=>({...d, _id: KSUID.parse(d._id).date})).should
-        .eql([{
-          _id: new Date(),
-          mod: 'Test',
-          sid: 'foo',
-          seq: 1,
+        .should.eql([{
+          tid: 'trace',
+          tim: new Date(),
+          _id: {mod: 'Test', sid: 'foo', seq: 1},
           evs: [
-            {n: 'food', p: {a: 'b'}, t: new Date('2011-12-13T14:15:16Z')},
-            {n: 'bard', p: {c: 123}, t: undefined}
+            {nam: 'food', pay: {a: 'b'}, tim: new Date('2011-12-13T14:15:16Z')},
+            {nam: 'bard', pay: {c: 123}, tim: undefined}
           ],
-          tid: 'trace'
         }]))
-  })
+  });
+
+  it('stores records on sequence', () => {
+    return store.record([new k.Event('food', {a: 'b'})], 'foo', 42, 'trace')
+
+      .then(() => new Promise((y, n) => db.find({}, (err, docs) => err ? n(err) : y(docs))))
+
+      .then(docs => docs
+        .should.eql([{
+          tid: 'trace',
+          tim: new Date(),
+          _id: {mod: 'Test', sid: 'foo', seq: 43},
+          evs: [
+            {nam: 'food', pay: {a: 'b'}, tim: undefined}
+          ],
+        }]))
+  });
+
+  it('records empty events', () => {
+    return store.record([], 'foo', null, 'trace')
+
+      .then(records => records.should.eql([]))
+
+      .then(() => new Promise((y, n) => db.find({}, (err, docs) => err ? n(err) : y(docs))))
+
+      .then(docs => docs
+        .should.eql([{
+          tid: 'trace',
+          tim: new Date(),
+          _id: {mod: 'Test', sid: 'foo', seq: 1},
+          evs: []
+        }]))
+  });
+
+  it('rejects Records on occupied heads', () => {
+    let record = {_id: {mod: 'Test', sid: 'foo', seq: 42}};
+
+    return new Promise((y, n) => db.insert(record, (err, doc) => err ? n(err) : y(doc)))
+
+      .then(() => store.record([], 'foo', 41))
+
+      .should.be.rejectedWith('Out of sequence')
+  });
 });

@@ -1,4 +1,3 @@
-const KSUID = require('ksuid');
 const karma = require('../../src/karma');
 
 class NestEventStore extends karma.EventStore {
@@ -6,28 +5,42 @@ class NestEventStore extends karma.EventStore {
     super(moduleName);
 
     this._dataStore = dataStore;
+    this._loaded = false;
   }
 
   record(events, streamId, onSequence, traceId) {
-    let ksuid = KSUID.randomSync();
-    return this._load()
-      .then(() => new Promise((y, n) => this._dataStore.insert({
-        _id: ksuid.string,
-        tid: traceId,
+    let insertion = {
+      tid: traceId,
+      tim: new Date(),
+      _id: {
         mod: this.module,
         sid: streamId,
-        seq: 1,
-        evs: events.map(event => ({
-          n: event.name,
-          p: event.payload,
-          t: event.time.getTime() == ksuid.date.getTime() ? undefined : event.time
-        }))
-      }, (err, docs) => err ? n(err) : y(docs))))
-      .then(() => super.record(events, streamId, onSequence, traceId));
+        seq: onSequence + 1
+      },
+      evs: events.map(event => ({
+        nam: event.name,
+        pay: event.payload,
+        tim: event.time.getTime() == Date.now() ? undefined : event.time
+      }))
+    };
+
+    return this.load()
+      .then(() => new Promise((y, n) => this._dataStore.insert(insertion, (err) => err ? n(err) : y())))
+      .then(() => super.record(events, streamId, onSequence, traceId))
+      .catch(err => {
+        if (err.errorType == 'uniqueViolated') return Promise.reject('Out of sequence');
+        return err
+      });
   }
 
-  _load() {
-    return new Promise((y, n) => this._dataStore.load(err => err ? n(err) : y()))
+  load() {
+    if (this._loaded) return Promise.resolve();
+
+    return new Promise((y, n) => this._dataStore.load(err => {
+      if (err) return n(err);
+      this._loaded = true;
+      y();
+    }))
   }
 }
 
