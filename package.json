@@ -17,8 +17,10 @@
     "body-parser": "^1.18.2",
     "express": "^4.16.2",
     "express-ws": "^3.0.0",
+    "ksuid": "^1.0.0",
     "mongo-oplog": "^2.1.0",
-    "mongodb": "^3.0.4"
+    "mongodb": "^3.0.4",
+    "nestdb": "git+https://github.com/JamesMGreene/nestdb.git"
   },
   "devDependencies": {
     "chai": "^4.1.2",
