@@ -87,7 +87,7 @@ describe('Applying Events', () => {
 
           .then(() => state.should.eql(['first', 'second', ['a one', 'b one', 'a two', 'b two']]))
 
-          .then(() => log.replayed.map(r=>r.lastRecordTime).should.eql([null]))
+          .then(() => log.replayed.map(r=>r.lastRecordTime).should.eql([undefined]))
       });
 
       it('consolidates when loaded', () => {
@@ -251,13 +251,13 @@ describe('Applying Events', () => {
           .then(() => applied.should.eql(['1a', '2a']))
 
           .then(() => log1.replayed.should.eql([{
-            ...{name: 'one', lastRecordTime: null},
+            ...{name: 'one'},
             ...(unit.name == 'an Aggregate'
               ? {streamId: 'foo'}
               : {eventNames: ['bard']}),
           }]))
           .then(() => log2.replayed.should.eql([{
-            ...{name: 'two', lastRecordTime: null},
+            ...{name: 'two'},
             ...(unit.name == 'an Aggregate'
               ? {streamId: 'foo'}
               : {eventNames: ['bard']}),
@@ -414,7 +414,6 @@ describe('Applying Events', () => {
             .then(() => applied.should.eql(['one', 'two']))
 
             .then(() => log.replayed.should.eql([{
-              lastRecordTime: null,
               eventNames: ['food', 'bard']
             }]))
         });
@@ -439,7 +438,6 @@ describe('Applying Events', () => {
             .then(() => applied.should.eql(['one']))
 
             .then(() => log.replayed.should.eql([{
-              lastRecordTime: null,
               streamId: 'foo'
             }]))
         });

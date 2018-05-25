@@ -64,7 +64,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.replayed.map(s=>s.lastRecordTime).should.eql([new Date(), null]))
+      .then(() => log.replayed.map(s=>s.lastRecordTime).should.eql([new Date(), undefined]))
 
       .then(() => reactions.should.eql([['one', 23], ['two', 21]]))
   });

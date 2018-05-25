@@ -205,7 +205,7 @@ class MongoRecordFilter extends karma.RecordFilter {
 
   after(lastRecordTime) {
     if (lastRecordTime) {
-      this.query._id = {$gte: mongodb.ObjectID.createFromTime(lastRecordTime.getTime() / 1000 - 10)};
+      this.query._id = {$gte: mongodb.ObjectID.createFromTime(lastRecordTime.getTime() / 1000)};
     }
     return this
   }

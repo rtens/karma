@@ -272,7 +272,6 @@ describe('Executing a Command', () => {
       }]))
 
       .then(() => log.replayed.should.eql([{
-        lastRecordTime: null,
         streamId: 'foo'
       }]))
   });

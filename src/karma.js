@@ -402,9 +402,15 @@ class UnitInstance {
 
   _subscribeToLog() {
     let filter = this._recordFilter();
+    if (this._lastRecordTime) filter.after(this._timeWindow(this._lastRecordTime));
+
     debug('subscribe', {key: this._key, filter});
     return this._log.subscribe(filter, record => this.apply(record))
       .then(subscription => this._subscription = subscription)
+  }
+
+  _timeWindow(time) {
+    return new Date(time.getTime() - 10000);
   }
 
   _consolidate() {
@@ -413,7 +419,6 @@ class UnitInstance {
 
   _recordFilter() {
     return this._log.filter()
-      .after(this._lastRecordTime)
       .nameIn(Object.keys(this.definition._appliers));
   }
 
@@ -542,7 +547,6 @@ class AggregateInstance extends UnitInstance {
 
   _recordFilter() {
     return this._log.filter()
-      .after(this._lastRecordTime)
       .ofStream(this.id)
   }
 

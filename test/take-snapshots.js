@@ -100,7 +100,7 @@ describe('Taking a Snapshot', () => {
         snapshots.snapshots = [{
           key: unit.Unit.name + '-One-foo',
           version: 'v1',
-          snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21}, ['snap'])
+          snapshot: new k.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21}, ['snap'])
         }];
 
         let state = [];
@@ -127,7 +127,7 @@ describe('Taking a Snapshot', () => {
             version: 'v1',
           }]))
 
-          .then(() => log.replayed.map(r=>r.lastRecordTime).should.eql([new Date('2011-12-13')]))
+          .then(() => log.replayed.map(r=>r.lastRecordTime).should.eql([new Date('2011-12-13T11:59:50')]))
       });
 
       it('catches itself if Snapshot fetching fails', () => {
@@ -258,7 +258,7 @@ describe('Taking a Snapshot', () => {
           snapshots.snapshots = [{
             key: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: new k.Snapshot(new Date('2011-12-13'), {foo: 21, bar: 22}, ['snap'])
+            snapshot: new k.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21, bar: 22}, ['snap'])
           }];
 
           let state = [];
@@ -286,7 +286,7 @@ describe('Taking a Snapshot', () => {
             }]))
 
             .then(() => log.replayed.should.eql([{
-              lastRecordTime: new Date('2011-12-13'),
+              lastRecordTime: new Date('2011-12-13T11:59:50'),
               eventNames: ['bard']
             }]))
         });
