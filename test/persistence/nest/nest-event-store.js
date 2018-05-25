@@ -6,6 +6,9 @@ chai.should();
 const k = require('../../../src/karma');
 const nest = require('../../../src/persistence/nest');
 
+if (!process.env.TEST_DATA_DIR)
+  console.log('Set $TEST_DATA_DIR to test persistent NestDB Event Store');
+
 describe('NestDB Event Store', () => {
   let _Date, db, store;
 
@@ -17,7 +20,7 @@ describe('NestDB Event Store', () => {
     Date.now = () => new Date().getTime();
     Date.prototype = _Date.prototype;
 
-    store = new nest.EventStore('Test');
+    store = new nest.EventStore('Test', process.env.TEST_DATA_DIR);
 
     return store.load()
       .then(() => db = store._db)

@@ -1,5 +1,5 @@
-if (!process.env.MONGODB_URI_TEST || !process.env.MONGODB_OPLOG_URI_TEST)
-  return console.log('Set $MONGODB_URI_TEST and $MONGODB_OPLOG_URI_TEST to test MongoEventLog');
+if (!process.env.TEST_MONGODB_URI || !process.env.TEST_MONGODB_OPLOG_URI)
+  return console.log('Set $TEST_MONGODB_URI and $TEST_MONGODB_OPLOG_URI to test MongoEventLog');
 
 const chai = require('chai');
 const promised = require('chai-as-promised');
@@ -17,11 +17,11 @@ describe('MongoDB Event Log', () => {
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 10000);
-    log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, process.env.MONGODB_OPLOG_URI_TEST, db, 'bla_');
+    log = new mongo.EventLog('Test', process.env.TEST_MONGODB_URI, process.env.TEST_MONGODB_OPLOG_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
-      return mongodb.MongoClient.connect(process.env.MONGODB_URI_TEST)
+      return mongodb.MongoClient.connect(process.env.TEST_MONGODB_URI)
         .then(client => Promise.resolve(execute(client.db(db)))
           .then(r => result = r)
           .catch(e => console.error(e))
@@ -44,7 +44,7 @@ describe('MongoDB Event Log', () => {
   });
 
   it('fails if it cannot connect to the oplog', () => {
-    return (log = new mongo.EventLog('Test', process.env.MONGODB_URI_TEST, 'mongodb://foo', null, {reconnectTries: 0}))
+    return (log = new mongo.EventLog('Test', process.env.TEST_MONGODB_URI, 'mongodb://foo', null, {reconnectTries: 0}))
 
       .subscribe()
 

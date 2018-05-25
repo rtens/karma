@@ -5,14 +5,16 @@ chai.should();
 
 const k = require('../../../src/karma');
 const nest = require('../../../src/persistence/nest');
-const Datastore = require('nestdb');
+
+if (!process.env.TEST_DATA_DIR)
+  console.log('Set $TEST_DATA_DIR to test persistent NestDB Event Log');
 
 describe('NestDB Event Log', () => {
   let db, log;
 
   beforeEach(() => {
-    db = new Datastore();
-    log = new nest.EventLog('Test', db);
+    log = new nest.EventLog('Test', process.env.TEST_DATA_DIR);
+    db = log._db;
 
     return log.load()
   });

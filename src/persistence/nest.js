@@ -5,7 +5,10 @@ class NestEventStore extends karma.EventStore {
   constructor(moduleName) {
     super(moduleName);
 
-    this._db = new Datastore();
+    let options = {};
+    if (process.env.TEST_DATA_DIR) options.filename = process.env.TEST_DATA_DIR + '/' + moduleName;
+
+    this._db = new Datastore(options);
     this._loaded = false;
   }
 
@@ -45,10 +48,13 @@ class NestEventStore extends karma.EventStore {
 }
 
 class NestEventLog extends karma.EventLog {
-  constructor(moduleName, dataStore) {
+  constructor(moduleName) {
     super(moduleName);
 
-    this._db = dataStore;
+    let options = {};
+    if (process.env.TEST_DATA_DIR) options.filename = process.env.TEST_DATA_DIR + '/' + moduleName;
+
+    this._db = new Datastore(options);
     this._loaded = false;
 
     this._subscriptions = [];

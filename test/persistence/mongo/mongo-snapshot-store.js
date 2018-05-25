@@ -1,5 +1,5 @@
-if (!process.env.MONGODB_URI_TEST)
-  return console.log('Set $MONGODB_URI_TEST to test MongoSnapshotStore');
+if (!process.env.TEST_MONGODB_URI)
+  return console.log('Set $TEST_MONGODB_URI to test MongoSnapshotStore');
 
 const chai = require('chai');
 const promised = require('chai-as-promised');
@@ -15,11 +15,11 @@ describe('MongoDB Snapshot Store', () => {
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    snapshots = new mongo.SnapshotStore('Test', process.env.MONGODB_URI_TEST, db, 'bla_');
+    snapshots = new mongo.SnapshotStore('Test', process.env.TEST_MONGODB_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
-      return mongodb.MongoClient.connect(process.env.MONGODB_URI_TEST)
+      return mongodb.MongoClient.connect(process.env.TEST_MONGODB_URI)
         .then(client => Promise.resolve(execute(client.db(db)))
           .then(r => result = r)
           .catch(e => console.error(e))
