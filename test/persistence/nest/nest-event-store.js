@@ -5,7 +5,6 @@ chai.should();
 
 const k = require('../../../src/karma');
 const nest = require('../../../src/persistence/nest');
-const Datastore = require('nestdb');
 
 describe('NestDB Event Store', () => {
   let _Date, db, store;
@@ -18,14 +17,15 @@ describe('NestDB Event Store', () => {
     Date.now = () => new Date().getTime();
     Date.prototype = _Date.prototype;
 
-    db = new Datastore();
-    store = new nest.EventStore('Test', db);
+    store = new nest.EventStore('Test');
 
     return store.load()
+      .then(() => db = store._db)
   });
 
   afterEach(() => {
     Date = _Date;
+    return new Promise(y => db.destroy(y));
   });
 
   it('stores records', () => {
@@ -47,7 +47,7 @@ describe('NestDB Event Store', () => {
         .should.eql([{
           tid: 'trace',
           tim: new Date(),
-          _id: {mod: 'Test', sid: 'foo', seq: 1},
+          _id: {sid: 'foo', seq: 1},
           evs: [
             {nam: 'food', pay: {a: 'b'}, tim: new Date('2011-12-13T14:15:16Z')},
             {nam: 'bard', pay: {c: 123}, tim: undefined}
@@ -64,7 +64,7 @@ describe('NestDB Event Store', () => {
         .should.eql([{
           tid: 'trace',
           tim: new Date(),
-          _id: {mod: 'Test', sid: 'foo', seq: 43},
+          _id: {sid: 'foo', seq: 43},
           evs: [
             {nam: 'food', pay: {a: 'b'}, tim: undefined}
           ],
@@ -82,13 +82,13 @@ describe('NestDB Event Store', () => {
         .should.eql([{
           tid: 'trace',
           tim: new Date(),
-          _id: {mod: 'Test', sid: 'foo', seq: 1},
+          _id: {sid: 'foo', seq: 1},
           evs: []
         }]))
   });
 
   it('rejects Records on occupied heads', () => {
-    let record = {_id: {mod: 'Test', sid: 'foo', seq: 42}};
+    let record = {_id: {sid: 'foo', seq: 42}};
 
     return new Promise((y, n) => db.insert(record, (err, doc) => err ? n(err) : y(doc)))
 
