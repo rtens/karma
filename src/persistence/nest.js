@@ -1,25 +1,19 @@
 const karma = require('../../src/karma');
-const Datastore = require('nestdb');
 
 class NestEventStore extends karma.EventStore {
-  constructor(moduleName) {
+  constructor(moduleName, datastore) {
     super(moduleName);
-
-    let options = {};
-    if (process.env.TEST_DATA_DIR) options.filename = process.env.TEST_DATA_DIR + '/' + moduleName;
-
-    this._db = new Datastore(options);
-    this._loaded = false;
+    this._db = datastore;
   }
 
   record(events, streamId, onSequence, traceId) {
     let insertion = {
       tid: traceId,
       tim: new Date(),
-      _id: {
+      _id: JSON.stringify({
         sid: streamId,
-        seq: onSequence + 1
-      },
+        seq: (onSequence || 0) + 1
+      }),
       evs: events.map(event => ({
         nam: event.name,
         pay: event.payload,
@@ -27,7 +21,7 @@ class NestEventStore extends karma.EventStore {
       }))
     };
 
-    return this.load()
+    return Promise.resolve()
       .then(() => new Promise((y, n) => this._db.insert(insertion, (err) => err ? n(err) : y())))
       .then(() => super.record(events, streamId, onSequence, traceId))
       .catch(err => {
@@ -35,35 +29,33 @@ class NestEventStore extends karma.EventStore {
         return err
       });
   }
-
-  load() {
-    if (this._loaded) return Promise.resolve();
-
-    return new Promise((y, n) => this._db.load(err => {
-      if (err) return n(err);
-      this._loaded = true;
-      y();
-    }))
-  }
 }
 
 class NestEventLog extends karma.EventLog {
-  constructor(moduleName) {
+  constructor(moduleName, datastore) {
     super(moduleName);
-
-    let options = {};
-    if (process.env.TEST_DATA_DIR) options.filename = process.env.TEST_DATA_DIR + '/' + moduleName;
-
-    this._db = new Datastore(options);
-    this._loaded = false;
-
+    this._db = datastore;
     this._subscriptions = [];
+
+    this._db.ensureIndex({fieldName: 'tim'});
+    this._db.ensureIndex({fieldName: '_id.sid'});
+    this._db.on('inserted', doc => this._inserted(doc));
+  }
+
+  _inserted(recordSet) {
+    try {
+      this._apply(recordSet, this._subscriptions)
+    } catch (err) {
+      console.error(err.stack ? err.stack : err)
+    }
   }
 
   subscribe(filter, applier) {
     const subscription = {filter, applier};
 
-    return new Promise((y, n) => this._db.find({}, (err, docs) => err ? n(err) : y(docs)))
+    return Promise.resolve()
+
+      .then(() => new Promise((y, n) => this._db.find({}, (err, docs) => err ? n(err) : y(docs))))
 
       .then(recordSets => recordSets.forEach(recordSet => this._apply(recordSet, [subscription])))
 
@@ -79,34 +71,14 @@ class NestEventLog extends karma.EventLog {
     return new NestRecordFilter()
   }
 
-  load() {
-    if (this._loaded) return Promise.resolve();
-
-    return new Promise((y, n) => this._db.load(err => {
-      if (err) return n(err);
-      this._loaded = true;
-      y();
-    }))
-
-      .then(() => new Promise((y, n) => this._db.ensureIndex({fieldName: 'tim'}, err => err ? n(err) : y())))
-
-      .then(() => new Promise((y, n) => this._db.ensureIndex({fieldName: '_id.sid'}, err => err ? n(err) : y())))
-
-      .then(() => this._db.on('inserted', recordSet => {
-        try {
-          this._apply(recordSet, this._subscriptions)
-        } catch (err) {
-          console.error(err.stack ? err.stack : err)
-        }
-      }))
-  }
-
   _apply(recordSet, subscriptions) {
-    subscriptions.forEach(({filter, applier}) => {
-      if (!filter.matchesRecordSet(recordSet)) return;
+    let parsedRecordSet = {...recordSet, _id: JSON.parse(recordSet._id)};
 
-      recordSet.evs.filter(event => filter.matchesEvent(event))
-        .forEach((event, i) => applier(this._inflateRecord(recordSet, event, i)))
+    subscriptions.forEach(({filter, applier}) => {
+      if (!filter.matchesRecordSet(parsedRecordSet)) return;
+
+      parsedRecordSet.evs.filter(event => filter.matchesEvent(event))
+        .forEach((event, i) => applier(this._inflateRecord(parsedRecordSet, event, i)))
     });
   }
 
@@ -159,16 +131,22 @@ class NestSnapshotStore extends karma.SnapshotStore {
 }
 
 class NestPersistenceFactory extends karma.PersistenceFactory {
+  constructor(datastore) {
+    super();
+    datastore.load();
+    this._datastore = datastore;
+  }
+
   eventLog(moduleName) {
-    return new EventLog(moduleName)
+    return new NestEventLog(moduleName, this._datastore)
   }
 
   snapshotStore(moduleName) {
-    return new SnapshotStore(moduleName);
+    return new NestSnapshotStore(moduleName, this._datastore);
   }
 
   eventStore(moduleName) {
-    return new EventStore(moduleName);
+    return new NestEventStore(moduleName, this._datastore);
   }
 }
 

@@ -2,7 +2,9 @@ const express = require('express');
 const bodyParser = require('body-parser');
 const karma = require('./src/karma');
 const mongo = require('./src/persistence/mongo');
+const nest = require('./src/persistence/nest');
 const expressWs = require('express-ws');
+const Datastore = require('nestdb');
 
 let strategy = {
   onAccess: unit => {
@@ -15,8 +17,11 @@ let strategy = {
 
 new karma.Module('Demo',
   strategy,
-  new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
-  new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))
+  // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
+  // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))
+
+  new nest.PersistenceFactory(new Datastore({filename: 'data/store'})),
+  new nest.PersistenceFactory(new Datastore({filename: 'data/meta_store'})))
 
   .add(new karma.Aggregate('Bob')
 
@@ -57,12 +62,13 @@ new karma.Module('Demo',
       this.total = 0;
     })
 
-    .applying('food', function ({count}) {
+    .applying('food', function ({count}, {streamId}) {
+      if (streamId != this.id) return;
       this.total += count;
     })
 
     .respondingTo('Food', $=>$.of, function () {
-      return this.total
+      return this.total;
     }))
 
   .add(new karma.Saga('John')
