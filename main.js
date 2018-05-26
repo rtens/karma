@@ -8,10 +8,10 @@ const Datastore = require('nestdb');
 
 let strategy = {
   onAccess: unit => {
-    // unit.takeSnapshot();
-    // if (unit.id == '__Module-Demo') return;
-    //
-    // unit.unload();
+    unit.takeSnapshot();
+    if (unit.id == '__Module-Demo') return;
+
+    unit.unload();
   }
 };
 
@@ -20,28 +20,30 @@ new karma.Module('Demo',
   // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
   // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))
 
-  new nest.PersistenceFactory(new Datastore({filename: 'data/store'})),
-  new nest.PersistenceFactory(new Datastore({filename: 'data/meta_store'})))
+  new nest.PersistenceFactory(new Datastore({filename: 'data/Demo/store'}), new Datastore({filename: 'data/Demo/snapshots'})),
+  new nest.PersistenceFactory(new Datastore({filename: 'data/Demo/meta_store'}), new Datastore({filename: 'data/Demo/meta_snapshots'})))
 
   .add(new karma.Aggregate('Bob')
 
     .initializing(function () {
-      this.total = 0;
-      this.limit = 5;
+      this.state = {
+        total: 0,
+        limit: 5
+      }
     })
 
     .executing('Foo', $=>$.target, function ({count}) {
-      if (this.total + count > this.limit) {
+      if (this.state.total + count > this.state.limit) {
         throw new Error('Too much');
       }
       return [
-        new karma.Event('food', {count, total: this.total + count}),
+        new karma.Event('food', {count, total: this.state.total + count}),
         new karma.Event('bard', {foo: 42}),
       ]
     })
 
     .applying('food', function ({total}) {
-      this.total = total;
+      this.state.total = total;
     })
 
     .executing('Inc', $=>$.where, function ({by}) {
@@ -49,7 +51,7 @@ new karma.Module('Demo',
     })
 
     .applying('incd', function ({by}) {
-      this.limit += by;
+      this.state.limit += by;
     })
 
     .executing('Bar', $=>$.to, function ({to}) {
@@ -59,16 +61,18 @@ new karma.Module('Demo',
   .add(new karma.Projection('Alice')
 
     .initializing(function () {
-      this.total = 0;
+      this.state = {
+        total: 0
+      }
     })
 
     .applying('food', function ({count}, {streamId}) {
       if (streamId != this.id) return;
-      this.total += count;
+      this.state.total += count;
     })
 
     .respondingTo('Food', $=>$.of, function () {
-      return this.total;
+      return this.state.total;
     }))
 
   .add(new karma.Saga('John')

@@ -120,32 +120,74 @@ class NestRecordFilter extends karma.RecordFilter {
 }
 
 class NestSnapshotStore extends karma.SnapshotStore {
+  constructor(moduleName, datastore) {
+    super(moduleName);
+    this._db = datastore;
+  }
+
   store(key, version, snapshot) {
-    return Promise.resolve()
+    let query = {
+      _id: JSON.stringify({
+        key: key,
+        ver: version
+      })
+    };
+
+    let update = {
+      _id: JSON.stringify({
+        key: key,
+        ver: version
+      }),
+      las: snapshot.lastRecordTime,
+      had: snapshot.heads,
+      sta: snapshot.state
+    };
+
+    return new Promise((y, n) =>
+      this._db.update(query, update, {upsert: true}, (err) => err ? n(err) : y()))
   }
 
   fetch(key, version) {
-    return Promise.reject(new Error('No snapshot'))
+    let query = {
+      _id: JSON.stringify({
+        key: key,
+        ver: version
+      })
+    };
+
+    return Promise.resolve()
+
+      .then(() => new Promise((y, n) => this._db.findOne(query, (err, doc) => err ? n(err) : y(doc))))
+
+      .then(doc => doc ? doc : Promise.reject(new Error('No snapshot')))
+
+      .then(doc => ({...doc, _id: JSON.parse(doc._id)}))
+
+      .then(doc => new karma.Snapshot(doc.las, doc.had, doc.sta));
   }
 }
 
 class NestPersistenceFactory extends karma.PersistenceFactory {
-  constructor(datastore) {
+  constructor(recordDatastore, snapshotDatastore) {
     super();
-    datastore.load();
-    this._datastore = datastore;
+
+    recordDatastore.load();
+    snapshotDatastore.load();
+
+    this._recordDatastore = recordDatastore;
+    this._snapshotDatastore = snapshotDatastore;
   }
 
   eventLog(moduleName) {
-    return new NestEventLog(moduleName, this._datastore)
+    return new NestEventLog(moduleName, this._recordDatastore)
   }
 
   snapshotStore(moduleName) {
-    return new NestSnapshotStore(moduleName, this._datastore);
+    return new NestSnapshotStore(moduleName, this._snapshotDatastore);
   }
 
   eventStore(moduleName) {
-    return new NestEventStore(moduleName, this._datastore);
+    return new NestEventStore(moduleName, this._recordDatastore);
   }
 }
 
