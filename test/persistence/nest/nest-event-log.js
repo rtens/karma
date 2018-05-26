@@ -28,10 +28,10 @@ describe('NestDB Event Log', () => {
     db.destroy();
   });
 
-  it('creates indices for Record time and Stream ID', () => {
+  it('creates index for Record time', () => {
     return Promise.resolve()
 
-      .then(() => db.indexes.should.have.all.keys(['_id', 'tim', '_id.sid']))
+      .then(() => db.indexes.should.have.all.keys(['_id', 'tim']))
   });
 
   it('replays stored Records of module', () => {

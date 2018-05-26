@@ -38,7 +38,6 @@ class NestEventLog extends karma.EventLog {
     this._subscriptions = [];
 
     this._db.ensureIndex({fieldName: 'tim'});
-    this._db.ensureIndex({fieldName: '_id.sid'});
     this._db.on('inserted', doc => this._inserted(doc));
   }
 
