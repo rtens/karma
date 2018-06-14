@@ -91,8 +91,22 @@ class FakeRequest {
 
 class FakeResponse {
   constructor() {
+    this.headers = {};
     this.statusCode = 200;
     this.body = null;
+  }
+
+  setHeader(field, value) {
+    this.headers[field] = value;
+  }
+
+  //noinspection JSUnusedGlobalSymbols
+  header(field, value) {
+    this.setHeader(field, value);
+  }
+
+  set(field, value) {
+    this.setHeader(field, value);
   }
 
   status(code) {
@@ -102,6 +116,10 @@ class FakeResponse {
 
   send(body) {
     this.body = body
+  }
+
+  end(body) {
+    this.send(body)
   }
 }
 
@@ -160,13 +178,20 @@ class RequestResult {
 }
 
 class ResponseExpectation {
-  constructor(body) {
+  constructor(body = null) {
     this.body = body;
+    this.headers = {};
+  }
+
+  withHeaders(headers) {
+    this.headers = headers;
+    return this
   }
 
   assert(result) {
     result.response.statusCode.should.equal(200, 'Unexpected response status')
       && chai.expect(result.response.body).to.eql(this.body, 'Unexpected response body')
+      && result.response.headers.should.eql(this.headers, 'Unexpected response headers')
   }
 }
 
@@ -177,7 +202,7 @@ class RejectionExpectation {
 
   assert(result) {
     result.response.statusCode.should.equal(403, 'Missing Rejection')
-      && result.response.body.code.should.equal(this.code, 'Unexpected Rejection code')
+    && result.response.body.code.should.equal(this.code, 'Unexpected Rejection code')
   }
 }
 

@@ -181,5 +181,50 @@ describe('Specifying HTTP Routes', () => {
         .then(expect.Response('bar'))
         .done()
     ])
-  })
+  });
+
+  it('fails if headers of response do not match', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', (req, res) => null))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response()
+        .withHeaders({not: 'set'}))
+
+      .done()
+
+      .should.be.rejectedWith('')
+  });
+
+  it('asserts headers of response', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', (req, res) => {
+        res.setHeader('One', 'uno');
+        res.header('Two', 'dos');
+        res.set('Three', 'tre');
+      }))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response()
+        .withHeaders({
+          One: 'uno',
+          Two: 'dos',
+          Three: 'tre'
+        }))
+
+      .done()
+  });
+
+  it('assert content sent with response.end()', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', (req, res) => res.end('bar')))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response('bar'))
+
+      .done()
+  });
 });
