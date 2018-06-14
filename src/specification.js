@@ -6,7 +6,14 @@ const fake = require('../src/fakes');
 
 class Example {
   constructor(module) {
+    this._setUpErrorLogging();
+
     module(this._setupDomain(), this._setupServer());
+  }
+
+  _setUpErrorLogging() {
+    this.errors = [];
+    console.error = message => this.errors.push(message);
   }
 
   _setupDomain() {
@@ -67,12 +74,12 @@ class FakeRequest {
 
   execute(server) {
     if (!server.handlers[this.method][this.route]) {
-      return Promise.reject(new Error(`No handler for [${this.route}] registered`))
+      return Promise.reject(new Error(`No handler for [${this.method.toUpperCase()} ${this.route}] registered`))
     }
 
     let response = new FakeResponse();
 
-    return (server.handlers[this.method][this.route](this, response) || Promise.resolve())
+    return new Promise(y => y(server.handlers[this.method][this.route](this, response)))
       .then(() => response)
   }
 }
@@ -109,7 +116,7 @@ class RequestAction {
   }
 
   perform(example) {
-    return new Result(this.request.execute(example.server))
+    return new RequestResult(this.request.execute(example.server), example.errors)
   }
 }
 
@@ -130,9 +137,10 @@ class PostAction extends RequestAction {
   }
 }
 
-class Result {
-  constructor(response) {
+class RequestResult {
+  constructor(response, errors) {
     this.lastPromise = response.then(res => this.response = res);
+    this.errors = errors;
   }
 
   then(expectation) {
@@ -142,6 +150,7 @@ class Result {
 
   done() {
     return this.lastPromise
+      .then(() => this.errors.should.eql([], 'Unexpected Error(s)'))
   }
 }
 
@@ -151,7 +160,7 @@ class ResponseExpectation {
   }
 
   assert(result) {
-    return result.response.statusCode.should.equal(200, 'Unexpected response status')
+    result.response.statusCode.should.equal(200, 'Unexpected response status')
       && chai.expect(result.response.body).to.eql(this.body, 'Unexpected response body')
   }
 }
@@ -162,8 +171,19 @@ class RejectionExpectation {
   }
 
   assert(result) {
-    return result.response.statusCode.should.equal(403, 'Missing Rejection')
+    result.response.statusCode.should.equal(403, 'Missing Rejection')
       && result.response.body.code.should.equal(this.code, 'Unexpected Rejection code')
+  }
+}
+
+class ErrorExpectation {
+  constructor(message) {
+    this.message = message;
+  }
+
+  assert(result) {
+    result.errors.should.contain(this.message, 'Missing Error');
+    result.errors.splice(result.errors.indexOf(this.message), 1);
   }
 }
 
@@ -193,6 +213,7 @@ module.exports = {
   },
   expect: {
     Response: body => new ResponseExpectation(body),
-    Rejection: code => new RejectionExpectation(code)
+    Rejection: code => new RejectionExpectation(code),
+    Error: message => new ErrorExpectation(message)
   }
 };

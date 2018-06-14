@@ -9,7 +9,7 @@ describe('Specifying HTTP Routes', () => {
 
       .done()
 
-      .should.be.rejectedWith('No handler for [/foo] registered')
+      .should.be.rejectedWith('No handler for [GET /foo] registered')
   });
 
   it('fails if the response does not match', () => {
@@ -78,11 +78,42 @@ describe('Specifying HTTP Routes', () => {
         "expected 'NOPE' to equal 'NOT_NOPE'")
   });
 
-  it('fails if an expected Error is not logged');
+  it('fails if an expected Error is not logged', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', () => console.error('Not Nope')))
 
-  it('asserts a logged Error');
+      .when(I.get('/foo'))
 
-  it('fails if an unexpected Error is logged');
+      .then(expect.Error('Nope'))
+
+      .done()
+
+      .should.be.rejectedWith("Missing Error: " +
+        "expected [ 'Not Nope' ] to include 'Nope'")
+  });
+
+  it('asserts a logged Error', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', () => console.error('Nope')))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Error('Nope'))
+
+      .done()
+  });
+
+  it('fails if an unexpected Error is logged', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', () => console.error('Nope')))
+
+      .when(I.get('/foo'))
+
+      .done()
+
+      .should.be.rejectedWith("Unexpected Error(s): " +
+        "expected [ 'Nope' ] to deeply equal []")
+  });
 
   it('uses URL parameters and query arguments of GET request', () => {
     return new Example((domain, server) =>
@@ -98,7 +129,15 @@ describe('Specifying HTTP Routes', () => {
       .done()
   });
 
-  it('fails if the Route of a POST request is not defined');
+  it('fails if the Route of a POST request is not defined', () => {
+    return new Example(() => null)
+
+      .when(I.post('/foo'))
+
+      .done()
+
+      .should.be.rejectedWith('No handler for [POST /foo] registered')
+  });
 
   it('uses URL parameters and query arguments of POST request', () => {
     return new Example((domain, server) =>
