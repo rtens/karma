@@ -1,7 +1,6 @@
-const express = require('express');
-const bodyParser = require('body-parser');
-const request = require('supertest');
-const querystring = require('querystring');
+const chai = require('chai');
+chai.should();
+
 const karma = require('../src/karma');
 const fake = require('../src/fakes');
 
@@ -25,9 +24,7 @@ class Example {
   }
 
   _setupServer() {
-    this.server = express();
-    this.server.use(bodyParser.json());
-
+    this.server = new FakeServer();
     return this.server
   }
 
@@ -46,48 +43,105 @@ class Example {
   }
 }
 
+class FakeServer {
+  constructor() {
+    this.handlers = {get: {}, post: {}};
+  }
+
+  get(route, handler) {
+    this.handlers.get[route] = handler
+  }
+
+  post(route, handler) {
+    this.handlers.post[route] = handler
+  }
+}
+
+class FakeRequest {
+  constructor(method, route) {
+    this.method = method;
+    this.route = route;
+    this.params = {};
+    this.query = {};
+  }
+
+  execute(server) {
+    if (!server.handlers[this.method][this.route]) {
+      return Promise.reject(new Error(`No handler for [${this.route}] registered`))
+    }
+
+    let response = new FakeResponse();
+
+    return (server.handlers[this.method][this.route](this, response) || Promise.resolve())
+      .then(() => response)
+  }
+}
+
+class FakeResponse {
+  constructor() {
+    this.statusCode = 200;
+    this.body = null;
+  }
+
+  status(code) {
+    this.statusCode = code;
+    return this
+  }
+
+  send(body) {
+    this.body = body
+  }
+}
+
 class RequestAction {
-  constructor(path) {
-    this.url = path;
+  constructor(method, route) {
+    this.request = new FakeRequest(method, route);
+  }
+
+  withUrlParameters(parameters) {
+    this.request.params = parameters;
+    return this
   }
 
   withQuery(query) {
-    this.url += '?' + querystring.stringify(query);
+    this.request.query = query;
     return this
   }
 
   perform(example) {
-    return new Result(this._performRequest(request(example.server)))
+    return new Result(this.request.execute(example.server))
   }
 }
 
 class GetAction extends RequestAction {
-
-  _performRequest(req) {
-    return req.get(this.url);
+  constructor(route) {
+    super('get', route);
   }
 }
 
 class PostAction extends RequestAction {
-
-  withBody(body) {
-    this.body = body;
-    return this
+  constructor(route) {
+    super('post', route);
   }
 
-  _performRequest(req) {
-    return req.post(this.url)
-      .send(this.body);
+  withBody(body) {
+    this.request.body = body;
+    return this
   }
 }
 
 class Result {
   constructor(response) {
-    this.response = response;
+    this.lastPromise = response.then(res => this.response = res);
   }
 
   then(expectation) {
-    return expectation.assert(this);
+    this.lastPromise = this.lastPromise.then(() => expectation.assert(this));
+    return this
+  }
+
+  done() {
+    return this.lastPromise
   }
 }
 
@@ -97,8 +151,19 @@ class ResponseExpectation {
   }
 
   assert(result) {
-    return result.response
-      .expect(200, this.body)
+    return result.response.statusCode.should.equal(200, 'Unexpected response status')
+      && chai.expect(result.response.body).to.eql(this.body, 'Unexpected response body')
+  }
+}
+
+class RejectionExpectation {
+  constructor(code) {
+    this.code = code;
+  }
+
+  assert(result) {
+    return result.response.statusCode.should.equal(403, 'Missing Rejection')
+      && result.response.body.code.should.equal(this.code, 'Unexpected Rejection code')
   }
 }
 
@@ -123,10 +188,11 @@ module.exports = {
     Event: (name, payload) => new Event(name, payload)
   },
   I: {
-    get: (path) => new GetAction(path),
-    post: (path) => new PostAction(path)
+    get: path => new GetAction(path),
+    post: path => new PostAction(path)
   },
   expect: {
-    Response: (body) => new ResponseExpectation(body)
+    Response: body => new ResponseExpectation(body),
+    Rejection: code => new RejectionExpectation(code)
   }
 };

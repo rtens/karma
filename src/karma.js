@@ -151,6 +151,12 @@ class Event extends Message {
   }
 }
 
+class Rejection extends Error {
+  constructor(code, message) {
+    super(message || code, code)
+  }
+}
+
 class Record {
   constructor(event, streamId, sequence, traceId, time = new Date()) {
     this.time = time;
@@ -921,6 +927,7 @@ module.exports = {
   Command,
   Query,
   Event,
+  Rejection,
 
   UnitStrategy,
   Aggregate,

@@ -30,6 +30,8 @@ describe('Specifying Projections', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response(['one', 'two']))
+
+      .done()
   });
 
   it('uses time of recorded Events', () => {
@@ -46,5 +48,24 @@ describe('Specifying Projections', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response([2, 6]))
-  })
+
+      .done()
+  });
+
+  it('fails if the Query is rejected', () => {
+    return new Example((domain, server) => {
+      domain.add(new k.Projection('foo')
+        .respondingTo('Foo', ()=>'foo', function () {
+          throw new k.Rejection('NOPE')
+        }));
+      server.get('/foo', (req, res) =>
+        domain.respondTo(new k.Query('Foo')))
+    })
+
+      .when(I.get('/foo'))
+
+      .done()
+
+      .should.be.rejectedWith('NOPE')
+  });
 });

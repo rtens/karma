@@ -96,12 +96,12 @@ describe('Responding to a Query', () => {
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', () => {
-          throw new Error('Nope')
+          throw new k.Rejection('NOPE', 'Not good')
         }))
 
       .respondTo(new k.Query('Foo', 'bar'))
 
-      .should.be.rejectedWith('Nope')
+      .should.be.rejectedWith(k.Rejection, 'Not good')
   });
 
   it('can be delayed until Projection reaches stream heads', () => {
