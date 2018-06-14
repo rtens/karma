@@ -183,9 +183,9 @@ describe('Specifying HTTP Routes', () => {
     ])
   });
 
-  it('fails if headers of response do not match', () => {
+  it('fails if header is missing', () => {
     return new Example((domain, server) =>
-      server.get('/foo', (req, res) => null))
+      server.get('/foo', () => null))
 
       .when(I.get('/foo'))
 
@@ -194,7 +194,23 @@ describe('Specifying HTTP Routes', () => {
 
       .done()
 
-      .should.be.rejectedWith('')
+      .should.be.rejectedWith("expected {} to have key 'not'")
+  });
+
+  it('fails if header value doe not match', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', (req, res) => {
+        res.header('not', 'bar');
+      }))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response()
+        .withHeaders({not: 'baz'}))
+
+      .done()
+
+      .should.be.rejectedWith("Unexpected value of header [not]: expected 'bar' to equal 'baz'")
   });
 
   it('asserts headers of response', () => {
@@ -210,8 +226,7 @@ describe('Specifying HTTP Routes', () => {
       .then(expect.Response()
         .withHeaders({
           One: 'uno',
-          Two: 'dos',
-          Three: 'tre'
+          Two: 'dos'
         }))
 
       .done()
@@ -224,6 +239,28 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response('bar'))
+
+      .done()
+  });
+
+  it('converts Buffer to string', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', (req, res) => res.send(new Buffer('bar'))))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response('bar'))
+
+      .done()
+  });
+
+  it('parses JSON string', () => {
+    return new Example((domain, server) =>
+      server.get('/foo', (req, res) => res.send('{"bar":"baz"}')))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response({bar: 'baz'}))
 
       .done()
   });

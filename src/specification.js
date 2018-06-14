@@ -52,15 +52,15 @@ class Example {
 
 class FakeServer {
   constructor() {
-    this.handlers = {get: {}, post: {}};
+    this.handlers = {GET: {}, POST: {}};
   }
 
   get(route, handler) {
-    this.handlers.get[route] = handler
+    this.handlers.GET[route] = handler
   }
 
   post(route, handler) {
-    this.handlers.post[route] = handler
+    this.handlers.POST[route] = handler
   }
 
   use(route, handler) {
@@ -71,7 +71,7 @@ class FakeServer {
 
 class FakeRequest {
   constructor(method, route) {
-    this.method = method;
+    this.method = method.toUpperCase();
     this.route = route;
     this.params = {};
     this.query = {};
@@ -115,7 +115,13 @@ class FakeResponse {
   }
 
   send(body) {
-    this.body = body
+    if (Buffer.isBuffer(body)) body = body.toString();
+    this.body = body;
+
+    try {
+      this.body = JSON.parse(this.body);
+    } catch (ignored) {
+    }
   }
 
   end(body) {
@@ -189,9 +195,13 @@ class ResponseExpectation {
   }
 
   assert(result) {
-    result.response.statusCode.should.equal(200, 'Unexpected response status')
-      && chai.expect(result.response.body).to.eql(this.body, 'Unexpected response body')
-      && result.response.headers.should.eql(this.headers, 'Unexpected response headers')
+    result.response.statusCode.should.equal(200, 'Unexpected response status');
+    chai.expect(result.response.body).to.eql(this.body, 'Unexpected response body');
+
+    Object.keys(this.headers).forEach(header => {
+      chai.expect(result.response.headers).to.have.any.key(header);
+      result.response.headers[header].should.equal(this.headers[header], `Unexpected value of header [${header}]`);
+    })
   }
 }
 
