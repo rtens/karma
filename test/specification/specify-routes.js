@@ -163,5 +163,23 @@ describe('Specifying HTTP Routes', () => {
       .then(expect.Response('Hello BAR'))
 
       .done()
+  });
+
+  it('registers Routes as middleware', () => {
+    let example = new Example((domain, server) =>
+      server.use('/foo', (req, res) => res.send('bar')));
+
+    return Promise.all([
+
+      example
+        .when(I.post('/foo'))
+        .then(expect.Response('bar'))
+        .done(),
+
+      example
+        .when(I.get('/foo'))
+        .then(expect.Response('bar'))
+        .done()
+    ])
   })
 });

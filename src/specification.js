@@ -62,6 +62,11 @@ class FakeServer {
   post(route, handler) {
     this.handlers.post[route] = handler
   }
+
+  use(route, handler) {
+    this.get(route, handler);
+    this.post(route, handler);
+  }
 }
 
 class FakeRequest {
