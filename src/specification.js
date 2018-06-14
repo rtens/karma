@@ -3,8 +3,7 @@ const bodyParser = require('body-parser');
 const request = require('supertest');
 const querystring = require('querystring');
 
-class Specification {
-
+class Example {
   constructor(module) {
     this.server = express();
     this.server.use(bodyParser.json());
@@ -12,45 +11,74 @@ class Specification {
     module(null, this.server);
   }
 
-  whenGetting(path, query) {
-    return new GetRequest(this.server, path, query)
-  }
-
-  whenPosting(path, query) {
-    return new PostRequest(this.server, path, query)
+  when(action) {
+    return action.perform(this)
   }
 }
 
-class Request {
-
-  constructor(request) {
-    this.request = request;
+class RequestAction {
+  constructor(path) {
+    this.url = path;
   }
 
-  expectResponse(body) {
-    return this.request
-      .expect(200, body);
+  withQuery(query) {
+    this.url += '?' + querystring.stringify(query);
+    return this
   }
-}
 
-class GetRequest extends Request {
-
-  constructor(server, path, query) {
-    super(request(server)
-      .get(path + '?' + querystring.stringify(query)))
+  perform(example) {
+    return new Result(this._performRequest(request(example.server)))
   }
 }
 
-class PostRequest extends Request {
+class GetAction extends RequestAction {
 
-  constructor(server, path, query) {
-    super(request(server)
-      .post(path + '?' + querystring.stringify(query)))
+  _performRequest(req) {
+    return req.get(this.url);
   }
+}
+
+class PostAction extends RequestAction {
 
   withBody(body) {
-    return new Request(this.request.send(body))
+    this.body = body;
+    return this
+  }
+
+  _performRequest(req) {
+    return req.post(this.url)
+      .send(this.body);
   }
 }
 
-module.exports = Specification;
+class Result {
+  constructor(response) {
+    this.response = response;
+  }
+
+  then(expectation) {
+    return expectation.assert(this);
+  }
+}
+
+class ResponseExpectation {
+  constructor(body) {
+    this.body = body;
+  }
+
+  assert(result) {
+    return result.response
+      .expect(200, this.body)
+  }
+}
+
+module.exports = {
+  Example,
+  I: {
+    get: (path) => new GetAction(path),
+    post: (path) => new PostAction(path)
+  },
+  expect: {
+    Response: (body) => new ResponseExpectation(body)
+  }
+};
