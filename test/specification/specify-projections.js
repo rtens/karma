@@ -38,8 +38,10 @@ describe('Specifying Projections', () => {
         this.state.push(record.event.time.getDay())
       })))
 
-      .given(the.Event('food').withTime('2011-12-13'))
-      .given(the.Event('food').withTime('2001-02-03'))
+      .givenAll([
+        the.Event('food').withTime('2011-12-13'),
+        the.Event('food').withTime('2001-02-03')
+      ])
 
       .when(I.get('/foo'))
 

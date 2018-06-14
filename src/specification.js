@@ -31,6 +31,11 @@ class Example {
     return this
   }
 
+  givenAll(contexts) {
+    contexts.forEach(context => this.given(context));
+    return this
+  }
+
   when(action) {
     return action.perform(this)
   }
