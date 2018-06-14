@@ -1,5 +1,5 @@
 const k = require('../../src/karma');
-const {Example, a, I, expect} = require('../../src/specification');
+const {Example, the, I, expect} = require('../../src/specification');
 
 describe('Specifying Projections', () => {
 
@@ -24,8 +24,8 @@ describe('Specifying Projections', () => {
         this.state.push($)
       })))
 
-      .given(a.Event('food', 'one'))
-      .given(a.Event('food', 'two'))
+      .given(the.Event('food', 'one'))
+      .given(the.Event('food', 'two'))
 
       .when(I.get('/foo'))
 
@@ -38,8 +38,8 @@ describe('Specifying Projections', () => {
         this.state.push(record.event.time.getDay())
       })))
 
-      .given(a.Event('food').withTime('2011-12-13'))
-      .given(a.Event('food').withTime('2001-02-03'))
+      .given(the.Event('food').withTime('2011-12-13'))
+      .given(the.Event('food').withTime('2001-02-03'))
 
       .when(I.get('/foo'))
 

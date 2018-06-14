@@ -109,7 +109,7 @@ class Event {
 
 module.exports = {
   Example,
-  a: {
+  the: {
     Event: (name, payload) => new Event(name, payload)
   },
   I: {
