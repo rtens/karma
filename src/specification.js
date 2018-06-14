@@ -7,23 +7,28 @@ const fake = require('../src/fakes');
 
 class Example {
   constructor(module) {
+    module(this._setupDomain(), this._setupServer());
+  }
+
+  _setupDomain() {
+    this.store = new fake.EventStore();
+    this.log = new fake.EventLog();
+
+    return new karma.Module('Test',
+      new karma.UnitStrategy(),
+      {
+        eventStore: () => this.store,
+        eventLog: () => this.log,
+        snapshotStore: () => new karma.SnapshotStore(),
+      },
+      new karma.PersistenceFactory());
+  }
+
+  _setupServer() {
     this.server = express();
     this.server.use(bodyParser.json());
 
-    this.store = (this.store = new fake.EventStore());
-    this.log = (this.log = new fake.EventLog());
-
-    const strategy = new karma.UnitStrategy();
-    const persistence = {
-      eventStore: () => this.store,
-      eventLog: () => this.log,
-      snapshotStore: () => new karma.SnapshotStore(),
-    };
-    const metaPersistence = new karma.PersistenceFactory();
-
-    let domain = new karma.Module('Test', strategy, persistence, metaPersistence);
-
-    module(domain, this.server);
+    return this.server
   }
 
   given(context) {
@@ -108,7 +113,7 @@ class Event {
   }
 
   configure(example) {
-      example.log.records.push(new karma.Record(this.event));
+    example.log.records.push(new karma.Record(this.event));
   }
 }
 
