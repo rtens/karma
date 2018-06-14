@@ -1,7 +1,7 @@
 const k = require('../../src/karma');
 const {Example, the, I, expect} = require('../../src/specification');
 
-describe('Specifying Projections', () => {
+describe.skip('Specifying Projections', () => {
 
   let module = configure => (domain, server) => {
 
