@@ -1,4 +1,4 @@
-const karma = require('../../src/karma');
+const karma = require('./karma');
 
 class FakeEventStore extends karma.EventStore {
   constructor() {
