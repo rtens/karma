@@ -1,3 +1,8 @@
+const chai = require('chai');
+const promised = require('chai-as-promised');
+chai.use(promised);
+chai.should();
+
 const {Example, I, expect} = require('../../src/specification');
 
 describe('Specifying HTTP Routes', () => {

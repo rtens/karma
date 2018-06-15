@@ -1,6 +1,4 @@
-const chai = require('chai');
-chai.should();
-
+const expect = require('chai').expect;
 const karma = require('../src/karma');
 const fake = require('../src/fakes');
 
@@ -159,7 +157,7 @@ class RequestResult extends Result {
 
   finalAssertion() {
     //noinspection BadExpressionStatementJS
-    chai.expect(this.errors, 'Unexpected Error(s)').to.be.empty;
+    expect(this.errors, 'Unexpected Error(s)').to.be.empty;
   }
 }
 
@@ -175,12 +173,12 @@ class ResponseExpectation {
   }
 
   assert(result) {
-    result.response.statusCode.should.equal(200, 'Unexpected response status');
-    chai.expect(result.response.body).to.eql(this.body, 'Unexpected response body');
+    expect(result.response.statusCode).to.equal(200, 'Unexpected response status');
+    expect(result.response.body).to.eql(this.body, 'Unexpected response body');
 
     Object.keys(this.headers).forEach(header => {
-      chai.expect(result.response.headers).to.have.any.key(header);
-      result.response.headers[header].should.equal(this.headers[header], `Unexpected value of header [${header}]`);
+      expect(result.response.headers).to.have.any.key(header);
+      expect(result.response.headers[header]).to.equal(this.headers[header], `Unexpected value of header [${header}]`);
     })
   }
 }
@@ -191,8 +189,8 @@ class RejectionExpectation {
   }
 
   assert(result) {
-    result.response.statusCode.should.equal(403, 'Missing Rejection')
-    && result.response.body.code.should.equal(this.code, 'Unexpected Rejection code')
+    expect(result.response.statusCode).to.equal(403, 'Missing Rejection');
+    expect(result.response.body.code).to.equal(this.code, 'Unexpected Rejection code');
   }
 }
 
@@ -202,7 +200,7 @@ class ErrorExpectation {
   }
 
   assert(result) {
-    result.errors.should.contain(this.message, 'Missing Error');
+    expect(result.errors).to.contain(this.message, 'Missing Error');
     result.errors.splice(result.errors.indexOf(this.message), 1);
   }
 }
