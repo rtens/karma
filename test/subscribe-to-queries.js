@@ -3,7 +3,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const fake = require('./../src/fakes');
+const fake = require('./../src/specification/fakes');
 const k = require('../src/karma');
 
 describe('Subscribing to a Query', () => {

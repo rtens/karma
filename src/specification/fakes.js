@@ -1,4 +1,4 @@
-const karma = require('./karma');
+const karma = require('./../karma');
 
 class FakeEventStore extends karma.EventStore {
   constructor() {
@@ -90,9 +90,89 @@ class FakeSnapshotStore extends karma.SnapshotStore {
   }
 }
 
+class FakeServer {
+  constructor() {
+    this.handlers = {GET: {}, POST: {}};
+  }
+
+  get(route, handler) {
+    this.handlers.GET[route] = handler
+  }
+
+  post(route, handler) {
+    this.handlers.POST[route] = handler
+  }
+
+  use(route, handler) {
+    this.get(route, handler);
+    this.post(route, handler);
+  }
+}
+
+class FakeRequest {
+  constructor(method, route) {
+    this.method = method.toUpperCase();
+    this.route = route;
+    this.params = {};
+    this.query = {};
+  }
+
+  execute(server) {
+    if (!server.handlers[this.method][this.route]) {
+      return Promise.reject(new Error(`No handler for [${this.method.toUpperCase()} ${this.route}] registered`))
+    }
+
+    let response = new FakeResponse();
+    return new Promise(y => y(server.handlers[this.method][this.route](this, response)))
+      .then(() => response)
+  }
+}
+
+class FakeResponse {
+  constructor() {
+    this.headers = {};
+    this.statusCode = 200;
+    this.body = null;
+  }
+
+  setHeader(field, value) {
+    this.headers[field] = value;
+  }
+
+  //noinspection JSUnusedGlobalSymbols
+  header(field, value) {
+    this.setHeader(field, value);
+  }
+
+  set(field, value) {
+    this.setHeader(field, value);
+  }
+
+  status(code) {
+    this.statusCode = code;
+    return this
+  }
+
+  send(body) {
+    if (Buffer.isBuffer(body)) body = body.toString();
+    this.body = body;
+
+    try {
+      this.body = JSON.parse(this.body);
+    } catch (ignored) {
+    }
+  }
+
+  end(body) {
+    this.send(body)
+  }
+}
+
 module.exports = {
   EventStore: FakeEventStore,
   EventLog: FakeEventLog,
   RecordFilter: FakeRecordFilter,
-  SnapshotStore: FakeSnapshotStore
+  SnapshotStore: FakeSnapshotStore,
+  Server: FakeServer,
+  Request: FakeRequest
 };
