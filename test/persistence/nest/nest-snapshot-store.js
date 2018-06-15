@@ -3,8 +3,8 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../../src/karma');
-const nest = require('../../../src/persistence/nest');
+const _persistence = require('../../../src/persistence');
+const _nest = require('../../../src/persistence/nest');
 const Datastore = require('nestdb');
 
 if (!process.env.TEST_DATA_DIR)
@@ -20,7 +20,7 @@ describe('NestDB Snapshot Store', () => {
       db = new Datastore();
     }
 
-    snapshots = new nest.SnapshotStore('Test', db);
+    snapshots = new _nest.SnapshotStore('Test', db);
     return new Promise((y, n) => db.load(err => err ? n(err) : y()))
   });
 
@@ -29,7 +29,7 @@ describe('NestDB Snapshot Store', () => {
   });
 
   it('stores Snapshots', () => {
-    let snapshot = new k.Snapshot(new Date('2011-12-13'), {foo: 42}, {foo: 'bar'});
+    let snapshot = new _persistence.Snapshot(new Date('2011-12-13'), {foo: 42}, {foo: 'bar'});
 
     return snapshots.store('foo', 'v1', snapshot)
 
@@ -62,12 +62,12 @@ describe('NestDB Snapshot Store', () => {
       .then(() => snapshots.fetch('foo', 'v2'))
 
       .then(snapshot => snapshot.should.eql(
-        new k.Snapshot(new Date('2011-12-13'), {foo: 42}, {foo: 'bar'})))
+        new _persistence.Snapshot(new Date('2011-12-13'), {foo: 42}, {foo: 'bar'})))
   });
 
   it('updates existing Snapshots', () => {
-    let snapshot1 = new k.Snapshot(new Date('2011-12-13'), {foo: 21}, {foo: 'bar'});
-    let snapshot2 = new k.Snapshot(new Date('2011-12-14'), {foo: 42}, {foo: 'baz'});
+    let snapshot1 = new _persistence.Snapshot(new Date('2011-12-13'), {foo: 21}, {foo: 'bar'});
+    let snapshot2 = new _persistence.Snapshot(new Date('2011-12-14'), {foo: 42}, {foo: 'baz'});
 
     return snapshots.store('foo', 'v1', snapshot1)
 

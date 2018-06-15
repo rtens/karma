@@ -3,9 +3,13 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const fake = require('./../src/specification/fakes');
+const _event = require('../src/event');
+const _unit = require('../src/unit');
+const _persistence = require('../src/persistence');
+
 const units = require('./common/units');
-const k = require('../src/karma');
+const fake = require('./../src/specification/fakes');
+const k = require('..');
 
 describe('Taking a Snapshot', () => {
   let _Date, Module;
@@ -18,18 +22,18 @@ describe('Taking a Snapshot', () => {
     Date.prototype = _Date.prototype;
 
     Module = (args = {}) =>
-      new k.Module(
+      new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
         {
-          eventLog: () => args.log || new k.EventLog(),
-          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
-          eventStore: () => args.store || new k.EventStore()
+          eventLog: () => args.log || new fake.EventLog(),
+          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
+          eventStore: () => args.store || new fake.EventStore()
         },
         {
-          eventLog: () => args.metaLog || new k.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
-          eventStore: () => args.metaStore || new k.EventStore()
+          eventLog: () => args.metaLog || new fake.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
+          eventStore: () => args.metaStore || new fake.EventStore()
         })
   });
 
@@ -39,10 +43,10 @@ describe('Taking a Snapshot', () => {
 
   it('passes Module names to the SnapshotStore', () => {
     let passedNames = [];
-    let persistence = new k.PersistenceFactory();
+    let persistence = new _persistence.PersistenceFactory();
     persistence.snapshotStore = name => passedNames.push(name);
 
-    new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
+    new k.Domain('Foo', new _unit.UnitStrategy, persistence, persistence);
 
     passedNames.should.eql(['Foo', 'Foo__meta']);
   });
@@ -53,8 +57,8 @@ describe('Taking a Snapshot', () => {
       it('stores the Snapshot by key and version', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
-          new k.Record(new k.Event('not applied', 'not'), 'bar', 22, null, new Date('2011-12-13')),
+          new _event.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
+          new _event.Record(new k.Event('not applied', 'not'), 'bar', 22, null, new Date('2011-12-13')),
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -92,15 +96,15 @@ describe('Taking a Snapshot', () => {
       it('reconstitutes from Snapshot and Events', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard', 'not'), 'foo', 21),
-          new k.Record(new k.Event('bard', 'one'), 'foo', 23)
+          new _event.Record(new k.Event('bard', 'not'), 'foo', 21),
+          new _event.Record(new k.Event('bard', 'one'), 'foo', 23)
         ];
 
         let snapshots = new fake.SnapshotStore();
         snapshots.snapshots = [{
           key: unit.Unit.name + '-One-foo',
           version: 'v1',
-          snapshot: new k.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21}, ['snap'])
+          snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21}, ['snap'])
         }];
 
         let state = [];
@@ -248,17 +252,17 @@ describe('Taking a Snapshot', () => {
         it('reconstitutes from Snapshot and Events of multiple streams', () => {
           let log = new fake.EventLog();
           log.records = [
-            new k.Record(new k.Event('bard', 'not'), 'foo', 21),
-            new k.Record(new k.Event('bard', 'one'), 'foo', 23),
-            new k.Record(new k.Event('bard', 'not'), 'bar', 22),
-            new k.Record(new k.Event('bard', 'two'), 'bar', 23),
+            new _event.Record(new k.Event('bard', 'not'), 'foo', 21),
+            new _event.Record(new k.Event('bard', 'one'), 'foo', 23),
+            new _event.Record(new k.Event('bard', 'not'), 'bar', 22),
+            new _event.Record(new k.Event('bard', 'two'), 'bar', 23),
           ];
 
           let snapshots = new fake.SnapshotStore();
           snapshots.snapshots = [{
             key: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: new k.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21, bar: 22}, ['snap'])
+            snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21, bar: 22}, ['snap'])
           }];
 
           let state = [];
@@ -295,8 +299,8 @@ describe('Taking a Snapshot', () => {
         it('saves a Snapshot with multiple heads', () => {
           let log = new fake.EventLog();
           log.records = [
-            new k.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
-            new k.Record(new k.Event('bard', 'two'), 'bar', 42, null, new Date('2011-12-14')),
+            new _event.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
+            new _event.Record(new k.Event('bard', 'two'), 'bar', 42, null, new Date('2011-12-14')),
           ];
 
           let snapshots = new fake.SnapshotStore();

@@ -3,8 +3,10 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
+const _event = require('../src/event');
+
 const fake = require('./../src/specification/fakes');
-const k = require('../src/karma');
+const k = require('..');
 
 describe('Reacting to an Event', () => {
   let _Date, Module;
@@ -17,20 +19,20 @@ describe('Reacting to an Event', () => {
     Date.prototype = _Date.prototype;
 
     Module = (args = {}) =>
-      new k.Module(
+      new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
         {
-          eventLog: () => args.log || new k.EventLog(),
-          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
-          eventStore: () => args.store || new k.EventStore()
+          eventLog: () => args.log || new fake.EventLog(),
+          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
+          eventStore: () => args.store || new fake.EventStore()
         },
         {
           eventLog: module => module == '__admin'
-            ? args.adminLog || new k.EventLog()
-            : args.metaLog || new k.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
-          eventStore: () => args.metaStore || new k.EventStore()
+            ? args.adminLog || new fake.EventLog()
+            : args.metaLog || new fake.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
+          eventStore: () => args.metaStore || new fake.EventStore()
         })
   });
 
@@ -51,8 +53,8 @@ describe('Reacting to an Event', () => {
   it('invokes the reactor for recorded Events', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('food', 'one'), 'foo', 23),
-      new k.Record(new k.Event('food', 'two'), 'bar', 21),
+      new _event.Record(new k.Event('food', 'one'), 'foo', 23),
+      new _event.Record(new k.Event('food', 'two'), 'bar', 21),
     ];
 
     let reactions = [];
@@ -72,7 +74,7 @@ describe('Reacting to an Event', () => {
   it('locks Reactions', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
+      new _event.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
     ];
 
     let metaStore = new fake.EventStore();
@@ -104,7 +106,7 @@ describe('Reacting to an Event', () => {
   it('records time of last Record if no reaction exists for it', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
+      new _event.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
     ];
 
     let metaStore = new fake.EventStore();
@@ -133,12 +135,12 @@ describe('Reacting to an Event', () => {
   it('does not record time of last Record already recorded', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:15Z'))
+      new _event.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:15Z'))
     ];
 
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-13T14:15:16Z')}),
+      new _event.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-13T14:15:16Z')}),
         '__Module-Test')
     ];
 
@@ -161,9 +163,9 @@ describe('Reacting to an Event', () => {
   it('subscribes to EventLog using Record time of last locked Reaction', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-11')})),
-      new k.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-13')})),
-      new k.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-12')})),
+      new _event.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-11')})),
+      new _event.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-13')})),
+      new _event.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-12')})),
     ];
 
     let log = new fake.EventLog();
@@ -176,7 +178,7 @@ describe('Reacting to an Event', () => {
   it('keeps state of last Record time', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-13')})),
+      new _event.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-13')})),
     ];
 
     let log = new fake.EventLog();
@@ -201,9 +203,9 @@ describe('Reacting to an Event', () => {
   it('subscribes to EventLog using time of last consumed Record', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-11')})),
-      new k.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-13')})),
-      new k.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-12')})),
+      new _event.Record(new k.Event('__reaction-locked', {recordTime: new Date('2011-12-11')})),
+      new _event.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-13')})),
+      new _event.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-12')})),
     ];
 
     let adminLog = new fake.EventLog();
@@ -230,7 +232,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'one'), 'foo', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'foo', 42)))
 
       .then(() => reactions.should.eql(['one']))
   });
@@ -250,14 +252,14 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'one'))))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'))))
 
       .then(() => reactions.should.eql(['a one', 'b one']))
   });
 
   it('marks throwing reactions as failed', () => {
     let log = new fake.EventLog();
-    log.records = [new k.Record(new k.Event('food', 'one'), 'bar', 23, 'trace')];
+    log.records = [new _event.Record(new k.Event('food', 'one'), 'bar', 23, 'trace')];
 
     let metaStore = new fake.EventStore();
 
@@ -301,7 +303,7 @@ describe('Reacting to an Event', () => {
 
   it('marks reactions with rejected Promises as failed', () => {
     let log = new fake.EventLog();
-    log.records = [new k.Record(new k.Event('food', 'one'), 'foo', 23, 'trace')];
+    log.records = [new _event.Record(new k.Event('food', 'one'), 'foo', 23, 'trace')];
 
     let metaStore = new fake.EventStore();
 
@@ -318,12 +320,12 @@ describe('Reacting to an Event', () => {
   it('does not invoke reactor if reaction is locked', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
+      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
     ];
 
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('food', 'one'), 'foo', 21)
+      new _event.Record(new k.Event('food', 'one'), 'foo', 21)
     ];
 
     let metaStore = new fake.EventStore();
@@ -337,9 +339,9 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'not'), 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'foo', 22)))
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'two'), 'bar', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'two'), 'bar', 22)))
 
       .then(() => reactions.should.eql(['one', 'two']))
 
@@ -369,7 +371,7 @@ describe('Reacting to an Event', () => {
   it('keeps state of locked Reactions', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
+      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
     ];
 
     let log = new fake.EventLog();
@@ -387,11 +389,11 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'not'), 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'foo', 22)))
 
       .then(() => metaLog.records = [])
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'not'), 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'foo', 22)))
 
       .then(() => reactions.should.eql([]))
   });
@@ -399,13 +401,13 @@ describe('Reacting to an Event', () => {
   it('invokes reactor if reaction has failed after being locked', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new k.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 21}), '__Saga-One-bar', 3),
-      new k.Record(new k.Event('__reaction-failed', {streamId: 'foo', sequence: 21}), '__Saga-One-bar', 4),
+      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 21}), '__Saga-One-bar', 3),
+      new _event.Record(new k.Event('__reaction-failed', {streamId: 'foo', sequence: 21}), '__Saga-One-bar', 4),
     ];
 
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('food', 'one'), 'foo', 21)
+      new _event.Record(new k.Event('food', 'one'), 'foo', 21)
     ];
 
     let metaStore = new fake.EventStore();
@@ -436,7 +438,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => adminLog.publish(new k.Record(new k.Event('__reaction-retry-requested', {
+      .then(() => adminLog.publish(new _event.Record(new k.Event('__reaction-retry-requested', {
         sagaId: 'foo',
         sagaKey: '__Saga-One-foo',
         record: {

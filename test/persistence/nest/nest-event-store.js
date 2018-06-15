@@ -3,8 +3,8 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../../src/karma');
-const nest = require('../../../src/persistence/nest');
+const _event = require('../../../src/event');
+const _nest = require('../../../src/persistence/nest');
 const Datastore = require('nestdb');
 
 if (!process.env.TEST_DATA_DIR)
@@ -27,7 +27,7 @@ describe('NestDB Event Store', () => {
       db = new Datastore();
     }
 
-    store = new nest.EventStore('Test', db);
+    store = new _nest.EventStore('Test', db);
     return new Promise((y, n) => db.load(err => err ? n(err) : y()))
   });
 
@@ -38,15 +38,15 @@ describe('NestDB Event Store', () => {
 
   it('stores records', () => {
     let events = [
-      new k.Event('food', {a: 'b'}, new Date('2011-12-13T14:15:16Z')),
-      new k.Event('bard', {c: 123}, new Date('2016-12-06')),
+      new _event.Event('food', {a: 'b'}, new Date('2011-12-13T14:15:16Z')),
+      new _event.Event('bard', {c: 123}, new Date('2016-12-06')),
     ];
 
     return store.record(events, 'foo', undefined, 'trace')
 
       .then(records => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13T14:15:16Z')), 'foo', 1, 'trace'),
-        new k.Record(new k.Event('bard', {c: 123}, new Date('2016-12-06')), 'foo', 2, 'trace')
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2011-12-13T14:15:16Z')), 'foo', 1, 'trace'),
+        new _event.Record(new _event.Event('bard', {c: 123}, new Date('2016-12-06')), 'foo', 2, 'trace')
       ]))
 
       .then(() => new Promise((y, n) => db.find({}, (err, docs) => err ? n(err) : y(docs))))
@@ -64,7 +64,7 @@ describe('NestDB Event Store', () => {
   });
 
   it('stores records on sequence', () => {
-    return store.record([new k.Event('food', {a: 'b'})], 'foo', 42, 'trace')
+    return store.record([new _event.Event('food', {a: 'b'})], 'foo', 42, 'trace')
 
       .then(() => new Promise((y, n) => db.find({}, (err, docs) => err ? n(err) : y(docs))))
 
@@ -111,11 +111,11 @@ describe('NestDB Event Store', () => {
     it('keep Records on reloading', () => {
       return Promise.resolve()
 
-        .then(() => store.record([new k.Event('food')], 'foo', 0))
+        .then(() => store.record([new _event.Event('food')], 'foo', 0))
 
-        .then(() => store.record([new k.Event('food')], 'foo', 1))
+        .then(() => store.record([new _event.Event('food')], 'foo', 1))
 
-        .then(() => store.record([new k.Event('food')], 'foo', 2))
+        .then(() => store.record([new _event.Event('food')], 'foo', 2))
 
         .then(() => new Promise((y, n) => db.load(err => err ? n(err) : y())))
 

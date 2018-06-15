@@ -1,4 +1,6 @@
-const karma = require('../karma');
+const unit = require('../unit');
+const persistence = require('../persistence');
+const domain = require('../domain');
 const fake = require('./fakes');
 
 class Example {
@@ -17,14 +19,14 @@ class Example {
     this.store = new fake.EventStore();
     this.log = new fake.EventLog();
 
-    return new karma.Module('Test',
-      new karma.UnitStrategy(),
+    return new domain.Domain('Test',
+      new unit.UnitStrategy(),
       {
         eventStore: () => this.store,
         eventLog: () => this.log,
-        snapshotStore: () => new karma.SnapshotStore(),
+        snapshotStore: () => new fake.SnapshotStore(),
       },
-      new karma.PersistenceFactory());
+      new persistence.PersistenceFactory());
   }
 
   _setupServer() {

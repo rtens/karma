@@ -1,6 +1,7 @@
-const karma = require('../../src/karma');
+const _event = require('../../src/event');
+const _persistence = require('../../src/persistence');
 
-class NestEventStore extends karma.EventStore {
+class NestEventStore extends _persistence.EventStore {
   constructor(moduleName, datastore) {
     super(moduleName);
     this._db = datastore;
@@ -31,7 +32,7 @@ class NestEventStore extends karma.EventStore {
   }
 }
 
-class NestEventLog extends karma.EventLog {
+class NestEventLog extends _persistence.EventLog {
   constructor(moduleName, datastore) {
     super(moduleName);
     this._db = datastore;
@@ -82,13 +83,13 @@ class NestEventLog extends karma.EventLog {
   }
 
   _inflateRecord(recordSet, event, i) {
-    return new karma.Record(
-      new karma.Event(event.nam, event.pay, event.tim || recordSet.tim),
+    return new _event.Record(
+      new _event.Event(event.nam, event.pay, event.tim || recordSet.tim),
       recordSet._id.sid, recordSet._id.seq + i, recordSet.tid, recordSet.tim);
   }
 }
 
-class NestRecordFilter extends karma.RecordFilter {
+class NestRecordFilter extends _persistence.RecordFilter {
   constructor() {
     super();
     this.recordMatchers = [];
@@ -119,7 +120,7 @@ class NestRecordFilter extends karma.RecordFilter {
   }
 }
 
-class NestSnapshotStore extends karma.SnapshotStore {
+class NestSnapshotStore extends _persistence.SnapshotStore {
   constructor(moduleName, datastore) {
     super(moduleName);
     this._db = datastore;
@@ -163,11 +164,11 @@ class NestSnapshotStore extends karma.SnapshotStore {
 
       .then(doc => ({...doc, _id: JSON.parse(doc._id)}))
 
-      .then(doc => new karma.Snapshot(doc.las, doc.had, doc.sta));
+      .then(doc => new _persistence.Snapshot(doc.las, doc.had, doc.sta));
   }
 }
 
-class NestPersistenceFactory extends karma.PersistenceFactory {
+class NestPersistenceFactory extends _persistence.PersistenceFactory {
   constructor(recordDatastore, snapshotDatastore) {
     super();
 

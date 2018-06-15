@@ -1,4 +1,4 @@
-const karma = require('../karma');
+const event = require('../event');
 
 class Context {
   configure(example) {
@@ -8,7 +8,7 @@ class Context {
 class Event extends Context {
   constructor(name, payload) {
     super();
-    this.event = new karma.Event(name, payload);
+    this.event = new event.Event(name, payload);
   }
 
   withTime(timeString) {
@@ -17,7 +17,7 @@ class Event extends Context {
   }
 
   configure(example) {
-    example.log.records.push(new karma.Record(this.event));
+    example.log.records.push(new event.Record(this.event));
   }
 }
 

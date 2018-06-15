@@ -1,8 +1,10 @@
+const _persistence = require('../../src/persistence');
+const _event = require('../../src/event');
+
 const mongodb = require('mongodb');
 const mongoOplog = require('mongo-oplog');
-const karma = require('../../src/karma');
 
-class MongoEventStore extends karma.EventStore {
+class MongoEventStore extends _persistence.EventStore {
   constructor(moduleName, connectionUri, database, collectionPrefix, connectionOptions) {
     super(moduleName);
     this._uri = connectionUri;
@@ -39,7 +41,7 @@ class MongoEventStore extends karma.EventStore {
     return this.connect()
       .then(() => this._db.collection(this._collection).insertOne(document))
       .catch(err => Promise.reject(err.code == 11000 ? new Error('Out of sequence') : err))
-      .then(() => events.map((e, i) => new karma.Record(e, streamId, sequence + i, traceId)))
+      .then(() => events.map((e, i) => new _event.Record(e, streamId, sequence + i, traceId)))
   }
 
   close() {
@@ -52,7 +54,7 @@ class MongoEventStore extends karma.EventStore {
   }
 }
 
-class MongoEventLog extends karma.EventLog {
+class MongoEventLog extends _persistence.EventLog {
   constructor(moduleName, databaseConnectionUri, oplogConnectionUri, database, collectionPrefix, connectionOptions) {
     super(moduleName);
     this._dbUri = databaseConnectionUri;
@@ -177,8 +179,8 @@ class MongoEventLog extends karma.EventLog {
       sequence = (time + (rest % 1000) + i / recordSet.e.length - 1450285627000) / 55287980000
     }
 
-    return new karma.Record(
-      new karma.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
+    return new _event.Record(
+      new _event.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
       recordSet.a, sequence, recordSet.c, recordSet._id.getTimestamp());
   }
 
@@ -197,7 +199,7 @@ class MongoEventLog extends karma.EventLog {
   }
 }
 
-class MongoRecordFilter extends karma.RecordFilter {
+class MongoRecordFilter extends _persistence.RecordFilter {
   constructor(moduleName) {
     super();
     this.query = {d: moduleName}
@@ -221,7 +223,7 @@ class MongoRecordFilter extends karma.RecordFilter {
   }
 }
 
-class MongoSnapshotStore extends karma.SnapshotStore {
+class MongoSnapshotStore extends _persistence.SnapshotStore {
   constructor(moduleName, connectionUri, database, collectionPrefix, connectionOptions) {
     super(moduleName);
     this._uri = connectionUri;
@@ -267,7 +269,7 @@ class MongoSnapshotStore extends karma.SnapshotStore {
     return this.connect().then(() => this._db
       .collection(this._prefix + 'snapshots_' + this.module)
       .findOne({k: key, v: version})
-      .then(doc => doc ? new karma.Snapshot(doc.t, doc.h, doc.s) : Promise.reject('No snapshot')))
+      .then(doc => doc ? new _persistence.Snapshot(doc.t, doc.h, doc.s) : Promise.reject('No snapshot')))
   }
 
   close() {
@@ -276,7 +278,7 @@ class MongoSnapshotStore extends karma.SnapshotStore {
   }
 }
 
-class MongoPersistenceFactory extends karma.PersistenceFactory {
+class MongoPersistenceFactory extends _persistence.PersistenceFactory {
   constructor(databaseConnectionUri, oplogConnectionUri, databaseName, collectionPrefix) {
     super();
     this.uri = databaseConnectionUri;

@@ -3,26 +3,29 @@ const promised = require('chai-as-promised');
 const should = chai.should();
 chai.use(promised);
 
+const _event = require('../src/event');
+const _unit = require('../src/unit');
+
 const fake = require('./../src/specification/fakes');
-const k = require('../src/karma');
+const k = require('..');
 
 describe('Responding to a Query', () => {
   let Module;
 
   beforeEach(() => {
     Module = (args = {}) =>
-      new k.Module(
+      new k.Domain(
         args.name || 'Test',
-        args.strategy || new k.UnitStrategy(),
+        args.strategy || new _unit.UnitStrategy(),
         {
-          eventLog: () => args.log || new k.EventLog(),
-          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
-          eventStore: () => args.store || new k.EventStore()
+          eventLog: () => args.log || new fake.EventLog(),
+          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
+          eventStore: () => args.store || new fake.EventStore()
         },
         {
-          eventLog: () => args.metaLog || new k.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
-          eventStore: () => args.metaStore || new k.EventStore()
+          eventLog: () => args.metaLog || new fake.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
+          eventStore: () => args.metaStore || new fake.EventStore()
         })
   });
 
@@ -121,13 +124,13 @@ describe('Responding to a Query', () => {
     return new Promise(y => setTimeout(y, 0))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new k.Record(new k.Event(), 'bar', 41)))
+      .then(() => log.publish(new _event.Record(new k.Event(), 'bar', 41)))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'one'), 'baz', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'baz', 42)))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new k.Record(new k.Event(), 'bar', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event(), 'bar', 42)))
       .then(() => promise.should.eventually.equal('one later'))
   });
 
@@ -146,13 +149,13 @@ describe('Responding to a Query', () => {
     return new Promise(y => setTimeout(y, 0))
       .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
 
-      .then(() => log.publish(new k.Record(new k.Event(), 'bar', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event(), 'bar', 42)))
       .then(() => log.subscriptions.map(s => s.active).should.eql([false]))
   });
 
   it('is not delayed if heads are already reached', () => {
     let log = new fake.EventLog();
-    log.records = [new k.Record(new k.Event('food'), 'bar', 42)];
+    log.records = [new _event.Record(new k.Event('food'), 'bar', 42)];
 
     return Module({log})
 

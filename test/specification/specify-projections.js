@@ -3,7 +3,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../src/karma');
+const k = require('../..');
 const {Example, the, I, expect} = require('../../src/specification');
 
 describe('Specifying Projections', () => {

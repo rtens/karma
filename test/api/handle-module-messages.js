@@ -3,21 +3,23 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const fake = require('../../src/specification/fakes');
+const _event = require('../../src/event');
 
-const k = require('../../src/karma');
+const fake = require('../../src/specification/fakes');
+const k = require('../..');
+
 const http = require('../../src/api/http');
 
 describe('Handling Module Messages', () => {
 
   it('responds to a Query', () => {
     let persistence = {
-      eventLog: () => new k.EventLog(),
-      eventStore: () => new k.EventStore(),
-      snapshotStore: () => new k.SnapshotStore()
+      eventLog: () => new fake.EventLog(),
+      eventStore: () => new fake.EventStore(),
+      snapshotStore: () => new fake.SnapshotStore()
     };
 
-    let module = new k.Module('Test', new k.UnitStrategy(), persistence, persistence)
+    let module = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo})=>'Hello ' + foo));
@@ -32,12 +34,12 @@ describe('Handling Module Messages', () => {
   it('executes a Command', () => {
     let store = new fake.EventStore();
     let persistence = {
-      eventLog: () => new k.EventLog(),
+      eventLog: () => new fake.EventLog(),
       eventStore: () => store,
-      snapshotStore: () => new k.SnapshotStore()
+      snapshotStore: () => new fake.SnapshotStore()
     };
 
-    let module = new k.Module('Test', new k.UnitStrategy(), persistence, persistence)
+    let module = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
@@ -53,16 +55,16 @@ describe('Handling Module Messages', () => {
 
   it('responds with a Query after executing a Command', () => {
     let log = new fake.EventLog();
-    log.records = [new k.Record(new k.Event(), 'foo', 40)];
+    log.records = [new _event.Record(new k.Event(), 'foo', 40)];
 
     let persistence = {
       eventLog: () => log,
-      eventStore: () => new k.EventStore(),
-      snapshotStore: () => new k.SnapshotStore()
+      eventStore: () => new fake.EventStore(),
+      snapshotStore: () => new fake.SnapshotStore()
     };
 
     let applied;
-    let module = new k.Module('Test', new k.UnitStrategy(), persistence, persistence)
+    let module = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', () => [new k.Event(), new k.Event()]))
@@ -78,7 +80,7 @@ describe('Handling Module Messages', () => {
 
     return new Promise(y => setTimeout(y, 0))
 
-      .then(() => log.publish(new k.Record(new k.Event('bard', 'One'), 'foo', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('bard', 'One'), 'foo', 42)))
 
       .then(() => response.should.eventually.eql('One/foo'))
   });

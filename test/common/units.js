@@ -1,34 +1,39 @@
-const k = require('../../src/karma');
+const event = require('../../src/event');
+const domain = require('../../src/domain');
+const message = require('../../src/message');
+const aggregate = require('../../src/units/aggregate');
+const projection = require('../../src/units/projection');
+const saga = require('../../src/units/saga');
 
 module.exports = {
   execute: {
     name: 'an Aggregate',
-    Unit: k.Aggregate,
-    Message: k.Command,
+    Unit: aggregate.Aggregate,
+    Message: message.Command,
     handling: 'executing',
     handle: 'execute',
   },
   respond: {
     name: 'a Projection',
-    Unit: k.Projection,
-    Message: k.Query,
+    Unit: projection.Projection,
+    Message: message.Query,
     handling: 'respondingTo',
     handle: 'respondTo',
   },
   subscribe: {
     name: 'a subscribed Projection',
-    Unit: k.Projection,
-    Message: k.Query,
+    Unit: projection.Projection,
+    Message: message.Query,
     handling: 'respondingTo',
     handle: 'subscribeTo',
   },
   react: {
     name: 'a Saga',
-    Unit: k.Saga,
-    Message: class extends k.Record {
+    Unit: saga.Saga,
+    Message: class extends event.Record {
       //noinspection JSUnusedGlobalSymbols
       constructor(name, payload) {
-        super(new k.Event(name, payload))
+        super(new event.Event(name, payload))
       }
     },
     handling: 'reactingTo',

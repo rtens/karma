@@ -3,9 +3,12 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const fake = require('./../src/specification/fakes');
+const _event = require('../src/event');
+const _persistence = require('../src/persistence');
+
 const units = require('./common/units');
-const k = require('../src/karma');
+const fake = require('./../src/specification/fakes');
+const k = require('..');
 
 describe('Applying Events', () => {
   let _Date, Module;
@@ -18,18 +21,18 @@ describe('Applying Events', () => {
     Date.prototype = _Date.prototype;
 
     Module = (args = {}) =>
-      new k.Module(
+      new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
         {
-          eventLog: () => args.log || new k.EventLog(),
-          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
-          eventStore: () => args.store || new k.EventStore()
+          eventLog: () => args.log || new fake.EventLog(),
+          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
+          eventStore: () => args.store || new fake.EventStore()
         },
         {
-          eventLog: () => args.metaLog || new k.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
-          eventStore: () => args.metaStore || new k.EventStore()
+          eventLog: () => args.metaLog || new fake.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
+          eventStore: () => args.metaStore || new fake.EventStore()
         })
   });
 
@@ -39,10 +42,10 @@ describe('Applying Events', () => {
 
   it('passes Module names to the EventLog', () => {
     let passedNames = [];
-    let persistence = new k.PersistenceFactory();
+    let persistence = new _persistence.PersistenceFactory();
     persistence.eventLog = name => passedNames.push(name);
 
-    new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
+    new k.Domain('Foo', new k.UnitStrategy, persistence, persistence);
 
     passedNames.should.eql(['Foo', '__admin', 'Foo__meta']);
   });
@@ -53,10 +56,10 @@ describe('Applying Events', () => {
       it('uses recorded Events', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-          new k.Record(new k.Event('bard', 'duplicate'), 'foo', 21),
-          new k.Record(new k.Event('bard', 'two'), 'foo', 22),
-          new k.Record(new k.Event('not applied', 'tre'), 'foo', 23)
+          new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
+          new _event.Record(new k.Event('bard', 'duplicate'), 'foo', 21),
+          new _event.Record(new k.Event('bard', 'two'), 'foo', 22),
+          new _event.Record(new k.Event('not applied', 'tre'), 'foo', 23)
         ];
 
         let state = [];
@@ -93,8 +96,8 @@ describe('Applying Events', () => {
       it('consolidates when loaded', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-          new k.Record(new k.Event('bard', 'two'), 'foo', 22),
+          new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
+          new _event.Record(new k.Event('bard', 'two'), 'foo', 22),
         ];
 
         let consolidated = [];
@@ -124,7 +127,7 @@ describe('Applying Events', () => {
       it('waits for the Unit to be loaded', () => {
         let history = [];
         let wait = 10;
-        let log = new (class extends k.EventLog {
+        let log = new (class extends _persistence.EventLog {
           subscribe(lastRecordTime, subscriber) {
             if (!wait) return super.subscribe(lastRecordTime, subscriber);
 
@@ -155,7 +158,7 @@ describe('Applying Events', () => {
       it('keeps the reconstituted Unit', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard', 'a '), 'foo', 21)
+          new _event.Record(new k.Event('bard', 'a '), 'foo', 21)
         ];
 
         let state = [];
@@ -194,7 +197,7 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'one'), 'foo')))
 
           .then(() => applied.should.eql(['one']))
 
@@ -221,9 +224,9 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => log.publish(new k.Record(new k.Event('bard', 'One'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'One'), 'foo')))
 
-          .then(() => log.publish(new k.Record(new k.Event('bard', 'Two'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'Two'), 'foo')))
 
           .then(() => consolidated.should.eql(['Zero', 'ZeroOne', 'ZeroOneTwo']))
 
@@ -232,15 +235,15 @@ describe('Applying Events', () => {
 
       it('uses Events from combined EventLogs', () => {
         let log1 = new fake.EventLog();
-        log1.records = [new k.Record(new k.Event('bard', '1a'), 'foo')];
+        log1.records = [new _event.Record(new k.Event('bard', '1a'), 'foo')];
         log1.filter = () => new fake.RecordFilter().named('one');
 
         let log2 = new fake.EventLog();
-        log2.records = [new k.Record(new k.Event('bard', '2a'), 'foo')];
+        log2.records = [new _event.Record(new k.Event('bard', '2a'), 'foo')];
         log2.filter = () => new fake.RecordFilter().named('two');
 
         let applied = [];
-        return Module({log: new k.CombinedEventLog([log1, log2])})
+        return Module({log: new _persistence.CombinedEventLog([log1, log2])})
 
           .add(new unit.Unit('One')
             .applying('bard', (payload) => applied.push(payload))
@@ -263,8 +266,8 @@ describe('Applying Events', () => {
               : {eventNames: ['bard']}),
           }]))
 
-          .then(() => log1.publish(new k.Record(new k.Event('bard', '1b'), 'foo')))
-          .then(() => log2.publish(new k.Record(new k.Event('bard', '2b'), 'foo')))
+          .then(() => log1.publish(new _event.Record(new k.Event('bard', '1b'), 'foo')))
+          .then(() => log2.publish(new _event.Record(new k.Event('bard', '2b'), 'foo')))
 
           .then(() => applied.should.eql(['1a', '2a', '1b', '2b']))
 
@@ -275,7 +278,7 @@ describe('Applying Events', () => {
       it('notifies the UnitStrategy', () => {
         let log = new fake.EventLog('Foobar');
         log.records = [
-          new k.Record(new k.Event('bard'), 'foo')
+          new _event.Record(new k.Event('bard'), 'foo')
         ];
 
         let notified = [];
@@ -305,7 +308,7 @@ describe('Applying Events', () => {
       it('unloads the Unit if failing during replay', () => {
         let log = new fake.EventLog();
         log.records = [
-          new k.Record(new k.Event('bard'), 'foo', 21),
+          new _event.Record(new k.Event('bard'), 'foo', 21),
         ];
 
         let notified = [];
@@ -351,7 +354,7 @@ describe('Applying Events', () => {
 
         return module[unit.handle](new unit.Message('Foo'))
 
-          .then(() => log.publish(new k.Record(new k.Event('bard', 'one'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'one'), 'foo')))
 
           .should.be.rejectedWith('Nope')
 
@@ -368,7 +371,7 @@ describe('Applying Events', () => {
         it('is redone if Unit is unloaded', () => {
           let log = new fake.EventLog();
           log.records = [
-            new k.Record(new k.Event('food', 'one'), 'foo')
+            new _event.Record(new k.Event('food', 'one'), 'foo')
           ];
 
           let strategy = {onAccess: unit => unit.unload()};
@@ -397,8 +400,8 @@ describe('Applying Events', () => {
         it('uses recorded Events of any stream', () => {
           let log = new fake.EventLog();
           log.records = [
-            new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-            new k.Record(new k.Event('bard', 'two'), 'bar', 22),
+            new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
+            new _event.Record(new k.Event('bard', 'two'), 'bar', 22),
           ];
 
           let applied = [];
@@ -422,8 +425,8 @@ describe('Applying Events', () => {
         it('uses only Events of own stream', () => {
           let log = new fake.EventLog();
           log.records = [
-            new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-            new k.Record(new k.Event('bard', 'two'), 'bar', 22),
+            new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
+            new _event.Record(new k.Event('bard', 'two'), 'bar', 22),
           ];
 
           let applied = [];

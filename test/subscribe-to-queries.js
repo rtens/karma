@@ -3,26 +3,29 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
+const _persistence = require('../src/persistence');
+const _event = require('../src/event');
+
 const fake = require('./../src/specification/fakes');
-const k = require('../src/karma');
+const k = require('..');
 
 describe('Subscribing to a Query', () => {
   let Module;
 
   beforeEach(() => {
     Module = (args = {}) =>
-      new k.Module(
+      new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
         {
-          eventLog: () => args.log || new k.EventLog(),
-          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
-          eventStore: () => args.store || new k.EventStore()
+          eventLog: () => args.log || new fake.EventLog(),
+          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
+          eventStore: () => args.store || new fake.EventStore()
         },
         {
-          eventLog: () => args.metaLog || new k.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
-          eventStore: () => args.metaStore || new k.EventStore()
+          eventLog: () => args.metaLog || new fake.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
+          eventStore: () => args.metaStore || new fake.EventStore()
         })
   });
 
@@ -56,7 +59,7 @@ describe('Subscribing to a Query', () => {
     snapshots.snapshots = [{
       key: 'Projection-One-foo',
       version: 'v1',
-      snapshot: new k.Snapshot(new Date(), {}, 'snap ')
+      snapshot: new _persistence.Snapshot(new Date(), {}, 'snap ')
     }];
 
     return Module({log, snapshots})
@@ -75,7 +78,7 @@ describe('Subscribing to a Query', () => {
 
       .subscribeTo(new k.Query('Foo'), response => responses.push(response))
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'one'))))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'))))
 
       .then(() => responses.should.eql(['snap ', 'snap one']))
   });
@@ -99,7 +102,7 @@ describe('Subscribing to a Query', () => {
 
       .subscribeTo(new k.Query('Foo'), response => responses.push(response))
 
-      .then(() => log.publish(new k.Record(new k.Event('not food', 'two'))))
+      .then(() => log.publish(new _event.Record(new k.Event('not food', 'two'))))
 
       .then(() => responses.should.eql(['one']))
   });
@@ -142,7 +145,7 @@ describe('Subscribing to a Query', () => {
 
       .then(subscription => subscription.cancel('bar'))
 
-      .then(() => log.publish(new k.Record(new k.Event('food', 'one'))))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'))))
 
       .then(() => responses.should.eql(['']))
   });

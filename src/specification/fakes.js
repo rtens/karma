@@ -1,6 +1,6 @@
-const karma = require('./../karma');
+const persistence = require('../persistence');
 
-class FakeEventStore extends karma.EventStore {
+class FakeEventStore extends persistence.EventStore {
   constructor() {
     super();
     this.recorded = [];
@@ -12,7 +12,7 @@ class FakeEventStore extends karma.EventStore {
   }
 }
 
-class FakeEventLog extends karma.EventLog {
+class FakeEventLog extends persistence.EventLog {
   constructor() {
     super();
     this.records = [];
@@ -46,7 +46,7 @@ class FakeEventLog extends karma.EventLog {
   }
 }
 
-class FakeRecordFilter extends karma.RecordFilter {
+class FakeRecordFilter extends persistence.RecordFilter {
   named(name) {
     this.name = name;
     return this
@@ -68,7 +68,7 @@ class FakeRecordFilter extends karma.RecordFilter {
   }
 }
 
-class FakeSnapshotStore extends karma.SnapshotStore {
+class FakeSnapshotStore extends persistence.SnapshotStore {
   constructor() {
     super();
     this.snapshots = [];

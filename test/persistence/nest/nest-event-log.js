@@ -3,8 +3,8 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../../src/karma');
-const nest = require('../../../src/persistence/nest');
+const _event = require('../../../src/event');
+const _nest = require('../../../src/persistence/nest');
 const Datastore = require('nestdb');
 
 if (!process.env.TEST_DATA_DIR)
@@ -20,7 +20,7 @@ describe('NestDB Event Log', () => {
       db = new Datastore();
     }
 
-    log = new nest.EventLog('Test', db);
+    log = new _nest.EventLog('Test', db);
     return new Promise((y, n) => db.load(err => err ? n(err) : y()))
   });
 
@@ -55,10 +55,10 @@ describe('NestDB Event Log', () => {
 
       .then(() => records.should.eql([
 
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2011-12-13')),
           'foo', 21, 'trace', new Date('2013-12-11')),
 
-        new k.Record(new k.Event('bard', {c: 123}, new Date('2013-12-11')),
+        new _event.Record(new _event.Event('bard', {c: 123}, new Date('2013-12-11')),
           'foo', 22, 'trace', new Date('2013-12-11'))
       ]))
   });
@@ -104,10 +104,10 @@ describe('NestDB Event Log', () => {
 
       .then(() => records.should.eql([
 
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2011-12-13')),
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2011-12-13')),
           'foo', 21, 'trace', new Date('2013-12-11')),
 
-        new k.Record(new k.Event('bard', {c: 123}, new Date('2013-12-11')),
+        new _event.Record(new _event.Event('bard', {c: 123}, new Date('2013-12-11')),
           'foo', 22, 'trace', new Date('2013-12-11'))
       ]))
   });
@@ -206,7 +206,7 @@ describe('NestDB Event Log', () => {
   it('notifies multiple Logs', () => {
     let records = [];
 
-    let log2 = new nest.EventLog('Test2', db);
+    let log2 = new _nest.EventLog('Test2', db);
 
     return Promise.resolve()
 
@@ -226,7 +226,7 @@ describe('NestDB Event Log', () => {
 
       .then(() => records.should.eql([
 
-        new k.Record(new k.Event('food', undefined, new Date('2011-12-13')),
+        new _event.Record(new _event.Event('food', undefined, new Date('2011-12-13')),
           'foo', 21, 'trace', new Date('2011-12-13')),
       ]))
   });

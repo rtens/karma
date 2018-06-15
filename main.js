@@ -1,6 +1,6 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-const karma = require('./src/karma');
+const karma = require('.');
 const mongo = require('./src/persistence/mongo');
 const nest = require('./src/persistence/nest');
 const expressWs = require('express-ws');
@@ -15,7 +15,7 @@ let strategy = {
   }
 };
 
-new karma.Module('Demo',
+new karma.Domain('Demo',
   strategy,
   // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
   // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))

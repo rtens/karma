@@ -3,8 +3,12 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
+const _event = require('../src/event');
+const _persistence = require('../src/persistence');
+const _unit = require('../src/unit');
+
 const fake = require('./../src/specification/fakes');
-const k = require('../src/karma');
+const k = require('..');
 
 describe('Executing a Command', () => {
   let _Date, _setTimeout, waits, Module;
@@ -24,18 +28,18 @@ describe('Executing a Command', () => {
     };
 
     Module = (args = {}) =>
-      new k.Module(
+      new k.Domain(
         args.name || 'Test',
-        args.strategy || new k.UnitStrategy(),
+        args.strategy || new _unit.UnitStrategy(),
         {
-          eventLog: () => args.log || new k.EventLog(),
-          snapshotStore: () => args.snapshots || new k.SnapshotStore(),
-          eventStore: () => args.store || new k.EventStore()
+          eventLog: () => args.log || new fake.EventLog(),
+          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
+          eventStore: () => args.store || new fake.EventStore()
         },
         {
-          eventLog: () => args.metaLog || new k.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new k.SnapshotStore(),
-          eventStore: () => args.metaStore || new k.EventStore()
+          eventLog: () => args.metaLog || new fake.EventLog(),
+          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
+          eventStore: () => args.metaStore || new fake.EventStore()
         })
   });
 
@@ -46,10 +50,10 @@ describe('Executing a Command', () => {
 
   it('passes Module names to the EventStore', () => {
     let passedNames = [];
-    let persistence = new k.PersistenceFactory();
+    let persistence = new _persistence.PersistenceFactory();
     persistence.eventStore = name => passedNames.push(name);
 
-    new k.Module('Foo', new k.UnitStrategy, persistence, persistence);
+    new k.Domain('Foo', new _unit.UnitStrategy, persistence, persistence);
 
     passedNames.should.eql(['Foo', 'Foo__meta']);
   });
@@ -149,8 +153,8 @@ describe('Executing a Command', () => {
       .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
       .then(records => records.should.eql([
-        new k.Record(new k.Event('food', 'one'), 'one', 1, 'trace'),
-        new k.Record(new k.Event('bard', 'two'), 'one', 2, 'trace'),
+        new _event.Record(new k.Event('food', 'one'), 'one', 1, 'trace'),
+        new _event.Record(new k.Event('bard', 'two'), 'one', 2, 'trace'),
       ]))
 
       .then(() => store.recorded.should.eql([{
@@ -243,8 +247,8 @@ describe('Executing a Command', () => {
   it('applies only Events of Aggregate stream', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-      new k.Record(new k.Event('bard', 'not'), 'bar', 22)
+      new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
+      new _event.Record(new k.Event('bard', 'not'), 'bar', 22)
     ];
 
     let store = new fake.EventStore();
@@ -279,10 +283,10 @@ describe('Executing a Command', () => {
   it('records Event with the sequence of the last event on stream', () => {
     let log = new fake.EventLog();
     log.records = [
-      new k.Record(new k.Event('bard', 'one'), 'foo', 21),
-      new k.Record(new k.Event('bard', 'two'), 'foo', 22),
-      new k.Record(new k.Event('food', 'tre'), 'foo', 23),
-      new k.Record(new k.Event('bard', 'not'), 'bar', 24),
+      new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
+      new _event.Record(new k.Event('bard', 'two'), 'foo', 22),
+      new _event.Record(new k.Event('food', 'tre'), 'foo', 23),
+      new _event.Record(new k.Event('bard', 'not'), 'bar', 24),
     ];
 
     let store = new fake.EventStore();

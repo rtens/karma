@@ -6,8 +6,9 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../../src/karma');
-const mongo = require('../../../src/persistence/mongo');
+const _event = require('../../../src/event');
+const _mongo = require('../../../src/persistence/mongo');
+
 const mongodb = require('mongodb');
 
 describe('MongoDB Event Store', () => {
@@ -22,7 +23,7 @@ describe('MongoDB Event Store', () => {
     Date.prototype = _Date.prototype;
 
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    store = new mongo.EventStore('Test', process.env.TEST_MONGODB_URI, db, 'bla_');
+    store = new _mongo.EventStore('Test', process.env.TEST_MONGODB_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -42,7 +43,7 @@ describe('MongoDB Event Store', () => {
   });
 
   it('fails if it cannot connect', () => {
-    return new mongo.EventStore('Test', 'mongodb://foo', null, null, {reconnectTries: 0})
+    return new _mongo.EventStore('Test', 'mongodb://foo', null, null, {reconnectTries: 0})
 
       .record([])
 
@@ -60,13 +61,13 @@ describe('MongoDB Event Store', () => {
 
   it('stores Records in a Collection', () => {
     return store.record([
-      new k.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')),
-      new k.Event('bard', {c: 421}, new Date('2013-12-11')),
+      new _event.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')),
+      new _event.Event('bard', {c: 421}, new Date('2013-12-11')),
     ], 'foo', null, 'trace')
 
       .then(records => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')), 'foo', 1, 'trace'),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 2, 'trace')
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')), 'foo', 1, 'trace'),
+        new _event.Record(new _event.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 2, 'trace')
       ]))
 
       .then(() => onDb(db => db.collection('bla_event_store').find().toArray()))

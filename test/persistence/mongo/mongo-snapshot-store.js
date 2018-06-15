@@ -6,8 +6,9 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../../src/karma');
-const mongo = require('../../../src/persistence/mongo');
+const _persistence = require('../../../src/persistence');
+const _mongo = require('../../../src/persistence/mongo');
+
 const mongodb = require('mongodb');
 
 describe('MongoDB Snapshot Store', () => {
@@ -15,7 +16,7 @@ describe('MongoDB Snapshot Store', () => {
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    snapshots = new mongo.SnapshotStore('Test', process.env.TEST_MONGODB_URI, db, 'bla_');
+    snapshots = new _mongo.SnapshotStore('Test', process.env.TEST_MONGODB_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -34,7 +35,7 @@ describe('MongoDB Snapshot Store', () => {
   });
 
   it('fails if it cannot connect', () => {
-    return new mongo.SnapshotStore('Test', 'mongodb://foo', null, null, {reconnectTries: 0})
+    return new _mongo.SnapshotStore('Test', 'mongodb://foo', null, null, {reconnectTries: 0})
 
       .fetch()
 
@@ -54,7 +55,7 @@ describe('MongoDB Snapshot Store', () => {
 
   it('stores Snapshots in a collection', () => {
     return snapshots.store('foo', 'v1',
-      new k.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'}))
+      new _persistence.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'}))
 
       .then(() => onDb(db => db.collection('bla_snapshots_Test').find().toArray()))
 
@@ -82,15 +83,15 @@ describe('MongoDB Snapshot Store', () => {
       .then(() => snapshots.fetch('foo', 'v1'))
 
       .then(snapshot => snapshot.should.eql(
-        new k.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'})))
+        new _persistence.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'})))
   });
 
   it('updates existing Snapshots in a collection', () => {
     return snapshots.store('foo', 'v1',
-      new k.Snapshot(new Date('2011-12-13'), {foo: 21}, {foo: 'bar'}))
+      new _persistence.Snapshot(new Date('2011-12-13'), {foo: 21}, {foo: 'bar'}))
 
       .then(() => snapshots.store('foo', 'v1',
-        new k.Snapshot(new Date('2011-12-14'), {foo: 42}, {foo: 'baz', bar: 'bam'})))
+        new _persistence.Snapshot(new Date('2011-12-14'), {foo: 42}, {foo: 'baz', bar: 'bam'})))
 
       .then(() => onDb(db => db.collection('bla_snapshots_Test').find().toArray()))
 

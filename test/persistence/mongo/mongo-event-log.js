@@ -6,8 +6,9 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const k = require('../../../src/karma');
-const mongo = require('../../../src/persistence/mongo');
+const _event = require('../../../src/event');
+const _mongo = require('../../../src/persistence/mongo');
+
 const mongodb = require('mongodb');
 
 const objectId = time => mongodb.ObjectID.createFromTime(new Date(time).getTime() / 1000);
@@ -17,7 +18,7 @@ describe('MongoDB Event Log', () => {
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 10000);
-    log = new mongo.EventLog('Test', process.env.TEST_MONGODB_URI, process.env.TEST_MONGODB_OPLOG_URI, db, 'bla_');
+    log = new _mongo.EventLog('Test', process.env.TEST_MONGODB_URI, process.env.TEST_MONGODB_OPLOG_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -36,7 +37,7 @@ describe('MongoDB Event Log', () => {
   });
 
   it('fails if it cannot connect to the database', () => {
-    return new mongo.EventLog('Test', 'mongodb://foo', null, null, null, {reconnectTries: 0})
+    return new _mongo.EventLog('Test', 'mongodb://foo', null, null, null, {reconnectTries: 0})
 
       .subscribe()
 
@@ -44,7 +45,7 @@ describe('MongoDB Event Log', () => {
   });
 
   it('fails if it cannot connect to the oplog', () => {
-    return (log = new mongo.EventLog('Test', process.env.TEST_MONGODB_URI, 'mongodb://foo', null, {reconnectTries: 0}))
+    return (log = new _mongo.EventLog('Test', process.env.TEST_MONGODB_URI, 'mongodb://foo', null, {reconnectTries: 0}))
 
       .subscribe()
 
@@ -84,9 +85,9 @@ describe('MongoDB Event Log', () => {
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2017-12-13')),
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2017-12-13')),
           'foo', 21, 'trace', new Date('2017-12-11')),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2017-12-11')),
+        new _event.Record(new _event.Event('bard', {c: 421}, new Date('2017-12-11')),
           'foo', 21.5, 'trace', new Date('2017-12-11'))
       ]))
   });
@@ -176,11 +177,11 @@ describe('MongoDB Event Log', () => {
       .then(() => new Promise(y => setTimeout(y, 100)))
 
       .then(() => records.should.eql([
-        new k.Record(new k.Event('food', {a: 'b'}, new Date('2017-12-13')),
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2017-12-13')),
           'foo', 23, 'trace', new Date('2017-12-11')),
-        new k.Record(new k.Event('bard', {c: 421}, new Date('2017-12-11')),
+        new _event.Record(new _event.Event('bard', {c: 421}, new Date('2017-12-11')),
           'foo', 23.5, 'trace', new Date('2017-12-11')),
-        new k.Record(new k.Event('food', undefined, new Date('2017-12-12')),
+        new _event.Record(new _event.Event('food', undefined, new Date('2017-12-12')),
           'foo', 0, undefined, new Date('2017-12-12'))
       ]))
   });
