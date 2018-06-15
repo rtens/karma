@@ -1,7 +1,7 @@
 const k = require('../../src/karma');
 const {Example, the, I, expect} = require('../../src/specification');
 
-describe.skip('Specifying Projections', () => {
+describe('Specifying Projections', () => {
 
   let module = configure => (domain, server) => {
 
@@ -30,8 +30,6 @@ describe.skip('Specifying Projections', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response(['one', 'two']))
-
-      .done()
   });
 
   it('uses time of recorded Events', () => {
@@ -40,16 +38,15 @@ describe.skip('Specifying Projections', () => {
         this.state.push(record.event.time.getDay())
       })))
 
-      .givenAll([
+      .given([
         the.Event('food').withTime('2011-12-13'),
         the.Event('food').withTime('2001-02-03')
       ])
+      .given(the.Event('food').withTime('2013-12-11'))
 
       .when(I.get('/foo'))
 
-      .then(expect.Response([2, 6]))
-
-      .done()
+      .then(expect.Response([2, 6, 3]))
   });
 
   it('fails if the Query is rejected', () => {
@@ -63,8 +60,6 @@ describe.skip('Specifying Projections', () => {
     })
 
       .when(I.get('/foo'))
-
-      .done()
 
       .should.be.rejectedWith('NOPE')
   });

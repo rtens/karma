@@ -36,12 +36,8 @@ class Example {
   }
 
   given(context) {
-    context.configure(this);
-    return this
-  }
-
-  givenAll(contexts) {
-    contexts.forEach(context => this.given(context));
+    if (!Array.isArray(context)) context = [context];
+    context.forEach(c => c.configure(this));
     return this
   }
 
@@ -50,87 +46,35 @@ class Example {
   }
 }
 
-class FakeServer {
-  constructor() {
-    this.handlers = {GET: {}, POST: {}};
-  }
-
-  get(route, handler) {
-    this.handlers.GET[route] = handler
-  }
-
-  post(route, handler) {
-    this.handlers.POST[route] = handler
-  }
-
-  use(route, handler) {
-    this.get(route, handler);
-    this.post(route, handler);
+class Context {
+  configure(example) {
   }
 }
 
-class FakeRequest {
-  constructor(method, route) {
-    this.method = method.toUpperCase();
-    this.route = route;
-    this.params = {};
-    this.query = {};
+class Event extends Context {
+  constructor(name, payload) {
+    super();
+    this.event = new karma.Event(name, payload);
   }
 
-  execute(server) {
-    if (!server.handlers[this.method][this.route]) {
-      return Promise.reject(new Error(`No handler for [${this.method.toUpperCase()} ${this.route}] registered`))
-    }
-
-    let response = new FakeResponse();
-
-    return new Promise(y => y(server.handlers[this.method][this.route](this, response)))
-      .then(() => response)
-  }
-}
-
-class FakeResponse {
-  constructor() {
-    this.headers = {};
-    this.statusCode = 200;
-    this.body = null;
-  }
-
-  setHeader(field, value) {
-    this.headers[field] = value;
-  }
-
-  //noinspection JSUnusedGlobalSymbols
-  header(field, value) {
-    this.setHeader(field, value);
-  }
-
-  set(field, value) {
-    this.setHeader(field, value);
-  }
-
-  status(code) {
-    this.statusCode = code;
+  withTime(timeString) {
+    this.event.time = new Date(timeString);
     return this
   }
 
-  send(body) {
-    if (Buffer.isBuffer(body)) body = body.toString();
-    this.body = body;
-
-    try {
-      this.body = JSON.parse(this.body);
-    } catch (ignored) {
-    }
-  }
-
-  end(body) {
-    this.send(body)
+  configure(example) {
+    example.log.records.push(new karma.Record(this.event));
   }
 }
 
-class RequestAction {
+class Action {
+  perform(example) {
+  }
+}
+
+class RequestAction extends Action {
   constructor(method, route) {
+    super();
     this.request = new FakeRequest(method, route);
   }
 
@@ -166,20 +110,56 @@ class PostAction extends RequestAction {
   }
 }
 
-class RequestResult {
-  constructor(response, errors) {
-    this.lastPromise = response.then(res => this.response = res);
-    this.errors = errors;
+class Result {
+  constructor(promise) {
+    this.lastPromise = promise;
   }
 
-  then(expectation) {
-    this.lastPromise = this.lastPromise.then(() => expectation.assert(this));
+  finalAssertion() {
+  }
+
+  then(expectation, reject) {
+    let resolve = (typeof expectation != 'function')
+      ? this._keepStack(expectation)
+      : this._finishUp(expectation, reject);
+
+    this.lastPromise = this.lastPromise.then(resolve, reject);
     return this
   }
 
-  done() {
-    return this.lastPromise
-      .then(() => this.errors.should.eql([], 'Unexpected Error(s)'))
+  _keepStack(expectation) {
+    let error = new Error();
+    return () => {
+      try {
+        expectation.assert(this);
+      } catch (err) {
+        err.stack += error.stack;
+        throw err;
+      }
+    }
+  }
+
+  _finishUp(resolve, reject) {
+    return () => {
+      try {
+        this.finalAssertion();
+        resolve()
+      } catch (err) {
+        reject(err)
+      }
+    }
+  }
+}
+
+class RequestResult extends Result {
+  constructor(response, errors) {
+    super(response.then(res => this.response = res));
+    this.errors = errors;
+  }
+
+  finalAssertion() {
+    //noinspection BadExpressionStatementJS
+    chai.expect(this.errors, 'Unexpected Error(s)').to.be.empty;
   }
 }
 
@@ -227,18 +207,81 @@ class ErrorExpectation {
   }
 }
 
-class Event {
-  constructor(name, payload) {
-    this.event = new karma.Event(name, payload);
+class FakeServer {
+  constructor() {
+    this.handlers = {GET: {}, POST: {}};
   }
 
-  withTime(timeString) {
-    this.event.time = new Date(timeString);
+  get(route, handler) {
+    this.handlers.GET[route] = handler
+  }
+
+  post(route, handler) {
+    this.handlers.POST[route] = handler
+  }
+
+  use(route, handler) {
+    this.get(route, handler);
+    this.post(route, handler);
+  }
+}
+
+class FakeRequest {
+  constructor(method, route) {
+    this.method = method.toUpperCase();
+    this.route = route;
+    this.params = {};
+    this.query = {};
+  }
+
+  execute(server) {
+    if (!server.handlers[this.method][this.route]) {
+      return Promise.reject(new Error(`No handler for [${this.method.toUpperCase()} ${this.route}] registered`))
+    }
+
+    let response = new FakeResponse();
+    return new Promise(y => y(server.handlers[this.method][this.route](this, response)))
+      .then(() => response)
+  }
+}
+
+class FakeResponse {
+  constructor() {
+    this.headers = {};
+    this.statusCode = 200;
+    this.body = null;
+  }
+
+  setHeader(field, value) {
+    this.headers[field] = value;
+  }
+
+  //noinspection JSUnusedGlobalSymbols
+  header(field, value) {
+    this.setHeader(field, value);
+  }
+
+  set(field, value) {
+    this.setHeader(field, value);
+  }
+
+  status(code) {
+    this.statusCode = code;
     return this
   }
 
-  configure(example) {
-    example.log.records.push(new karma.Record(this.event));
+  send(body) {
+    if (Buffer.isBuffer(body)) body = body.toString();
+    this.body = body;
+
+    try {
+      this.body = JSON.parse(this.body);
+    } catch (ignored) {
+    }
+  }
+
+  end(body) {
+    this.send(body)
   }
 }
 

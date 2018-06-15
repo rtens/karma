@@ -7,8 +7,6 @@ describe('Specifying HTTP Routes', () => {
 
       .when(I.get('/foo'))
 
-      .done()
-
       .should.be.rejectedWith('No handler for [GET /foo] registered')
   });
 
@@ -19,8 +17,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response('baz'))
-
-      .done()
 
       .should.be.rejectedWith("Unexpected response body: " +
         "expected 'bar' to deeply equal 'baz'");
@@ -33,8 +29,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response('bar'))
-
-      .done()
   });
 
   it('fails if an expected Rejection is missing', () => {
@@ -44,8 +38,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Rejection('NOPE'))
-
-      .done()
 
       .should.be.rejectedWith('Missing Rejection: ' +
         'expected 200 to equal 403')
@@ -59,8 +51,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Rejection('NOPE'))
-
-      .done()
   });
 
   it('fails if the Rejection code does not match', () => {
@@ -71,8 +61,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Rejection('NOT_NOPE'))
-
-      .done()
 
       .should.be.rejectedWith("Unexpected Rejection code: " +
         "expected 'NOPE' to equal 'NOT_NOPE'")
@@ -86,10 +74,10 @@ describe('Specifying HTTP Routes', () => {
 
       .then(expect.Error('Nope'))
 
-      .done()
-
       .should.be.rejectedWith("Missing Error: " +
         "expected [ 'Not Nope' ] to include 'Nope'")
+
+      .then({assert: result => result.errors.splice(0, 1)})
   });
 
   it('asserts a logged Error', () => {
@@ -99,8 +87,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Error('Nope'))
-
-      .done()
   });
 
   it('fails if an unexpected Error is logged', () => {
@@ -109,10 +95,10 @@ describe('Specifying HTTP Routes', () => {
 
       .when(I.get('/foo'))
 
-      .done()
-
       .should.be.rejectedWith("Unexpected Error(s): " +
-        "expected [ 'Nope' ] to deeply equal []")
+        "expected [ 'Nope' ] to be empty")
+
+      .then({assert: result => result.errors.splice(0, 1)})
   });
 
   it('uses URL parameters and query arguments of GET request', () => {
@@ -125,16 +111,12 @@ describe('Specifying HTTP Routes', () => {
         .withQuery({greeting: 'hello'}))
 
       .then(expect.Response('hello foo'))
-
-      .done()
   });
 
   it('fails if the Route of a POST request is not defined', () => {
     return new Example(() => null)
 
       .when(I.post('/foo'))
-
-      .done()
 
       .should.be.rejectedWith('No handler for [POST /foo] registered')
   });
@@ -149,8 +131,6 @@ describe('Specifying HTTP Routes', () => {
         .withQuery({greeting: 'hello'}))
 
       .then(expect.Response('hello foo'))
-
-      .done()
   });
 
   it('uses body of POST request', () => {
@@ -161,8 +141,6 @@ describe('Specifying HTTP Routes', () => {
         .withBody({name: 'BAR'}))
 
       .then(expect.Response('Hello BAR'))
-
-      .done()
   });
 
   it('registers Routes as middleware', () => {
@@ -173,13 +151,11 @@ describe('Specifying HTTP Routes', () => {
 
       example
         .when(I.post('/foo'))
-        .then(expect.Response('bar'))
-        .done(),
+        .then(expect.Response('bar')),
 
       example
         .when(I.get('/foo'))
         .then(expect.Response('bar'))
-        .done()
     ])
   });
 
@@ -191,8 +167,6 @@ describe('Specifying HTTP Routes', () => {
 
       .then(expect.Response()
         .withHeaders({not: 'set'}))
-
-      .done()
 
       .should.be.rejectedWith("expected {} to have key 'not'")
   });
@@ -207,8 +181,6 @@ describe('Specifying HTTP Routes', () => {
 
       .then(expect.Response()
         .withHeaders({not: 'baz'}))
-
-      .done()
 
       .should.be.rejectedWith("Unexpected value of header [not]: expected 'bar' to equal 'baz'")
   });
@@ -228,8 +200,6 @@ describe('Specifying HTTP Routes', () => {
           One: 'uno',
           Two: 'dos'
         }))
-
-      .done()
   });
 
   it('assert content sent with response.end()', () => {
@@ -239,8 +209,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response('bar'))
-
-      .done()
   });
 
   it('converts Buffer to string', () => {
@@ -250,8 +218,6 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response('bar'))
-
-      .done()
   });
 
   it('parses JSON string', () => {
@@ -261,7 +227,5 @@ describe('Specifying HTTP Routes', () => {
       .when(I.get('/foo'))
 
       .then(expect.Response({bar: 'baz'}))
-
-      .done()
   });
 });
