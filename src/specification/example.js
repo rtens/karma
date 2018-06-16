@@ -46,8 +46,5 @@ class Example {
 }
 
 module.exports = {
-  Example,
-  the: require('./context'),
-  I: require('./action'),
-  expect: require('./expectation')
+  Example
 };

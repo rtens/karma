@@ -4,7 +4,7 @@ chai.use(promised);
 chai.should();
 
 const k = require('../..');
-const {Example, the, I, expect} = require('../../src/specification');
+const {Example, the, I, expect} = require('../../spec');
 
 describe('Specifying Projections', () => {
 

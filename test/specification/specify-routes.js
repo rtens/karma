@@ -3,7 +3,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const {Example, I, expect} = require('../../src/specification');
+const {Example, I, expect} = require('../../spec');
 
 describe('Specifying HTTP Routes', () => {
 
