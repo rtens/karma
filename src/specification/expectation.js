@@ -18,8 +18,8 @@ class ResponseExpectation extends Expectation {
   }
 
   assert(result) {
-    expect(result.response.statusCode).to.equal(200, 'Unexpected response status');
     expect(result.response.body).to.eql(this.body, 'Unexpected response body');
+    expect(result.response.statusCode).to.equal(200, 'Unexpected response status');
 
     Object.keys(this.headers).forEach(header => {
       expect(result.response.headers).to.have.any.key(header);

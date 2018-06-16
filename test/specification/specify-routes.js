@@ -17,7 +17,7 @@ describe('Specifying HTTP Routes', () => {
 
   it('fails if the response does not match', () => {
     return new Example((domain, server) =>
-      server.get('/foo', (req, res) => res.send('bar')))
+      server.get('/foo', (req, res) => res.status(201).send('bar')))
 
       .when(I.get('/foo'))
 
