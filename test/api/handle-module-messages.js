@@ -24,7 +24,7 @@ describe('Handling Module Messages', () => {
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo})=>'Hello ' + foo));
 
-    return new http.QueryHandler(module, req => new k.Query('Foo', {foo: 'Bar'}))
+    return new http.QueryHandler(module, () => new k.Query('Foo', {foo: 'Bar'}))
 
       .handle(new http.Request('ANY', '/'))
 
@@ -44,7 +44,7 @@ describe('Handling Module Messages', () => {
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
 
-    return new http.CommandHandler(module, req => new k.Command('Foo', {foo: 'Bar'}))
+    return new http.CommandHandler(module, () => new k.Command('Foo', {foo: 'Bar'}))
 
       .handle(new http.Request('ANY', '/').withTraceId('trace'))
 
@@ -73,7 +73,7 @@ describe('Handling Module Messages', () => {
         .applying('bard', payload => applied = payload)
         .respondingTo('Bar', ()=>'bar', ({bar}) => applied + bar));
 
-    let response = new http.CommandHandler(module, req => new k.Command('Foo'))
+    let response = new http.CommandHandler(module, () => new k.Command('Foo'))
       .respondingWith(req => new k.Query('Bar', {bar: req.path}))
 
       .handle(new http.Request('ANY', '/foo'));
