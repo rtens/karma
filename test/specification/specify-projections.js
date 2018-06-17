@@ -4,7 +4,7 @@ chai.use(promised);
 chai.should();
 
 const k = require('../..');
-const {Example, the, I, expect} = require('../../spec');
+const {the, Example, I, expect} = require('../../spec');
 
 describe('Specifying Projections', () => {
 
@@ -66,6 +66,6 @@ describe('Specifying Projections', () => {
 
       .when(I.get('/foo'))
 
-      .should.be.rejectedWith('NOPE')
+      .lastPromise.should.be.rejectedWith('NOPE')
   });
 });

@@ -12,7 +12,7 @@ describe('Specifying HTTP Routes', () => {
 
       .when(I.get('/foo'))
 
-      .should.be.rejectedWith('No handler for [GET /foo] registered')
+      .lastPromise.should.be.rejectedWith('No handler for [GET /foo] registered')
   });
 
   it('fails if the response does not match', () => {
@@ -23,7 +23,7 @@ describe('Specifying HTTP Routes', () => {
 
       .then(expect.Response('baz'))
 
-      .should.be.rejectedWith("Unexpected response body: " +
+      .lastPromise.should.be.rejectedWith("Unexpected response body: " +
         "expected 'bar' to deeply equal 'baz'");
   });
 
@@ -44,7 +44,7 @@ describe('Specifying HTTP Routes', () => {
 
       .then(expect.Rejection('NOPE'))
 
-      .should.be.rejectedWith('Missing Rejection: ' +
+      .lastPromise.should.be.rejectedWith('Missing Rejection: ' +
         'expected 200 to equal 403')
   });
 
@@ -67,7 +67,7 @@ describe('Specifying HTTP Routes', () => {
 
       .then(expect.Rejection('NOT_NOPE'))
 
-      .should.be.rejectedWith("Unexpected Rejection code: " +
+      .lastPromise.should.be.rejectedWith("Unexpected Rejection code: " +
         "expected 'NOPE' to equal 'NOT_NOPE'")
   });
 
@@ -79,7 +79,7 @@ describe('Specifying HTTP Routes', () => {
 
       .then(expect.Error('Nope'))
 
-      .should.be.rejectedWith("Missing Error: " +
+      .lastPromise.should.be.rejectedWith("Missing Error: " +
         "expected [ 'Not Nope' ] to include 'Nope'")
 
       .then({assert: result => result.errors.splice(0, 1)})
@@ -100,8 +100,12 @@ describe('Specifying HTTP Routes', () => {
 
       .when(I.get('/foo'))
 
-      .should.be.rejectedWith("Unexpected Error(s): " +
-        "expected [ 'Nope' ] to be empty")
+      .then(() => {
+        throw new Error('Should have failed')
+      }, err => {
+        err.message.should.equal("Unexpected Error(s): " +
+          "expected [ 'Nope' ] to be empty")
+      })
 
       .then({assert: result => result.errors.splice(0, 1)})
   });
@@ -123,7 +127,7 @@ describe('Specifying HTTP Routes', () => {
 
       .when(I.post('/foo'))
 
-      .should.be.rejectedWith('No handler for [POST /foo] registered')
+      .lastPromise.should.be.rejectedWith('No handler for [POST /foo] registered')
   });
 
   it('uses URL parameters and query arguments of POST request', () => {
@@ -173,7 +177,7 @@ describe('Specifying HTTP Routes', () => {
       .then(expect.Response()
         .withHeaders({not: 'set'}))
 
-      .should.be.rejectedWith("expected {} to have key 'not'")
+      .lastPromise.should.be.rejectedWith("expected {} to have key 'not'")
   });
 
   it('fails if header value doe not match', () => {
@@ -187,7 +191,8 @@ describe('Specifying HTTP Routes', () => {
       .then(expect.Response()
         .withHeaders({not: 'baz'}))
 
-      .should.be.rejectedWith("Unexpected value of header [not]: expected 'bar' to equal 'baz'")
+      .lastPromise.should.be.rejectedWith("Unexpected value of header [not]: " +
+        "expected 'bar' to equal 'baz'")
   });
 
   it('asserts headers of response', () => {
