@@ -27,13 +27,13 @@ class RequestAction extends Action {
   }
 }
 
-class GetAction extends RequestAction {
+class GetRequestAction extends RequestAction {
   constructor(route) {
     super('get', route);
   }
 }
 
-class PostAction extends RequestAction {
+class PostRequestAction extends RequestAction {
   constructor(route) {
     super('post', route);
   }
@@ -45,6 +45,6 @@ class PostAction extends RequestAction {
 }
 
 module.exports = {
-  get: path => new GetAction(path),
-  post: path => new PostAction(path)
+  get: path => new GetRequestAction(path),
+  post: path => new PostRequestAction(path)
 };
