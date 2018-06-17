@@ -5,9 +5,21 @@ const fake = require('./fakes');
 
 class Example {
   constructor(module) {
+    this._setUpDate();
     this._setUpErrorLogging();
 
     module(this._setupDomain(), this._setupServer());
+  }
+
+  _setUpDate() {
+    this.time = '2020-06-10';
+
+    const _Date = Date;
+    Date = function (time) {
+      return new _Date(time || this.time);
+    };
+    Date.now = () => new Date().getTime();
+    Date.prototype = _Date.prototype;
   }
 
   _setUpErrorLogging() {

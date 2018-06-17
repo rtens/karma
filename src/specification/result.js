@@ -1,8 +1,9 @@
 const expect = require('./expectation');
 
 class Result {
-  constructor(promise) {
-    this.lastPromise = promise;
+  constructor(example, promise) {
+    this.promise = promise;
+    this.example = example;
   }
 
   finalAssertion() {
@@ -13,7 +14,7 @@ class Result {
       ? this._keepStack(expectation)
       : this._finishUp(expectation, reject);
 
-    this.lastPromise = this.lastPromise.then(resolve, reject);
+    this.promise = this.promise.then(resolve, reject);
     return this
   }
 
@@ -42,9 +43,8 @@ class Result {
 }
 
 class RequestResult extends Result {
-  constructor(response, errors) {
-    super(response.then(res => this.response = res));
-    this.errors = errors;
+  constructor(example, response) {
+    super(example, response.then(res => this.response = res));
   }
 
   finalAssertion() {

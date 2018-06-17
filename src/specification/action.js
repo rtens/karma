@@ -23,7 +23,7 @@ class RequestAction extends Action {
   }
 
   perform(example) {
-    return new result.RequestResult(this.request.execute(example.server), example.errors)
+    return new result.RequestResult(example, this.request.execute(example.server))
   }
 }
 

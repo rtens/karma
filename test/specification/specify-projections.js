@@ -66,6 +66,6 @@ describe('Specifying Projections', () => {
 
       .when(I.get('/foo'))
 
-      .lastPromise.should.be.rejectedWith('NOPE')
+      .promise.should.be.rejectedWith('NOPE')
   });
 });

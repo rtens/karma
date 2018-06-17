@@ -47,8 +47,8 @@ class ErrorExpectation extends Expectation {
   }
 
   assert(result) {
-    expect(result.errors).to.contain(this.message, 'Missing Error');
-    result.errors.splice(result.errors.indexOf(this.message), 1);
+    expect(result.example.errors).to.contain(this.message, 'Missing Error');
+    result.example.errors.splice(result.example.errors.indexOf(this.message), 1);
   }
 }
 
@@ -56,7 +56,35 @@ class NoErrorExpectation extends Expectation {
 
   assert(result) {
     //noinspection BadExpressionStatementJS
-    expect(result.errors, 'Unexpected Error(s)').to.be.empty;
+    expect(result.example.errors, 'Unexpected Error(s)').to.be.empty;
+  }
+}
+
+class EventStreamExpectation extends Expectation {
+  constructor(streamId, events) {
+    super();
+    this.streamId = streamId;
+    this.events = events;
+  }
+
+  assert(result) {
+    const stream = result.example.store.recorded[0];
+    expect(stream.streamId).to.equal(this.streamId, 'Unexpected Event stream ID');
+    expect(stream.events.map(e=>e.name)).to.eql(this.events.map(e=>e.name), 'Event not recorded');
+    expect(stream.events).to.eql(this.events, 'Unexpected Events');
+  }
+}
+
+class EventExpectation extends Expectation {
+  constructor(name, payload) {
+    super();
+    this.name = name;
+    this.payload = payload;
+    this.time = new Date();
+  }
+
+  assert() {
+    throw new Error('Events must be expected in an EventStream');
   }
 }
 
@@ -64,5 +92,7 @@ module.exports = {
   Response: body => new ResponseExpectation(body),
   Rejection: code => new RejectionExpectation(code),
   Error: message => new ErrorExpectation(message),
-  NoError: () => new NoErrorExpectation()
+  NoError: () => new NoErrorExpectation(),
+  EventStream: (streamId, events) => new EventStreamExpectation(streamId, events),
+  Event: (name, payload) => new EventExpectation(name, payload)
 };
