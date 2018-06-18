@@ -5,12 +5,13 @@ const fake = require('./fakes');
 
 class Example {
   constructor(module) {
+    this.module = module;
+
     this._setUpDate();
     this._setUpErrorLogging();
-    this._setupDomain();
-    this._setupServer();
-
-    module(this.domain, this.server);
+    this._setUpDependencies();
+    this._setUpDomain();
+    this._setUpServer();
   }
 
   _setUpDate() {
@@ -30,7 +31,7 @@ class Example {
     console.error = message => this.errors.push(message);
   }
 
-  _setupDomain() {
+  _setUpDomain() {
     this.store = new fake.EventStore();
     this.log = new fake.EventLog();
 
@@ -51,8 +52,13 @@ class Example {
       });
   }
 
-  _setupServer() {
+  _setUpServer() {
     this.server = new fake.Server();
+  }
+
+  _setUpDependencies() {
+    this.dependencies = {};
+    this.stubs = {};
   }
 
   given(context) {
@@ -62,6 +68,8 @@ class Example {
   }
 
   when(action) {
+    this.module(this.domain, this.server, this.dependencies);
+
     return action.perform(this)
   }
 }

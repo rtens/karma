@@ -48,15 +48,15 @@ class ReactionFailureExpectation extends Expectation {
 
   assert(result) {
     const failures = result.example.metaStore.recorded
-        .map(r => r.events
-          .filter(e => e.name == '__reaction-failed')
-          .map(e => {
-            const message = e.payload.error.substr('Error: '.length,
-              e.payload.error.indexOf("\n") - 'Error: '.length);
-            if (message == this.message) e.name = 'expected:__reaction-failed';
-            return message;
-          }))
-        .reduce((flat, errs) => [...flat, ...errs], []);
+      .map(r => r.events
+        .filter(e => e.name == '__reaction-failed')
+        .map(e => {
+          const message = e.payload.error.substr('Error: '.length,
+            e.payload.error.indexOf("\n") - 'Error: '.length);
+          if (message == this.message) e.name = 'expected:__reaction-failed';
+          return message;
+        }))
+      .reduce((flat, errs) => [...flat, ...errs], []);
 
     expect(failures).to.contain(this.message, 'Missing reaction failure');
   }
@@ -110,6 +110,46 @@ class EventExpectation extends Expectation {
   }
 }
 
+class InvocationsExpectation extends Expectation {
+  constructor(stubKey) {
+    super();
+    this.key = stubKey;
+    this.invocations = [];
+  }
+
+  withArguments() {
+    this.invocations.push([...arguments]);
+    return this
+  }
+
+  assert(result) {
+    let invocations = result.example.stubs[this.key].invocations;
+
+    //noinspection BadExpressionStatementJS
+    expect(invocations, `Missing invocations of [${this.key}]`).to.not.be.empty;
+    expect(invocations.length).to.equal(this.invocations.length, `Unexpected invocations of [${this.key}]`);
+    this._assertArgumentCallbacks(invocations);
+    expect(invocations).to.eql(this.invocations, `Unexpected invocations of [${this.key}]`);
+  }
+
+  _assertArgumentCallbacks(invocations) {
+    this.invocations.forEach((invocation, i) =>
+      invocation.forEach((argument, a) => {
+        if (typeof argument == 'function') {
+          try {
+            argument(invocations[i][a]);
+          } catch (err) {
+            err.message = `Unexpected argument [${a}] in ` +
+              `invocation [${i}] of [${this.key}]: ` + err.message;
+            throw err;
+          }
+          this.invocations[i][a] = '*CALLBACK*';
+          invocations[i][a] = '*CALLBACK*';
+        }
+      }));
+  }
+}
+
 module.exports = {
   Response: body => new ResponseExpectation(body),
   Rejection: code => new RejectionExpectation(code),
@@ -117,5 +157,6 @@ module.exports = {
   LoggedError: message => new LoggedErrorExpectation(message),
   NoLoggedError: () => new NoLoggedErrorExpectation(),
   EventStream: (streamId, events) => new EventStreamExpectation(streamId, events),
-  Event: (name, payload) => new EventExpectation(name, payload)
+  Event: (name, payload) => new EventExpectation(name, payload),
+  Invocations: (stubKey) => new InvocationsExpectation(stubKey)
 };

@@ -67,6 +67,7 @@ class ReactionResult extends Result {
 }
 
 module.exports = {
+  Result,
   RequestResult,
   ReactionResult
 };
