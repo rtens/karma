@@ -60,6 +60,11 @@ class NotFoundError extends Error {
 }
 
 class Handler {
+  //noinspection JSUnusedLocalSymbols
+  matches(request) {
+    return true
+  }
+
   handle(request) {
     return Promise.resolve();
   }

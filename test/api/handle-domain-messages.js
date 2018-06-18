@@ -10,7 +10,7 @@ const k = require('../..');
 
 const http = require('../../src/api/http');
 
-describe('Handling Module Messages', () => {
+describe('Handling Domain Messages', () => {
 
   it('responds to a Query', () => {
     let persistence = {
@@ -24,7 +24,8 @@ describe('Handling Module Messages', () => {
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo})=>'Hello ' + foo));
 
-    return new http.QueryHandler(module, () => new k.Query('Foo', {foo: 'Bar'}))
+    return new http.RequestHandler()
+      .handling(new http.QueryHandler(module, () => new k.Query('Foo', {foo: 'Bar'})))
 
       .handle(new http.Request('ANY', '/'))
 
@@ -44,7 +45,8 @@ describe('Handling Module Messages', () => {
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
 
-    return new http.CommandHandler(module, () => new k.Command('Foo', {foo: 'Bar'}))
+    return new http.RequestHandler()
+      .handling(new http.CommandHandler(module, () => new k.Command('Foo', {foo: 'Bar'})))
 
       .handle(new http.Request('ANY', '/').withTraceId('trace'))
 
