@@ -55,6 +55,7 @@ class RequestResult extends Result {
 class ReactionResult extends Result {
 
   finalAssertion() {
+    expect.NoLoggedError().assert(this);
     this.example.metaStore.recorded
       .forEach(r => r.events
         .filter(e => e.name == '__reaction-failed')

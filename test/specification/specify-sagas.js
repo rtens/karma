@@ -65,6 +65,35 @@ describe('Specifying Sagas', () => {
       .then({assert: result => result.example.metaStore.recorded.splice(0, 2)})
   });
 
+  it('asserts logged Errors', () => {
+    return new Example(domain =>
+      domain.add(new k.Saga('One')
+        .reactingTo('food', ()=>'foo', () =>
+          console.error('Nope'))))
+
+      .when(I.publish(the.Event('food')))
+
+      .then(expect.LoggedError('Nope'))
+  });
+
+  it('fails if unexpected Error is logged', () => {
+    return new Example(domain =>
+      domain.add(new k.Saga('One')
+        .reactingTo('food', ()=>'foo', () =>
+          console.error('Nope'))))
+
+      .when(I.publish(the.Event('food')))
+
+      .then(() => {
+        throw new Error('Should have failed')
+      }, err => {
+        err.message.should.equal("Unexpected Error(s): " +
+          "expected [ 'Nope' ] to be empty")
+      })
+
+      .then({assert: result => result.example.errors.splice(0, 1)})
+  });
+
   it('does not use recorded Events to trigger the reaction', () => {
     let reacted = [];
 
