@@ -13,6 +13,11 @@ class RequestAction extends Action {
     this.request = new fake.Request(method, route);
   }
 
+  withHeaders(headers) {
+    this.request.headers = headers;
+    return this
+  }
+
   withUrlParameters(parameters) {
     this.request.params = parameters;
     return this

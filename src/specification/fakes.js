@@ -122,6 +122,7 @@ class FakeRequest {
     this.route = route;
     this.params = {};
     this.query = {};
+    this.headers = {};
   }
 
   execute(server) {

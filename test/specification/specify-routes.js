@@ -110,16 +110,17 @@ describe('Specifying HTTP Routes', () => {
       .then({assert: result => result.example.errors.splice(0, 1)})
   });
 
-  it('uses URL parameters and query arguments of GET request', () => {
+  it('uses headers, URL parameters and query arguments of GET request', () => {
     return new Example((domain, server) =>
       server.get('/greet/:name', (req, res) =>
-        res.send(`${req.query.greeting} ${req.params.name}`)))
+        res.send(`${req.query.greeting} ${req.params.name}${req.headers.mark}`)))
 
       .when(I.get('/greet/:name')
+        .withHeaders({mark: '!'})
         .withUrlParameters({name: 'foo'})
         .withQuery({greeting: 'hello'}))
 
-      .then(expect.Response('hello foo'))
+      .then(expect.Response('hello foo!'))
   });
 
   it('fails if the Route of a POST request is not defined', () => {
