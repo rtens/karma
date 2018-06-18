@@ -77,7 +77,7 @@ describe('Specifying HTTP Routes', () => {
 
       .when(I.get('/foo'))
 
-      .then(expect.Error('Nope'))
+      .then(expect.LoggedError('Nope'))
 
       .promise.should.be.rejectedWith("Missing Error: " +
         "expected [ 'Not Nope' ] to include 'Nope'")
@@ -91,7 +91,7 @@ describe('Specifying HTTP Routes', () => {
 
       .when(I.get('/foo'))
 
-      .then(expect.Error('Nope'))
+      .then(expect.LoggedError('Nope'))
   });
 
   it('fails if an unexpected Error is logged', () => {

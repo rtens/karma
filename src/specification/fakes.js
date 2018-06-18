@@ -70,7 +70,8 @@ class FakeRecordFilter extends persistence.RecordFilter {
   }
 
   matches(record) {
-    return !this.streamId || record.streamId == this.streamId;
+    return (!this.streamId || record.streamId == this.streamId)
+      && (!this.lastRecordTime || record.time >= this.lastRecordTime);
   }
 }
 

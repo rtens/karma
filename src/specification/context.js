@@ -17,7 +17,10 @@ class EventContext extends Context {
   }
 
   configure(example) {
-    example.log.records.push(new event.Record(this.event));
+    const sequence = example.log.records.length;
+    const time = 0;
+
+    example.log.records.push(new event.Record(this.event, null, sequence, null, time));
   }
 }
 

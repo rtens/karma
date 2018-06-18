@@ -40,7 +40,29 @@ class RejectionExpectation extends Expectation {
   }
 }
 
-class ErrorExpectation extends Expectation {
+class ReactionFailureExpectation extends Expectation {
+  constructor(message) {
+    super();
+    this.message = message;
+  }
+
+  assert(result) {
+    const failures = result.example.metaStore.recorded
+        .map(r => r.events
+          .filter(e => e.name == '__reaction-failed')
+          .map(e => {
+            const message = e.payload.error.substr('Error: '.length,
+              e.payload.error.indexOf("\n") - 'Error: '.length);
+            if (message == this.message) e.name = 'expected:__reaction-failed';
+            return message;
+          }))
+        .reduce((flat, errs) => [...flat, ...errs], []);
+
+    expect(failures).to.contain(this.message, 'Missing reaction failure');
+  }
+}
+
+class LoggedErrorExpectation extends Expectation {
   constructor(message) {
     super();
     this.message = message;
@@ -52,7 +74,7 @@ class ErrorExpectation extends Expectation {
   }
 }
 
-class NoErrorExpectation extends Expectation {
+class NoLoggedErrorExpectation extends Expectation {
 
   assert(result) {
     //noinspection BadExpressionStatementJS
@@ -91,8 +113,9 @@ class EventExpectation extends Expectation {
 module.exports = {
   Response: body => new ResponseExpectation(body),
   Rejection: code => new RejectionExpectation(code),
-  Error: message => new ErrorExpectation(message),
-  NoError: () => new NoErrorExpectation(),
+  Failure: message => new ReactionFailureExpectation(message),
+  LoggedError: message => new LoggedErrorExpectation(message),
+  NoLoggedError: () => new NoLoggedErrorExpectation(),
   EventStream: (streamId, events) => new EventStreamExpectation(streamId, events),
   Event: (name, payload) => new EventExpectation(name, payload)
 };

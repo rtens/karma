@@ -2,8 +2,8 @@ const expect = require('./expectation');
 
 class Result {
   constructor(example, promise) {
-    this.promise = promise;
     this.example = example;
+    this.promise = promise;
   }
 
   finalAssertion() {
@@ -48,10 +48,25 @@ class RequestResult extends Result {
   }
 
   finalAssertion() {
-    return expect.NoError().assert(this);
+    expect.NoLoggedError().assert(this);
+  }
+}
+
+class ReactionResult extends Result {
+
+  finalAssertion() {
+    this.example.metaStore.recorded
+      .forEach(r => r.events
+        .filter(e => e.name == '__reaction-failed')
+        .forEach(e => {
+          const error = new Error('Reaction failed: ' + e.payload.record.event.name);
+          error.stack = e.payload.error;
+          throw error
+        }))
   }
 }
 
 module.exports = {
-  RequestResult
+  RequestResult,
+  ReactionResult
 };

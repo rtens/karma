@@ -14,7 +14,7 @@ describe('Reacting to an Event', () => {
   beforeEach(() => {
     _Date = Date;
     Date = function (time) {
-      return new _Date(time || '2013-12-11T10:09:08Z');
+      return new _Date(time || '2010-11-12T13:00:00Z');
     };
     Date.prototype = _Date.prototype;
 
