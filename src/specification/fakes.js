@@ -33,7 +33,9 @@ class FakeEventLog extends persistence.EventLog {
     this.subscribed.push({filter, subscription});
 
     try {
-      return Promise.all(this.records.map(m => applier(m)))
+      return Promise.all(this.records
+        .filter(r => filter.matches(r))
+        .map(r => applier(r)))
         .then(() => this.subscriptions.push(subscription))
         .then(() => ({cancel: () => subscription.active = false}))
     } catch (err) {
@@ -65,6 +67,10 @@ class FakeRecordFilter extends persistence.RecordFilter {
   ofStream(streamId) {
     this.streamId = streamId;
     return this
+  }
+
+  matches(record) {
+    return !this.streamId || record.streamId == this.streamId;
   }
 }
 

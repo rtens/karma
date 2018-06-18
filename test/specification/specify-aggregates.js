@@ -4,22 +4,32 @@ chai.use(promised);
 chai.should();
 
 const k = require('../..');
-const {Example, I, expect} = require('../../spec');
+const {the, Example, I, expect} = require('../../spec');
 
 describe('Specifying Aggregates', () => {
 
-  const module = (domain, server) => {
-    domain.add(new k.Aggregate('One')
-      .executing('Foo', ()=>'foo', () => [
-        new k.Event('food', {foo: 'bar'}),
-        new k.Event('bard', {bar: 'foo'})
-      ]));
+  const module = configure => (domain, server) => {
+
+    domain.add(configure(new k.Aggregate('One'))
+      .initializing(function () {
+        this.state = {
+          foo: 'bar',
+          bar: 'foo'
+        };
+      })
+      .executing('Foo', ()=>'foo', function () {
+        return [
+          new k.Event('food', {foo: this.state.foo}),
+          new k.Event('bard', {bar: this.state.bar})
+        ]
+      }));
+
     server.post('/foo', (req, res) =>
       domain.execute(new k.Command('Foo')))
   };
 
   it('asserts recorded Events', () => {
-    return new Example(module)
+    return new Example(module(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
@@ -31,8 +41,50 @@ describe('Specifying Aggregates', () => {
       .then(expect.Response())
   });
 
+  it('uses recorded Events', () => {
+    return new Example(module(aggregate=>aggregate
+      .applying('bazd', function ({one, two}) {
+        this.state[one] = two;
+      })
+      .applying('band', function ({uno, dos}) {
+        this.state[uno] = dos;
+      })
+    ))
+
+      .given(the.EventStream('foo', [
+        the.Event('bazd', {one: 'foo', two: 'baz'}),
+        the.Event('band', {uno: 'bar', dos: 'ban'}),
+      ]))
+
+      .when(I.post('/foo'))
+
+      .then(expect.EventStream('foo', [
+        expect.Event('food', {foo: 'baz'}),
+        expect.Event('bard', {bar: 'ban'})
+      ]))
+  });
+
+  it('does not use recorded Events of other Stream', () => {
+    return new Example(module(aggregate =>aggregate
+      .applying('bazd', function ({one, two}) {
+        this.state[one] = two;
+      })
+    ))
+
+      .given(the.EventStream('not foo', [
+        the.Event('bazd', {one: 'foo', two: 'baz'}),
+      ]))
+
+      .when(I.post('/foo'))
+
+      .then(expect.EventStream('foo', [
+        expect.Event('food', {foo: 'bar'}),
+        expect.Event('bard', {bar: 'foo'})
+      ]))
+  });
+
   it('fails no ID of expected Event stream does not match', () => {
-    return new Example(module)
+    return new Example(module(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
@@ -43,7 +95,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if expected Event was not recorded', () => {
-    return new Example(module)
+    return new Example(module(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
@@ -56,7 +108,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if expected do not match recorded Events', () => {
-    return new Example(module)
+    return new Example(module(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
@@ -70,7 +122,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if Event is not expected inside Stream', () => {
-    return new Example(module)
+    return new Example(module(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
