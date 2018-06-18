@@ -41,6 +41,21 @@ describe('Specifying Aggregates', () => {
       .then(expect.Response())
   });
 
+  it('fails if the Command is rejected', () => {
+    return new Example((domain, server) => {
+      domain.add(new k.Aggregate('One')
+        .executing('Foo', ()=>'foo', () => {
+          throw new k.Rejection('NOPE')
+        }));
+      server.post('/foo', (req, res) =>
+        domain.execute(new k.Command('Foo')))
+    })
+
+      .when(I.post('/foo'))
+
+      .promise.should.be.rejectedWith('NOPE')
+  });
+
   it('uses recorded Events', () => {
     return new Example(module(aggregate=>aggregate
       .applying('bazd', function ({one, two}) {
