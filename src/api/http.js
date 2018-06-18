@@ -51,6 +51,12 @@ class Response {
   }
 }
 
+class NotFoundError extends Error {
+  constructor(request) {
+    super(`Cannot handle [${request.method} ${request.path}]`)
+  }
+}
+
 class Handler {
   handle(request) {
   }
@@ -111,7 +117,7 @@ class RequestHandler {
     let handler = this._handlers.find(h=>h.matches(request));
 
     if (!handler) {
-      return Promise.reject(new Error(`Cannot handle Request [${request.method} ${request.path}]`))
+      return Promise.reject(new NotFoundError(request))
     }
 
     return this._resolveAll(this._befores.slice(), request)

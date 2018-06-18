@@ -11,7 +11,7 @@ describe('Handling HTTP requests', () => {
     return new http.RequestHandler()
 
       .handle(new http.Request('GET', '/foo'))
-      .should.be.rejectedWith('Cannot handle Request [GET /foo]')
+      .should.be.rejectedWith(http.NotFoundError, 'Cannot handle [GET /foo]')
   });
 
   it('returns a response', () => {
@@ -75,7 +75,7 @@ describe('Handling HTTP requests', () => {
       })
 
       .handle(new http.Request())
-      .should.be.rejectedWith('Nope')
+      .should.be.rejectedWith(Error, 'Nope')
   });
 
   it('catches errors', () => {
@@ -184,7 +184,7 @@ describe('Handling HTTP requests', () => {
 
     return Promise.all([
       handler.handle(new http.Request('GET', '/'))
-        .should.be.rejectedWith('Cannot handle Request [GET /]'),
+        .should.be.rejectedWith('Cannot handle [GET /]'),
 
       handler.handle(new http.Request('GET', '/foo'))
         .should.eventually.eql('Hello / from foo'),
@@ -212,7 +212,7 @@ describe('Handling HTTP requests', () => {
         .should.eventually.eql('Hello / from bar'),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
-        .should.be.rejectedWith('Cannot handle Request [GET /foo/bar]')
+        .should.be.rejectedWith('Cannot handle [GET /foo/bar]')
     ])
   });
 
@@ -227,13 +227,13 @@ describe('Handling HTTP requests', () => {
         .should.eventually.eql('Hello /'),
 
       handler.handle(new http.Request('GET', '/bar'))
-        .should.be.rejectedWith('Cannot handle Request [GET /bar]'),
+        .should.be.rejectedWith('Cannot handle [GET /bar]'),
 
       handler.handle(new http.Request('GET', '/'))
-        .should.be.rejectedWith('Cannot handle Request [GET /]'),
+        .should.be.rejectedWith('Cannot handle [GET /]'),
 
       handler.handle(new http.Request('GET', '/foo/bar'))
-        .should.be.rejectedWith('Cannot handle Request [GET /foo/bar]')
+        .should.be.rejectedWith('Cannot handle [GET /foo/bar]')
     ])
   });
 
@@ -280,7 +280,7 @@ describe('Handling HTTP requests', () => {
         .should.eventually.eql('finally got this of bar'),
 
       handler.handle(new http.Request('POST', '/foo/bar/this'))
-        .should.be.rejectedWith('Cannot handle Request [POST /this]'),
+        .should.be.rejectedWith('Cannot handle [POST /this]'),
 
       handler.handle(new http.Request('ANY', '/foo/bar/that'))
         .should.eventually.eql('finally got that of bar'),
