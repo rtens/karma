@@ -21,7 +21,8 @@ class Query extends Message {
 
 class Rejection extends Error {
   constructor(code, message) {
-    super(message || code, code)
+    super(message || code);
+    this.code = code;
   }
 }
 

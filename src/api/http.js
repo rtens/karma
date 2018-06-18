@@ -1,3 +1,5 @@
+const message = require('../message');
+
 class Request {
   constructor(method, path) {
     this.headers = {};
@@ -59,6 +61,7 @@ class NotFoundError extends Error {
 
 class Handler {
   handle(request) {
+    return Promise.resolve();
   }
 }
 
@@ -190,6 +193,40 @@ class CommandHandler extends Handler {
   }
 }
 
+class ApiHandler extends RequestHandler {
+  handle(request) {
+    return super.handle(request)
+      .catch(err => {
+
+        if (err.constructor.name == NotFoundError.name)
+          return new Response()
+            .withStatus(404)
+            .withBody({
+              code: 'RESOURCE_NOT_FOUND',
+              message: err.message,
+              traceId: request.traceId
+            });
+
+        if (err.constructor.name == message.Rejection.name)
+          return new Response()
+            .withStatus(403)
+            .withBody({
+              code: err.code,
+              message: err.message,
+              traceId: request.traceId
+            });
+
+        return new Response()
+          .withStatus(500)
+          .withBody({
+            code: 'UNKNOWN_ERROR',
+            message: err.message,
+            traceId: request.traceId
+          })
+      })
+  }
+}
+
 module.exports = {
   Request,
   Response,
@@ -197,5 +234,6 @@ module.exports = {
   SlugHandler,
   SegmentHandler,
   QueryHandler,
-  CommandHandler
+  CommandHandler,
+  ApiHandler
 };
