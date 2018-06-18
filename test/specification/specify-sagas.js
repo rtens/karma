@@ -20,20 +20,6 @@ describe('Specifying Sagas', () => {
       .promise.then(() => reacted.should.eql(['bar']))
   });
 
-  it('does not use recorded Events to trigger the reaction', () => {
-    let reacted = [];
-
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', $=>reacted.push($))))
-
-      .given(the.Event('food', 'not'))
-
-      .when(I.publish(the.Event('food', 'bar')))
-
-      .promise.then(() => reacted.should.eql(['bar']))
-  });
-
   it('asserts expected failure of reaction', () => {
     return new Example(domain =>
       domain.add(new k.Saga('One')
@@ -78,4 +64,34 @@ describe('Specifying Sagas', () => {
 
       .then({assert: result => result.example.metaStore.recorded.splice(0, 2)})
   });
+
+  it('does not use recorded Events to trigger the reaction', () => {
+    let reacted = [];
+
+    return new Example(domain =>
+      domain.add(new k.Saga('One')
+        .reactingTo('food', ()=>'foo', $=>reacted.push($))))
+
+      .given(the.Event('food', 'not'))
+
+      .when(I.publish(the.Event('food', 'bar')))
+
+      .promise.then(() => reacted.should.eql(['bar']))
+  });
+
+  it('does not use Events recorded by a Command to trigger the reaction', () => {
+    let reacted = [];
+
+    return new Example((domain, server) => {
+      domain.add(new k.Saga('One')
+          .reactingTo('food', ()=>'foo', $=>reacted.push($)));
+      domain.add(new k.Aggregate('One')
+          .executing('Foo', ()=>'foo', () => [new k.Event('food', 'not')]));
+      server.post('/foo', () => domain.execute(new k.Command('Foo')));
+    })
+
+      .when(I.post('/foo'))
+
+      .promise.then(() => reacted.should.eql([]))
+  })
 });
