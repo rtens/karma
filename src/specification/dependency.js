@@ -1,43 +1,7 @@
-const event = require('../event');
+const expect = require('chai').expect;
+const specification = require('.');
 
-class Context {
-  configure(example) {
-  }
-}
-
-class EventContext extends Context {
-  constructor(name, payload) {
-    super();
-    this.event = new event.Event(name, payload);
-  }
-
-  withTime(timeString) {
-    this.event.time = new Date(timeString);
-    return this
-  }
-
-  configure(example) {
-    const sequence = example.log.records.length;
-    const time = 0;
-
-    example.log.records.push(new event.Record(this.event, null, sequence, null, time));
-  }
-}
-
-class EventStreamContext extends Context {
-  constructor(streamId, events) {
-    super();
-    this.streamId = streamId;
-    this.events = events;
-  }
-
-  configure(example) {
-    this.events.forEach(e =>
-      example.log.records.push(new event.Record(e.event, this.streamId)))
-  }
-}
-
-class ValueDependencyContext extends Context {
+class ValueDependencyContext extends specification.Context {
   constructor(key, value) {
     super();
     this.key = key;
@@ -109,9 +73,48 @@ class StubDependencyContext extends ValueDependencyContext {
   }
 }
 
+class InvocationsExpectation extends specification.Expectation {
+  constructor(stubKey) {
+    super();
+    this.key = stubKey;
+    this.invocations = [];
+  }
+
+  withArguments() {
+    this.invocations.push([...arguments]);
+    return this
+  }
+
+  assert(result) {
+    let invocations = result.example.stubs[this.key].invocations;
+
+    //noinspection BadExpressionStatementJS
+    expect(invocations, `Missing invocations of [${this.key}]`).to.not.be.empty;
+    expect(invocations.length).to.equal(this.invocations.length, `Unexpected invocations of [${this.key}]`);
+    this._assertArgumentCallbacks(invocations);
+    expect(invocations).to.eql(this.invocations, `Unexpected invocations of [${this.key}]`);
+  }
+
+  _assertArgumentCallbacks(invocations) {
+    this.invocations.forEach((invocation, i) =>
+      invocation.forEach((argument, a) => {
+        if (typeof argument == 'function') {
+          try {
+            argument(invocations[i][a]);
+          } catch (err) {
+            err.message = `Unexpected argument [${a}] in ` +
+              `invocation [${i}] of [${this.key}]: ` + err.message;
+            throw err;
+          }
+          this.invocations[i][a] = '*CALLBACK*';
+          invocations[i][a] = '*CALLBACK*';
+        }
+      }));
+  }
+}
+
 module.exports = {
-  EventStream: (streamId, events) => new EventStreamContext(streamId, events),
-  Event: (name, payload) => new EventContext(name, payload),
-  Value: (key, value) => new ValueDependencyContext(key, value),
-  Stub: (key, value) => new StubDependencyContext(key, value)
+  ValueDependencyContext,
+  StubDependencyContext,
+  InvocationsExpectation
 };

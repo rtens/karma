@@ -4,11 +4,11 @@ chai.use(promised);
 chai.should();
 
 const k = require('../..');
-const {the, Example, I, expect} = require('../../spec');
+const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Aggregates', () => {
 
-  const module = configure => (domain, server) => {
+  const module = configure => domain => {
 
     domain.add(configure(new k.Aggregate('One'))
       .initializing(function () {
@@ -24,31 +24,31 @@ describe('Specifying Aggregates', () => {
         ]
       }));
 
-    server.post('/foo', (req, res) =>
-      domain.execute(new k.Command('Foo')))
+    return new k.api.http.ApiHandler()
+      .handling(new k.api.http.CommandHandler(domain, () => new k.Command('Foo')))
   };
 
   it('asserts recorded Events', () => {
-    return new Example(module(aggregate=>aggregate))
+    return new Example(module(x=>x))
 
-      .when(I.post('/foo'))
+      .when(I.post())
+
+      .then(expect.Response())
 
       .then(expect.EventStream('foo', [
         expect.Event('food', {foo: 'bar'}),
         expect.Event('bard', {bar: 'foo'})
       ]))
-
-      .then(expect.Response())
   });
 
   it('fails if the Command is rejected', () => {
-    return new Example((domain, server) => {
+    return new Example(domain => {
       domain.add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', () => {
           throw new k.Rejection('NOPE')
         }));
-      server.post('/foo', (req, res) =>
-        domain.execute(new k.Command('Foo')))
+
+      return {handle: () => domain.execute(new k.Command('Foo'))}
     })
 
       .when(I.post('/foo'))

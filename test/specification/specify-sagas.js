@@ -4,7 +4,7 @@ chai.use(promised);
 chai.should();
 
 const k = require('../..');
-const {the, Example, I, expect} = require('../../spec');
+const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Sagas', () => {
 
@@ -111,12 +111,15 @@ describe('Specifying Sagas', () => {
   it('does not use Events recorded by a Command to trigger the reaction', () => {
     let reacted = [];
 
-    return new Example((domain, server) => {
+    return new Example(domain => {
+
       domain.add(new k.Saga('One')
           .reactingTo('food', ()=>'foo', $=>reacted.push($)));
+
       domain.add(new k.Aggregate('One')
           .executing('Foo', ()=>'foo', () => [new k.Event('food', 'not')]));
-      server.post('/foo', () => domain.execute(new k.Command('Foo')));
+
+      return {handle: () => domain.execute(new k.Command('Foo'))};
     })
 
       .when(I.post('/foo'))

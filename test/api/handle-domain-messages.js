@@ -8,7 +8,7 @@ const _event = require('../../src/event');
 const fake = require('../../src/specification/fakes');
 const k = require('../..');
 
-const http = require('../../src/api/http');
+const http = require('../../src/apis/http');
 
 describe('Handling Domain Messages', () => {
 

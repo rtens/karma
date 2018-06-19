@@ -1,6 +1,38 @@
-module.exports = {
-  Example: require('./src/specification/example').Example,
-  the: require('./src/specification/context'),
-  I: require('./src/specification/action'),
-  expect: require('./src/specification/expectation')
+const specification = require('./src/specification');
+const aggreagte = require('./src/specification/aggregate');
+const dependency = require('./src/specification/dependency');
+const logging = require('./src/specification/logging');
+const unit = require('./src/specification/unit');
+const saga = require('./src/specification/saga');
+
+module.exports = (config = {}) => {
+  let api = config.api || 'http';
+
+  if (typeof api == 'string') {
+    api = require('./src/specification/apis/' + api);
+  }
+
+  return {
+    Example: specification.Example,
+    the: {
+      EventStream: (streamId, events) => new unit.EventStreamContext(streamId, events),
+      Event: (name, payload) => new unit.EventContext(name, payload),
+      Value: (key, value) => new dependency.ValueDependencyContext(key, value),
+      Stub: (key, value) => new dependency.StubDependencyContext(key, value)
+    },
+    I: {
+      get: path => new api.GetRequestAction(path),
+      post: path => new api.PostRequestAction(path),
+      publish: event => new saga.PublishEventAction(event)
+    },
+    expect: {
+      Response: body => new api.ResponseExpectation(body),
+      Rejection: code => new api.RejectionExpectation(code),
+      Failure: message => new saga.ReactionFailureExpectation(message),
+      LoggedError: message => new logging.LoggedErrorExpectation(message),
+      EventStream: (streamId, events) => new aggreagte.EventStreamExpectation(streamId, events),
+      Event: (name, payload) => new aggreagte.EventExpectation(name, payload),
+      Invocations: (stubKey) => new dependency.InvocationsExpectation(stubKey)
+    }
+  }
 };

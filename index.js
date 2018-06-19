@@ -6,6 +6,8 @@ const persistence = require('./src/persistence');
 const aggregate = require('./src/units/aggregate');
 const projection = require('./src/units/projection');
 const saga = require('./src/units/saga');
+const express = require('./src/apis/express');
+const http = require('./src/apis/http');
 
 module.exports = {
   Domain: domain.Domain,
@@ -20,5 +22,10 @@ module.exports = {
   Saga: saga.Saga,
 
   UnitStrategy: unit.UnitStrategy,
-  CombinedEventLog: persistence.CombinedEventLog
+  CombinedEventLog: persistence.CombinedEventLog,
+
+  api: {
+    express,
+    http
+  }
 };

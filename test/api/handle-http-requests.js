@@ -3,7 +3,7 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const http = require('../../src/api/http');
+const http = require('../../src/apis/http');
 
 describe('Handling HTTP requests', () => {
 
@@ -42,7 +42,7 @@ describe('Handling HTTP requests', () => {
         .handle(new http.Request()
           .withHeader('Name', 'Foo'))
         .then(response => {
-          response.status.should.eql(123);
+          response.statusCode.should.eql(123);
           response.headers.Foo.should.eql('bar');
           response.body.should.eql('Hello Foo')
         })

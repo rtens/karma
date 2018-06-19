@@ -11,7 +11,6 @@ class Example {
     this._setUpErrorLogging();
     this._setUpDependencies();
     this._setUpDomain();
-    this._setUpServer();
   }
 
   _setUpDate() {
@@ -52,10 +51,6 @@ class Example {
       });
   }
 
-  _setUpServer() {
-    this.server = new fake.Server();
-  }
-
   _setUpDependencies() {
     this.dependencies = {};
     this.stubs = {};
@@ -68,12 +63,73 @@ class Example {
   }
 
   when(action) {
-    this.module(this.domain, this.server, this.dependencies);
+    this.handler = this.module(this.domain, this.dependencies);
 
     return action.perform(this)
   }
 }
 
+class Context {
+  configure(example) {
+  }
+}
+
+class Action {
+  perform(example) {
+  }
+}
+
+class Result {
+  constructor(example, promise) {
+    this.example = example;
+    this.promise = promise;
+  }
+
+  finalAssertion() {
+  }
+
+  then(expectation, reject) {
+    let resolve = (typeof expectation != 'function')
+      ? this._keepStack(expectation)
+      : this._finishUp(expectation, reject);
+
+    this.promise = this.promise.then(resolve, reject);
+    return this
+  }
+
+  _keepStack(expectation) {
+    let error = new Error();
+    return () => {
+      try {
+        expectation.assert(this);
+      } catch (err) {
+        err.stack += error.stack;
+        throw err;
+      }
+    }
+  }
+
+  _finishUp(resolve, reject) {
+    return () => {
+      try {
+        this.finalAssertion();
+        resolve()
+      } catch (err) {
+        reject(err)
+      }
+    }
+  }
+}
+
+class Expectation {
+  assert(result) {
+  }
+}
+
 module.exports = {
-  Example
+  Example,
+  Context,
+  Action,
+  Result,
+  Expectation
 };

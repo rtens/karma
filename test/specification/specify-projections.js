@@ -4,11 +4,11 @@ chai.use(promised);
 chai.should();
 
 const k = require('../..');
-const {the, Example, I, expect} = require('../../spec');
+const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Projections', () => {
 
-  let module = configure => (domain, server) => {
+  let module = configure => domain => {
 
     domain.add(configure(new k.Projection('foo')
       .initializing(function () {
@@ -18,9 +18,8 @@ describe('Specifying Projections', () => {
         return this.state
       })));
 
-    server.get('/foo', (req, res) =>
-      domain.respondTo(new k.Query('Foo'))
-        .then(response => res.send(response)))
+    return new k.api.http.ApiHandler()
+      .handling(new k.api.http.QueryHandler(domain, () => new k.Query('Foo')))
   };
 
   it('uses recorded Events', () => {
@@ -55,13 +54,13 @@ describe('Specifying Projections', () => {
   });
 
   it('fails if the Query is rejected', () => {
-    return new Example((domain, server) => {
+    return new Example(domain => {
       domain.add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', function () {
           throw new k.Rejection('NOPE')
         }));
-      server.get('/foo', (req, res) =>
-        domain.respondTo(new k.Query('Foo')))
+
+      return {handle: () => domain.respondTo(new k.Query('Foo'))}
     })
 
       .when(I.get('/foo'))

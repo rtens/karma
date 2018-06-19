@@ -3,15 +3,15 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const {the, Example, expect} = require('../../spec');
-const result = require('../../src/specification/result');
+const {the, Example, expect} = require('../../spec')();
+const specification = require('../../src/specification');
 
 describe('Specifying dependencies', () => {
 
   it('uses injected values', () => {
     let injected = null;
 
-    new Example((domain, server, dependencies) =>
+    new Example((domain, dependencies) =>
       injected = dependencies.foo)
 
       .given(the.Value('foo', 'bar'))
@@ -24,7 +24,7 @@ describe('Specifying dependencies', () => {
   it('uses injected stub', () => {
     let stubbed = null;
 
-    new Example((domain, server, dependencies) =>
+    new Example((domain, dependencies) =>
       stubbed = dependencies.foo())
 
       .given(the.Stub('foo').returning('bar'))
@@ -37,7 +37,7 @@ describe('Specifying dependencies', () => {
   it('uses dynamic stub', () => {
     let stubbed = null;
 
-    new Example((domain, server, dependencies) =>
+    new Example((domain, dependencies) =>
       stubbed = dependencies.foo('foo', 'bar'))
 
       .given(the.Stub('foo')
@@ -51,7 +51,7 @@ describe('Specifying dependencies', () => {
   it('uses dynamic stub with indexed callback', () => {
     let stubbed = [];
 
-    new Example((domain, server, dependencies) => {
+    new Example((domain, dependencies) => {
       stubbed.push(dependencies.foo(3, 4));
       stubbed.push(dependencies.foo(5, 6));
       stubbed.push(dependencies.foo(7, 8));
@@ -68,7 +68,7 @@ describe('Specifying dependencies', () => {
   it('uses injected values in objects', () => {
     let injected = null;
 
-    new Example((domain, server, dependencies) =>
+    new Example((domain, dependencies) =>
       injected = dependencies.foo.bar.baz)
 
       .given(the.Value('foo.bar.baz', 'ban'))
@@ -81,7 +81,7 @@ describe('Specifying dependencies', () => {
   it('uses injected values returned by function', () => {
     let injected = null;
 
-    new Example((domain, server, dependencies) =>
+    new Example((domain, dependencies) =>
       injected = dependencies.foo().bar().baz)
 
       .given(the.Value('foo().bar().baz', 'ban'))
@@ -92,7 +92,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations of static stubs', () => {
-    return new Example((domain, server, dependencies) => {
+    return new Example((domain, dependencies) => {
       dependencies.foo('a').bar('one', 'uno');
       dependencies.foo('b').bar('two', 'dos');
     })
@@ -111,7 +111,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations of dynamic stub', () => {
-    return new Example((domain, server, dependencies) => {
+    return new Example((domain, dependencies) => {
       dependencies.foo('one');
     })
 
@@ -137,7 +137,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if number of invocation does not match', () => {
-    return new Example((domain, server, dependencies) =>
+    return new Example((domain, dependencies) =>
       dependencies.foo('one'))
 
       .given(the.Stub('foo'))
@@ -153,7 +153,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if expected invocations does not match', () => {
-    return new Example((domain, server, dependencies) => {
+    return new Example((domain, dependencies) => {
       dependencies.foo('one', 'uno');
       dependencies.foo('two', 'dos');
     })
@@ -172,7 +172,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations with function', () => {
-    return new Example((domain, server, dependencies) => {
+    return new Example((domain, dependencies) => {
       dependencies.foo('one', 'uno');
       dependencies.foo('two', 'dos');
     })
@@ -187,7 +187,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if argument function fails', () => {
-    return new Example((domain, server, dependencies) =>
+    return new Example((domain, dependencies) =>
       dependencies.foo('one'))
 
       .given(the.Stub('foo'))
@@ -203,6 +203,6 @@ describe('Specifying dependencies', () => {
   });
 
   const anyAction = {
-    perform: example => new result.Result(example, Promise.resolve())
+    perform: example => new specification.Result(example, Promise.resolve())
   };
 });
