@@ -18,7 +18,7 @@ describe('Specifying Projections', () => {
         return this.state
       })));
 
-    return new k.api.http.ApiHandler()
+    return new k.api.http.RequestHandler()
       .handling(new k.api.http.QueryHandler(domain, () => new k.Query('Foo')))
   };
 
@@ -65,6 +65,13 @@ describe('Specifying Projections', () => {
 
       .when(I.get('/foo'))
 
-      .promise.should.be.rejectedWith('NOPE')
+      .then(() => {
+        throw new Error('Should have failed')
+      }, err => {
+        err.message.should.eql('Unexpected Rejection: ' +
+          'expected [Rejection: NOPE] to not exist')
+      })
+
+      .then({assert: result => result.rejection = null})
   });
 });

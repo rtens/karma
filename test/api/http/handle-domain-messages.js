@@ -3,14 +3,12 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
-const _event = require('../../src/event');
+const _event = require('../../../src/event');
 
-const fake = require('../../src/specification/fakes');
-const k = require('../..');
+const fake = require('../../../src/specification/fakes');
+const k = require('../../..');
 
-const http = require('../../src/apis/http');
-
-describe('Handling Domain Messages', () => {
+describe('Handling Domain Messages via HTTP', () => {
 
   it('responds to a Query', () => {
     let persistence = {
@@ -24,12 +22,12 @@ describe('Handling Domain Messages', () => {
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo})=>'Hello ' + foo));
 
-    return new http.RequestHandler()
-      .handling(new http.QueryHandler(module, () => new k.Query('Foo', {foo: 'Bar'})))
+    return new k.api.http.RequestHandler()
+      .handling(new k.api.http.QueryHandler(module, () => new k.Query('Foo', {foo: 'Bar'})))
 
-      .handle(new http.Request('ANY', '/'))
+      .handle(new k.api.http.Request('ANY', '/'))
 
-      .should.eventually.equal('Hello Bar')
+      .should.eventually.eql(new k.api.http.Response('Hello Bar'))
   });
 
   it('executes a Command', () => {
@@ -45,12 +43,12 @@ describe('Handling Domain Messages', () => {
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
 
-    return new http.RequestHandler()
-      .handling(new http.CommandHandler(module, () => new k.Command('Foo', {foo: 'Bar'})))
+    return new k.api.http.RequestHandler()
+      .handling(new k.api.http.CommandHandler(module, () => new k.Command('Foo', {foo: 'Bar'})))
 
-      .handle(new http.Request('ANY', '/').withTraceId('trace'))
+      .handle(new k.api.http.Request('ANY', '/').withTraceId('trace'))
 
-      .should.eventually.eql(null)
+      .should.eventually.eql(new k.api.http.Response())
 
       .then(() => store.recorded.map(r=>[r.events[0].payload, r.traceId]).should.eql([['Bar', 'trace']]))
   });
@@ -75,10 +73,10 @@ describe('Handling Domain Messages', () => {
         .applying('bard', payload => applied = payload)
         .respondingTo('Bar', ()=>'bar', ({bar}) => applied + bar));
 
-    let response = new http.CommandHandler(module, () => new k.Command('Foo'))
+    let response = new k.api.http.CommandHandler(module, () => new k.Command('Foo'))
       .respondingWith(req => new k.Query('Bar', {bar: req.path}))
 
-      .handle(new http.Request('ANY', '/foo'));
+      .handle(new k.api.http.Request('ANY', '/foo'));
 
     return new Promise(y => setTimeout(y, 0))
 

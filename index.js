@@ -25,7 +25,7 @@ module.exports = {
   CombinedEventLog: persistence.CombinedEventLog,
 
   api: {
-    express,
-    http
+    http,
+    express
   }
 };

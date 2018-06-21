@@ -1,35 +1,54 @@
-const api = require('../api');
+const message = require('../message');
 
-class RequestHandler extends api.RequestHandler {
-  constructor(app) {
-    super();
+class ApiHandler {
+  constructor(app, options = {}) {
     this.app = app;
+    this.generateTraceId = options.traceId || this._generateTraceId;
   }
 
-  handle(request) {
+  _generateTraceId() {
+    return (Math.floor(Math.random() * 0x100000000) + 0x10000000).toString(16)
+  }
+
+  handle(request, response) {
+    request.traceId = this.generateTraceId();
+
     return Promise.race([
 
-      new Promise(y => request.response.on('end', () =>
-        y(request.response))),
+      new Promise(y => response.on('end', () => y(response))),
 
-      new Promise(y => setTimeout(() =>
-        y(request.response), 10)),
-
-      new Promise(y => this.app.handle(request.request, request.response, () =>
-        y(request.response.status(404).end()))),
-    ])
+      new Promise((y, n) => this.app.handle(request, response, err =>
+        y(this._responseForError(err, request, response)))),
+    ]);
   }
-}
 
-class Request extends api.Request {
-  constructor(request, response) {
-    super();
-    this.request = request;
-    this.response = response;
+  _responseForError(err, request, response) {
+    if (!err) {
+      return response
+        .status(404)
+        .send(`Cannot ${request.method} ${request.url}`)
+    }
+
+    if (err instanceof message.Rejection) {
+      return response
+        .status(403)
+        .send({
+          code: err.code,
+          message: err.message,
+          traceId: request.traceId
+        })
+    }
+
+    return response
+      .status(500)
+      .send({
+        code: 'UNKNOWN_ERROR',
+        message: err.message,
+        traceId: request.traceId
+      })
   }
 }
 
 module.exports = {
-  RequestHandler,
-  Request
+  ApiHandler
 };

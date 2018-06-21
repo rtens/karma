@@ -44,7 +44,10 @@ class PostRequestAction extends RequestAction {
 
 class RequestResult extends specification.Result {
   constructor(example, response) {
-    super(example, response.then(res => this.response = res));
+    super(example, response
+      .then(res => res.statusCode == 404
+        ? Promise.reject(res.body)
+        : this.response = res));
   }
 
   //noinspection JSUnusedGlobalSymbols

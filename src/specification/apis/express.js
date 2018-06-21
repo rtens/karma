@@ -1,40 +1,44 @@
 const expect = require('chai').expect;
 
+const httpMocks = require('node-mocks-http');
+const events = require('events');
+
 const specification = require('..');
 const express = require('../../apis/express');
 const logging = require('../logging');
-
-const httpMocks = require('node-mocks-http');
-const events = require('events');
 
 class RequestAction extends specification.Action {
   constructor(method, route) {
     super();
 
-    const request  = httpMocks.createRequest({
+    this.request  = httpMocks.createRequest({
       method: method.toUpperCase(),
       url: route,
     });
 
-    const response = httpMocks.createResponse({
-      eventEmitter: events.EventEmitter
+    this.response = httpMocks.createResponse({
+      // eventEmitter: events.EventEmitter
     });
-
-    this.request = new express.Request(request, response);
   }
 
   withHeaders(headers) {
-    this.request.request.headers = headers;
+    this.request.headers = headers;
     return this
   }
 
   withQuery(query) {
-    this.request.request.query = query;
+    this.request.query = query;
     return this
   }
 
   perform(example) {
-    return new RequestResult(example, example.handler.handle(this.request))
+    return new RequestResult(example, Promise.race([
+
+      new Promise(y => setTimeout(() =>
+        y(this.response), 10)),
+
+      example.handler.handle(this.request, this.response),
+    ]))
   }
 }
 
@@ -50,14 +54,17 @@ class PostRequestAction extends RequestAction {
   }
 
   withBody(body) {
-    this.request.request.body = body;
+    this.request.body = body;
     return this
   }
 }
 
 class RequestResult extends specification.Result {
-  constructor(example, response) {
-    super(example, response.then(res => this.response = res));
+  constructor(example, handling) {
+    super(example, handling
+      .then(response => response.statusCode == 404
+        ? Promise.reject(response._getData())
+        : this.response = response));
   }
 
   //noinspection JSUnusedGlobalSymbols
@@ -81,6 +88,11 @@ class ResponseExpectation extends specification.Expectation {
 
   withHeaders(headers) {
     this.headers = headers;
+    return this
+  }
+
+  withBody(body) {
+    this.body = body;
     return this
   }
 

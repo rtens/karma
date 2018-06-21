@@ -1,6 +1,9 @@
+const expect = require('chai').expect;
+
 const unit = require('../unit');
 const persistence = require('../persistence');
 const domain = require('../domain');
+const message = require('../message');
 const fake = require('./fakes');
 
 class Example {
@@ -82,7 +85,10 @@ class Action {
 class Result {
   constructor(example, promise) {
     this.example = example;
-    this.promise = promise;
+    this.promise = promise
+      .catch(err => err instanceof message.Rejection
+        ? this.rejection = err
+        : Promise.reject(err));
   }
 
   finalAssertion() {
@@ -113,6 +119,10 @@ class Result {
     return () => {
       try {
         this.finalAssertion();
+
+        //noinspection BadExpressionStatementJS
+        expect(this.rejection, 'Unexpected Rejection').not.to.exist;
+
         resolve()
       } catch (err) {
         reject(err)

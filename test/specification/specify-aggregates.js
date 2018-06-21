@@ -24,7 +24,7 @@ describe('Specifying Aggregates', () => {
         ]
       }));
 
-    return new k.api.http.ApiHandler()
+    return new k.api.http.RequestHandler()
       .handling(new k.api.http.CommandHandler(domain, () => new k.Command('Foo')))
   };
 
@@ -53,7 +53,14 @@ describe('Specifying Aggregates', () => {
 
       .when(I.post('/foo'))
 
-      .promise.should.be.rejectedWith('NOPE')
+      .then(() => {
+        throw new Error('Should have failed')
+      }, err => {
+        err.message.should.eql('Unexpected Rejection: ' +
+          'expected [Rejection: NOPE] to not exist')
+      })
+
+      .then({assert: result => result.rejection = null})
   });
 
   it('uses recorded Events', () => {

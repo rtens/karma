@@ -1,5 +1,4 @@
 const message = require('../message');
-const api = require('../api');
 
 class Request {
   constructor(method, path) {
@@ -8,6 +7,11 @@ class Request {
     this.path = path;
     this.body = null;
     this.query = null;
+  }
+
+  withTraceId(traceId) {
+    this.traceId = traceId;
+    return this
   }
 
   withHeader(key, value) {
@@ -24,27 +28,22 @@ class Request {
     this.query = query;
     return this
   }
-
-  withTraceId(traceId) {
-    this.traceId = traceId;
-    return this
-  }
 }
 
 class Response {
   constructor(body = null) {
-    this.body = body;
-    this.headers = {};
     this.statusCode = 200;
-  }
-
-  withHeader(key, value) {
-    this.headers[key] = value;
-    return this
+    this.headers = {};
+    this.body = body;
   }
 
   withStatus(code) {
     this.statusCode = code;
+    return this
+  }
+
+  withHeader(key, value) {
+    this.headers[key] = value;
     return this
   }
 
@@ -56,12 +55,24 @@ class Response {
 
 class NotFoundError extends Error {
   constructor(request) {
-    super(`Cannot handle [${request.method} ${request.path}]`)
+    super(`Cannot handle [${request.method} ${request.path}]`);
   }
 }
 
-class RequestHandler {
+class Handler {
+  //noinspection JSUnusedLocalSymbols
+  matches(request) {
+    return true
+  }
+
+  handle(request) {
+    return Promise.resolve();
+  }
+}
+
+class RequestHandler extends Handler {
   constructor() {
+    super();
     this._matchers = [];
     this._befores = [];
     this._afters = [];
@@ -120,6 +131,7 @@ class RequestHandler {
 
     return this._resolveAll(this._befores.slice(), request)
       .then(request => handler.handle(request))
+      .then(response => response instanceof Response ? response : new Response(response))
       .then(response => this._resolveAll(this._afters.slice(), response))
       .catch(err => {
         let handler = this._errorHandlers.find(h=>h.matches(err));
@@ -156,51 +168,19 @@ class SlugHandler extends SegmentHandler {
   }
 }
 
-class QueryHandler extends api.RequestHandler {
-  constructor(domain, requestToQuery) {
-    super();
-    this._domain = domain;
-    this._query = requestToQuery;
-  }
-
-  handle(request) {
-    return this._domain.respondTo(this._query(request))
-  }
-}
-
-class CommandHandler extends api.RequestHandler {
-  constructor(domain, requestToCommand) {
-    super();
-    this._domain = domain;
-    this._command = requestToCommand;
-  }
-
-  respondingWith(requestToQuery) {
-    this._query = requestToQuery;
-    return this
-  }
-
-  handle(request) {
-    return this._domain.execute(this._command(request).withTraceId(request.traceId))
-      .then(records => this._query ? this._domain.respondTo(this._query(request).waitFor({
-        [records[records.length - 1].streamId]: records[records.length - 1].sequence
-      })) : null)
-  }
-}
-
 class ApiHandler extends RequestHandler {
+
   constructor(options = {}) {
     super();
-    this.generateTraceId = options.traceId
-      || (() => (Math.floor(Math.random() * 0x100000000) + 0x10000000).toString(16));
+    this.generateTraceId = options.traceId || this._generateTraceId;
+  }
+
+  _generateTraceId() {
+    return (Math.floor(Math.random() * 0x100000000) + 0x10000000).toString(16)
   }
 
   handle(request) {
     return super.handle(request.withTraceId(this.generateTraceId()))
-
-      .then(response => response instanceof Response
-        ? response
-        : new Response(response))
 
       .catch(err => {
 
@@ -233,6 +213,38 @@ class ApiHandler extends RequestHandler {
   }
 }
 
+class QueryHandler extends Handler {
+  constructor(domain, requestToQuery) {
+    super();
+    this._domain = domain;
+    this._query = requestToQuery;
+  }
+
+  handle(request) {
+    return this._domain.respondTo(this._query(request))
+  }
+}
+
+class CommandHandler extends Handler {
+  constructor(domain, requestToCommand) {
+    super();
+    this._domain = domain;
+    this._command = requestToCommand;
+  }
+
+  respondingWith(requestToQuery) {
+    this._query = requestToQuery;
+    return this
+  }
+
+  handle(request) {
+    return this._domain.execute(this._command(request).withTraceId(request.traceId))
+      .then(records => this._query ? this._domain.respondTo(this._query(request).waitFor({
+        [records[records.length - 1].streamId]: records[records.length - 1].sequence
+      })) : null)
+  }
+}
+
 module.exports = {
   Request,
   Response,
@@ -241,5 +253,6 @@ module.exports = {
   SegmentHandler,
   QueryHandler,
   CommandHandler,
-  ApiHandler
+  ApiHandler,
+  NotFoundError
 };

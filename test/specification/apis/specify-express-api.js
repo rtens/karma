@@ -11,22 +11,22 @@ const express = require('express');
 describe('Specifying an express API', () => {
 
   it('fails if the Route of a GET request is not defined', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()))
+    return new Example(() => new k.api.express.ApiHandler(express(), {traceId: () => 'trace'}))
 
       .when(I.get('/foo'))
 
-      .then(expect.Response().withStatus(404))
+      .promise.should.be.rejectedWith('Cannot GET /foo')
   });
 
   it('ignores if no response was sent', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', () => null)))
 
       .when(I.get('/foo'))
   });
 
   it('fails if the response does not match', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.status(201).send('bar'))))
 
       .when(I.get('/foo'))
@@ -38,19 +38,20 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if the response status does not match', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.status(201).send('bar'))))
 
       .when(I.get('/foo'))
 
-      .then(expect.Response('bar'))
+      .then(expect.Response('bar')
+        .withStatus(202))
 
       .promise.should.be.rejectedWith("Unexpected response status: " +
-        "expected 201 to equal 200");
+        "expected 201 to equal 202");
   });
 
   it('asserts the expected response', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.send('bar'))))
 
       .when(I.get('/foo'))
@@ -59,7 +60,7 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if an expected Rejection is missing', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.send('bar'))))
 
       .when(I.get('/foo'))
@@ -71,9 +72,10 @@ describe('Specifying an express API', () => {
   });
 
   it('asserts an expected Rejection', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
-      .get('/foo', (req, res) =>
-        res.status(403).send({code: 'NOPE', message: 'ignored'}))))
+    return new Example(() => new k.api.express.ApiHandler(express()
+      .get('/foo', () => {
+        throw new k.Rejection('NOPE', 'Nope')
+      })))
 
       .when(I.get('/foo'))
 
@@ -81,9 +83,10 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if the Rejection code does not match', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
-      .get('/foo', (req, res) =>
-        res.status(403).send({code: 'NOPE'}))))
+    return new Example(() => new k.api.express.ApiHandler(express()
+      .get('/foo', () => {
+        throw new k.Rejection('NOPE', 'Nope')
+      })))
 
       .when(I.get('/foo'))
 
@@ -94,7 +97,7 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if an expected Error is not logged', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', () => console.error('Not Nope'))))
 
       .when(I.get('/foo'))
@@ -108,7 +111,7 @@ describe('Specifying an express API', () => {
   });
 
   it('asserts a logged Error', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', () => console.error('Nope'))))
 
       .when(I.get('/foo'))
@@ -117,7 +120,7 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if an unexpected Error is logged', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', () => console.error('Nope'))))
 
       .when(I.get('/foo'))
@@ -133,7 +136,7 @@ describe('Specifying an express API', () => {
   });
 
   it('uses headers, URL parameters and query arguments of GET request', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/greet/:name', (req, res) =>
         res.send(`${req.query.greeting} ${req.params.name}${req.headers.mark}`))))
 
@@ -145,15 +148,15 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if the Route of a POST request is not defined', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()))
+    return new Example(() => new k.api.express.ApiHandler(express()))
 
       .when(I.post('/foo'))
 
-      .then(expect.Response().withStatus(404))
+      .promise.should.be.rejectedWith(k.api.NotFoundError, 'Cannot POST /foo')
   });
 
   it('uses headers, URL parameters and query arguments of POST request', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .post('/greet/:name', (req, res) =>
         res.send(`${req.query.greeting} ${req.params.name}${req.headers.mark}`))))
 
@@ -165,7 +168,7 @@ describe('Specifying an express API', () => {
   });
 
   it('uses body of POST request', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .post('/foo', (req, res) => res.send('Hello ' + req.body.name))))
 
       .when(I.post('/foo')
@@ -175,7 +178,7 @@ describe('Specifying an express API', () => {
   });
 
   it('registers Routes as middleware', () => {
-    const example = new Example(() => new k.api.express.RequestHandler(express()
+    const example = new Example(() => new k.api.express.ApiHandler(express()
       .use('/foo', (req, res) => res.send('bar'))));
 
     return Promise.all([
@@ -191,7 +194,7 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if header is missing', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', () => null)))
 
       .when(I.get('/foo'))
@@ -204,7 +207,7 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if header value doe not match', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.header('not', 'bar').end())))
 
       .when(I.get('/foo'))
@@ -217,7 +220,7 @@ describe('Specifying an express API', () => {
   });
 
   it('asserts headers of response', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => {
         res.setHeader('One', 'uno');
         res.header('Two', 'dos');
@@ -234,7 +237,7 @@ describe('Specifying an express API', () => {
   });
 
   it('assert content sent with response.end()', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.end('bar'))))
 
       .when(I.get('/foo'))
@@ -243,7 +246,7 @@ describe('Specifying an express API', () => {
   });
 
   it('parses JSON string', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.send('{"bar":"baz"}'))))
 
       .when(I.get('/foo'))
@@ -252,7 +255,7 @@ describe('Specifying an express API', () => {
   });
 
   it('fails gracefully to parse JSON string', () => {
-    return new Example(() => new k.api.express.RequestHandler(express()
+    return new Example(() => new k.api.express.ApiHandler(express()
       .get('/foo', (req, res) => res.send('not json'))))
 
       .when(I.get('/foo'))

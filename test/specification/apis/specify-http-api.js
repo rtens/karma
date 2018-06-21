@@ -8,20 +8,14 @@ const {Example, I, expect} = require('../../../spec')({api: 'http'});
 
 const express = require('express');
 
-describe('Specifying an express API', () => {
+describe('Specifying an HTTP API', () => {
 
-  it('responds with 404 if the Route of a GET request is not defined', () => {
-    return new Example(() => new k.api.http.ApiHandler({traceId: () => 'trace'}))
+  it('fails if the Route of a GET request is not defined', () => {
+    return new Example(() => new k.api.http.ApiHandler())
 
       .when(I.get('/foo'))
 
-      .then(expect.Response()
-        .withStatus(404)
-        .withBody({
-          code: 'RESOURCE_NOT_FOUND',
-          message: 'Cannot handle [get /foo]',
-          traceId: 'trace'
-        }))
+      .promise.should.be.rejectedWith('Cannot handle [get /foo]')
   });
 
   it('fails if the response does not match', () => {
@@ -42,10 +36,11 @@ describe('Specifying an express API', () => {
 
       .when(I.get('/foo'))
 
-      .then(expect.Response('bar'))
+      .then(expect.Response('bar')
+        .withStatus(202))
 
       .promise.should.be.rejectedWith("Unexpected response status: " +
-        "expected 201 to equal 200");
+        "expected 201 to equal 202");
   });
 
   it('asserts the expected response', () => {
@@ -141,17 +136,11 @@ describe('Specifying an express API', () => {
   });
 
   it('fails if the Route of a POST request is not defined', () => {
-    return new Example(() => new k.api.http.ApiHandler({traceId: () => 'trace'}))
+    return new Example(() => new k.api.http.ApiHandler())
 
       .when(I.post('/foo'))
 
-      .then(expect.Response()
-        .withStatus(404)
-        .withBody({
-          code: 'RESOURCE_NOT_FOUND',
-          message: 'Cannot handle [post /foo]',
-          traceId: 'trace'
-        }))
+      .promise.should.be.rejectedWith(k.api.NotFoundError, 'Cannot handle [post /foo]')
   });
 
   it('uses headers and query arguments of POST request', () => {
