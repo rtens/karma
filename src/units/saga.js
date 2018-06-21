@@ -30,7 +30,6 @@ class SagaInstance extends unit.UnitInstance {
   }
 
   reactTo(record) {
-    // debug('reactTo', {key: this._key, record});
 
     return this._lockReaction(record)
       .then(locked => locked ? this._tryToReactTo(record) : null)
@@ -41,7 +40,6 @@ class SagaInstance extends unit.UnitInstance {
 
     return new Promise(y => y(reactor.call(this, record.event.payload, record)))
       .catch(err => {
-        // debug('failed', {key: this._key, record, err});
         return this._markReactionFailed(record, err.stack || err)
       })
   }
@@ -54,8 +52,7 @@ class SagaInstance extends unit.UnitInstance {
       sequence: record.sequence
     }))
       .then(() => true)
-      .catch(error => {
-        // debug('locked', {key: this._key, record, error: error.message});
+      .catch(() => {
         return false;
       })
   }
@@ -80,6 +77,7 @@ class SagaRepository extends unit.UnitRepository {
     return this._getUnitsHandling(event);
   }
 
+  //noinspection JSUnusedGlobalSymbols
   _createInstance(sagaId, definition) {
     return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._meta);
   }

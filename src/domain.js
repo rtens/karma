@@ -91,7 +91,6 @@ class Domain extends BaseDomain {
   start() {
     return this._meta.respondTo(new message.Query('last-record-time'))
       .then(lastRecordTime => {
-        // debug('subscribe module', {lastRecordTime});
         return Promise.all([
           this._log.subscribe(this._log.filter().after(lastRecordTime),
             record => this.reactTo(record)),

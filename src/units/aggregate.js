@@ -27,6 +27,7 @@ class AggregateInstance extends unit.UnitInstance {
     this._store = store;
   }
 
+  //noinspection JSUnusedGlobalSymbols
   _recordFilter() {
     return this._log.filter()
       .ofStream(this.id)
@@ -39,7 +40,6 @@ class AggregateInstance extends unit.UnitInstance {
   }
 
   execute(command) {
-    // debug('execute', {command, id: this.id});
     try {
       return this._execute(command);
     } catch (err) {
@@ -52,7 +52,6 @@ class AggregateInstance extends unit.UnitInstance {
 
     if (!Array.isArray(events)) return Promise.resolve([]);
 
-    // debug('record', {id: this.id, tries, sequence: this._heads[this.id], events});
     return this._store.record(events, this.id, this._heads[this.id], command.traceId)
       .catch(e => {
         if (tries >= 10) throw e;
@@ -82,6 +81,7 @@ class AggregateRepository extends unit.UnitRepository {
       })
   }
 
+  //noinspection JSUnusedGlobalSymbols
   _createInstance(aggregateId, definition) {
     return new AggregateInstance(aggregateId, definition, this._log, this._snapshots, this._store);
   }

@@ -15,6 +15,7 @@ class Unit {
     this._mappers = {};
   }
 
+  //noinspection JSUnusedLocalSymbols
   canHandle(message) {
     return false
   }
@@ -100,10 +101,8 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
-    // debug('fetch', {key: this._key, version: this.definition.version});
     return this._snapshots.fetch(this._key, this.definition.version)
       .then(snapshot => {
-        // debug('fetched', {key: this._key, lastRecordTime: snapshot.lastRecordTime});
         this._lastRecordTime = snapshot.lastRecordTime;
         this._heads = snapshot.heads;
         this.state = snapshot.state;
@@ -115,7 +114,6 @@ class UnitInstance {
     let filter = this._recordFilter();
     if (this._lastRecordTime) filter.after(this._timeWindow(this._lastRecordTime));
 
-    // debug('subscribe', {key: this._key, filter});
     return this._log.subscribe(filter, record => this.apply(record))
       .then(subscription => this._subscription = subscription)
   }
@@ -144,13 +142,11 @@ class UnitInstance {
   }
 
   unload() {
-    // debug('unload', {key: this._key});
     this._onUnload.forEach(fn=>fn());
     if (this._subscription) this._subscription.cancel();
   }
 
   takeSnapshot() {
-    // debug('store', {key: this._key, version: this.definition.version});
     return this._snapshots.store(this._key, this.definition.version,
       new persistence.Snapshot(this._lastRecordTime, this._heads, this.state));
   }
@@ -163,7 +159,6 @@ class UnitInstance {
 
     if (record.sequence <= this._heads[record.streamId]) return;
 
-    // debug('apply', {key: this._key, record});
 
     try {
       appliers.forEach(applier => applier.call(this, record.event.payload, record));
@@ -209,7 +204,6 @@ class UnitRepository {
     let instance = this._instances[definition.name][unitId];
 
     if (!instance) {
-      // debug('load', {name: definition.name, id: unitId});
       instance = this._instances[definition.name][unitId] = this._createInstance(unitId, definition);
       instance.onUnload(() => delete this._instances[definition.name][unitId])
     }
