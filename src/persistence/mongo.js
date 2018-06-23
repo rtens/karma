@@ -3,6 +3,8 @@ const _event = require('../../src/event');
 
 const mongodb = require('mongodb');
 const mongoOplog = require('mongo-oplog');
+const BSON = require('bson');
+const debug = require('debug')('karma:snapshot');
 
 class MongoEventStore extends _persistence.EventStore {
   constructor(moduleName, connectionUri, database, collectionPrefix, connectionOptions) {
@@ -260,6 +262,10 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
         s: snapshot.state
       }
     };
+
+    if (debug.enabled) {
+      debug('%j', {key, version, size: new BSON().calculateObjectSize(document.$set)});
+    }
 
     return this.connect().then(() =>
       this._db.collection(this._prefix + 'snapshots_' + this.module).updateOne(filter, document, {upsert: true}))
