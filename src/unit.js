@@ -1,5 +1,7 @@
 const crypto = require('crypto');
 const persistence = require('./persistence');
+const logging = require('./logging');
+const _message = require('./message');
 
 class Unit {
   constructor(name) {
@@ -59,13 +61,14 @@ class Unit {
 }
 
 class UnitInstance {
-  constructor(id, definition, log, snapshots) {
+  constructor(id, definition, log, snapshots, logger) {
     this.id = id;
     this.definition = definition;
     this.state = {};
 
     this._log = log;
     this._snapshots = snapshots;
+    this._logger = logger;
 
     this._lastRecordTime = null;
     this._heads = {};
@@ -170,12 +173,21 @@ class UnitInstance {
 
     this._heads[record.streamId] = record.sequence;
   }
+
+  _unitLogger(traceId) {
+    return {
+      error: message => this._logger.error(this._key, traceId, message),
+      info: message => this._logger.info(this._key, traceId, message),
+      debug: message => this._logger.debug(this._key, traceId, message),
+    }
+  }
 }
 
 class UnitRepository {
-  constructor(log, snapshots) {
+  constructor(log, snapshots, logger) {
     this._log = log;
     this._snapshots = snapshots;
+    this._logger = logger;
 
     this._definitions = [];
     this._instances = {};
@@ -191,7 +203,7 @@ class UnitRepository {
       .map(unitDefinition => {
         let unitId = unitDefinition.mapToId(message);
         if (!unitId) {
-          return Promise.reject(new Error(`Cannot map [${message.name}]`))
+          return Promise.reject(new _message.Rejection('CANNOT_MAP_MESSAGE', `Cannot map [${message.name}]`))
         }
 
         return this._getOrLoad(unitDefinition, unitId)

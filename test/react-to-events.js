@@ -9,7 +9,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Reacting to an Event', () => {
-  let _Date, Module;
+  let _Date, Module, logger;
 
   beforeEach(() => {
     _Date = Date;
@@ -17,6 +17,8 @@ describe('Reacting to an Event', () => {
       return new _Date(time || '2010-11-12T13:00:00Z');
     };
     Date.prototype = _Date.prototype;
+
+    logger = new fake.Logger();
 
     Module = (args = {}) =>
       new k.Domain(
@@ -33,7 +35,8 @@ describe('Reacting to an Event', () => {
             : args.metaLog || new fake.EventLog(),
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
-        })
+        },
+        logger)
   });
 
   afterEach(() => {
@@ -62,7 +65,8 @@ describe('Reacting to an Event', () => {
     return Module({log})
 
       .add(new k.Saga('One')
-        .reactingTo('food', ()=>'baz', (payload, record) => reactions.push([payload, record.sequence])))
+        .reactingTo('food', ()=>'baz', (payload, record) =>
+          reactions.push([payload, record.sequence])))
 
       .start()
 
@@ -267,7 +271,7 @@ describe('Reacting to an Event', () => {
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', () => {
-          throw {stack: 'An Error'};
+          throw {stack: 'An Error stack', toString: () => 'Error: Nope'};
         }))
 
       .start()
@@ -293,12 +297,16 @@ describe('Reacting to an Event', () => {
             traceId: 'trace',
             time: new Date()
           },
-          error: 'An Error'
+          error: 'An Error stack'
         })],
         streamId: '__Saga-One-foo',
         onSequence: undefined,
         traceId: undefined
       }]))
+
+      .then(() => logger.logged['error:Saga-One-foo'].should.eql([
+        {traceId: 'trace', message: 'Error: Nope'}
+      ]))
   });
 
   it('marks reactions with rejected Promises as failed', () => {
@@ -315,6 +323,34 @@ describe('Reacting to an Event', () => {
       .start()
 
       .then(() => metaStore.recorded[1].events[0].payload.error.should.eql('Nope'))
+  });
+
+  it('logs messages from reaction', () => {
+    let log = new fake.EventLog();
+    log.records = [new _event.Record(new k.Event('food', 'one'), 'foo', 23, 'trace')];
+
+    let metaStore = new fake.EventStore();
+
+    return Module({log, metaStore})
+
+      .add(new k.Saga('One')
+        .reactingTo('food', ()=>'foo', (payload, record, log) => {
+          log.error('An Error');
+          log.info('Some Info');
+          log.debug('A Bug');
+        }))
+
+      .start()
+
+      .then(() => logger.logged['error:Saga-One-foo'].should.eql([
+        {traceId: 'trace', message: 'An Error'}
+      ]))
+      .then(() => logger.logged['info:Saga-One-foo'].should.eql([
+        {traceId: 'trace', message: 'Some Info'}
+      ]))
+      .then(() => logger.logged['debug:Saga-One-foo'].should.eql([
+        {traceId: 'trace', message: 'A Bug'}
+      ]))
   });
 
   it('does not invoke reactor if reaction is locked', () => {

@@ -1,3 +1,4 @@
+const message = require('../message');
 const unit = require('../unit');
 
 class Projection extends unit.Unit {
@@ -21,15 +22,16 @@ class Projection extends unit.Unit {
 }
 
 class ProjectionInstance extends unit.UnitInstance {
-  constructor(id, definition, log, snapshots) {
-    super(id, definition, log, snapshots);
+  constructor(id, definition, log, snapshots, logger) {
+    super(id, definition, log, snapshots, logger);
     this._waiters = [];
     this._unloaded = false;
   }
 
   respondTo(query) {
     return this._waitFor(query.heads)
-      .then(() => this.definition._responders[query.name].call(this, query.payload));
+      .then(() => this.definition._responders[query.name]
+        .call(this, query.payload, query, this._unitLogger(query.traceId)))
   }
 
   _waitFor(heads) {
@@ -58,7 +60,7 @@ class ProjectionRepository extends unit.UnitRepository {
       .then(instances => {
 
         if (instances.length == 0) {
-          throw new Error(`Cannot handle Query [${query.name}]`)
+          throw new message.Rejection('QUERY_NOT_FOUND', `Cannot handle Query [${query.name}]`)
         } else if (instances.length > 1) {
           throw new Error(`Too many handlers for Query [${query.name}]`)
         }
@@ -67,8 +69,9 @@ class ProjectionRepository extends unit.UnitRepository {
       })
   }
 
+  //noinspection JSUnusedGlobalSymbols
   _createInstance(projectionId, definition) {
-    return new ProjectionInstance(projectionId, definition, this._log, this._snapshots);
+    return new ProjectionInstance(projectionId, definition, this._log, this._snapshots, this._logger);
   }
 }
 

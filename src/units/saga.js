@@ -24,8 +24,8 @@ class Saga extends unit.Unit {
 }
 
 class SagaInstance extends unit.UnitInstance {
-  constructor(id, definition, log, snapshots, meta) {
-    super(id, definition, log, snapshots);
+  constructor(id, definition, log, snapshots, logger, meta) {
+    super(id, definition, log, snapshots, logger);
     this._meta = meta;
   }
 
@@ -38,8 +38,11 @@ class SagaInstance extends unit.UnitInstance {
   _tryToReactTo(record) {
     let reactor = this.definition._reactors[record.event.name];
 
-    return new Promise(y => y(reactor.call(this, record.event.payload, record)))
+    return new Promise(y => y(reactor
+      .call(this, record.event.payload, record, this._unitLogger(record.traceId))))
+
       .catch(err => {
+        this._logger.error(this._key, record.traceId, err);
         return this._markReactionFailed(record, err.stack || err)
       })
   }
@@ -68,8 +71,8 @@ class SagaInstance extends unit.UnitInstance {
 }
 
 class SagaRepository extends unit.UnitRepository {
-  constructor(log, snapshots, metaModule) {
-    super(log, snapshots);
+  constructor(log, snapshots, logger, metaModule) {
+    super(log, snapshots, logger);
     this._meta = metaModule;
   }
 
@@ -79,7 +82,7 @@ class SagaRepository extends unit.UnitRepository {
 
   //noinspection JSUnusedGlobalSymbols
   _createInstance(sagaId, definition) {
-    return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._meta);
+    return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._logger, this._meta);
   }
 }
 

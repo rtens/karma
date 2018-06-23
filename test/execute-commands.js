@@ -11,7 +11,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Executing a Command', () => {
-  let _Date, _setTimeout, waits, Module;
+  let _Date, _setTimeout, waits, Module, logger;
 
   beforeEach(() => {
     _Date = Date;
@@ -27,6 +27,8 @@ describe('Executing a Command', () => {
       fn()
     };
 
+    logger = new fake.Logger();
+
     Module = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
@@ -40,7 +42,8 @@ describe('Executing a Command', () => {
           eventLog: () => args.metaLog || new fake.EventLog(),
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
-        })
+        },
+        logger)
   });
 
   afterEach(() => {
@@ -61,9 +64,14 @@ describe('Executing a Command', () => {
   it('fails if no executer is defined', () => {
     return Module()
 
-      .execute(new k.Command('Foo'))
+      .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
-      .should.be.rejectedWith(Error, 'Cannot handle Command [Foo]')
+      .should.be.rejectedWith(k.Rejection, 'Cannot handle Command [Foo]')
+
+      .then(() => logger.logged['info:command'].should.eql([
+        {traceId: 'trace', message: {Foo: 'one'}},
+        {traceId: 'trace', message: {rejected: 'COMMAND_NOT_FOUND'}}
+      ]))
   });
 
   it('fails if an executer is defined twice in the same Aggregate', () => {
@@ -104,9 +112,14 @@ describe('Executing a Command', () => {
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>null))
 
-      .execute(new k.Command('Foo'))
+      .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
-      .should.be.rejectedWith(Error, 'Cannot map [Foo]')
+      .should.be.rejectedWith(k.Rejection, 'Cannot map [Foo]')
+
+      .then(() => logger.logged['info:command'].should.eql([
+        {traceId: 'trace', message: {Foo: 'one'}},
+        {traceId: 'trace', message: {rejected: 'CANNOT_MAP_MESSAGE'}}
+      ]))
   });
 
   it('executes the Command', () => {
@@ -115,15 +128,43 @@ describe('Executing a Command', () => {
     return Module()
 
       .add(new k.Aggregate('One')
-        .executing('Foo', ()=>'foo', payload => {
-          executed.push(payload);
+        .executing('Foo', ()=>'foo', (payload, command) => {
+          executed.push([payload, command.traceId]);
         }))
 
-      .execute(new k.Command('Foo', 'one', 'trace'))
+      .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
       .then(records => records.should.eql([]))
 
-      .then(() => executed.should.eql(['one']))
+      .then(() => executed.should.eql([['one', 'trace']]))
+
+      .then(() => logger.logged['info:command'].should.eql([
+        {traceId: 'trace', message: {Foo: 'one'}},
+        {traceId: 'trace', message: {executed: 'Foo'}}
+      ]))
+  });
+
+  it('logs messages from Command handler', () => {
+    return Module()
+
+      .add(new k.Aggregate('One')
+        .executing('Foo', ()=>'foo', (payload, command, log) => {
+          log.error('An Error');
+          log.info('Some Info');
+          log.debug('A Bug');
+        }))
+
+      .execute(new k.Command('Foo').withTraceId('trace'))
+
+      .then(() => logger.logged['error:Aggregate-One-foo'].should.eql([
+        {traceId: 'trace', message: 'An Error'}
+      ]))
+      .then(() => logger.logged['info:Aggregate-One-foo'].should.eql([
+        {traceId: 'trace', message: 'Some Info'}
+      ]))
+      .then(() => logger.logged['debug:Aggregate-One-foo'].should.eql([
+        {traceId: 'trace', message: 'A Bug'}
+      ]))
   });
 
   it('fails if the Command is rejected', () => {
@@ -131,12 +172,34 @@ describe('Executing a Command', () => {
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', function () {
+          throw new k.Rejection('NOPE', 'Nope')
+        }))
+
+      .execute(new k.Command('Foo', 'one').withTraceId('trace'))
+
+      .should.be.rejectedWith(k.Rejection, 'Nope')
+
+      .then(() => logger.logged['info:command'].should.eql([
+        {traceId: 'trace', message: {Foo: 'one'}},
+        {traceId: 'trace', message: {rejected: 'NOPE'}}
+      ]))
+  });
+
+  it('fails if the Command handler throws an Error', () => {
+    return Module()
+
+      .add(new k.Aggregate('One')
+        .executing('Foo', ()=>'foo', function () {
           throw new Error('Nope')
         }))
 
-      .execute(new k.Command('Foo'))
+      .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
       .should.be.rejectedWith(Error, 'Nope')
+
+      .then(() => logger.logged['error:command'].should.eql([
+        {traceId: 'trace', message: 'Error: Nope'}
+      ]))
   });
 
   it('records Events', () => {
@@ -165,7 +228,12 @@ describe('Executing a Command', () => {
         streamId: 'one',
         onSequence: undefined,
         traceId: 'trace'
-      }]));
+      }]))
+
+      .then(() => logger.logged['info:event'].should.eql([
+        {traceId: 'trace', message: {food: 'one'}},
+        {traceId: 'trace', message: {bard: 'two'}}
+      ]))
   });
 
   it('does not record no Events', () => {

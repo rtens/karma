@@ -1,3 +1,4 @@
+const message = require('../message');
 const unit = require('../unit');
 
 class Aggregate extends unit.Unit {
@@ -22,8 +23,8 @@ class Aggregate extends unit.Unit {
 }
 
 class AggregateInstance extends unit.UnitInstance {
-  constructor(id, definition, log, snapshots, store) {
-    super(id, definition, log, snapshots);
+  constructor(id, definition, log, snapshots, logger, store) {
+    super(id, definition, log, snapshots, logger);
     this._store = store;
   }
 
@@ -41,14 +42,15 @@ class AggregateInstance extends unit.UnitInstance {
 
   execute(command) {
     try {
-      return this._execute(command);
+      return this._execute(command)
     } catch (err) {
       return Promise.reject(err)
     }
   }
 
   _execute(command, tries = 0) {
-    let events = this.definition._executers[command.name].call(this, command.payload);
+    let events = this.definition._executers[command.name]
+      .call(this, command.payload, command, this._unitLogger(command.traceId));
 
     if (!Array.isArray(events)) return Promise.resolve([]);
 
@@ -62,8 +64,8 @@ class AggregateInstance extends unit.UnitInstance {
 }
 
 class AggregateRepository extends unit.UnitRepository {
-  constructor(log, snapshots, store) {
-    super(log, snapshots);
+  constructor(log, snapshots, logger, store) {
+    super(log, snapshots, logger);
     this._store = store;
   }
 
@@ -72,7 +74,7 @@ class AggregateRepository extends unit.UnitRepository {
       .then(instances => {
 
         if (instances.length == 0) {
-          throw new Error(`Cannot handle Command [${command.name}]`)
+          throw new message.Rejection('COMMAND_NOT_FOUND', `Cannot handle Command [${command.name}]`)
         } else if (instances.length > 1) {
           throw new Error(`Too many handlers for Command [${command.name}]`)
         }
@@ -83,7 +85,7 @@ class AggregateRepository extends unit.UnitRepository {
 
   //noinspection JSUnusedGlobalSymbols
   _createInstance(aggregateId, definition) {
-    return new AggregateInstance(aggregateId, definition, this._log, this._snapshots, this._store);
+    return new AggregateInstance(aggregateId, definition, this._log, this._snapshots, this._logger, this._store);
   }
 }
 

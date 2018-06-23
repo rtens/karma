@@ -4,18 +4,20 @@ const projection = require('./units/projection');
 const subscription = require('./units/subscription');
 const saga = require('./units/saga');
 const meta = require('./meta');
+const logging = require('./logging');
 
 class BaseDomain {
-  constructor(name, unitStrategy, persistenceFactory) {
+  constructor(name, unitStrategy, persistenceFactory, logger) {
     this._strategy = unitStrategy;
+    this._logger = logger || new logging.Logger();
 
     this._log = persistenceFactory.eventLog(name);
     this._snapshots = persistenceFactory.snapshotStore(name);
     this._store = persistenceFactory.eventStore(name);
 
-    this._aggregates = new aggregate.AggregateRepository(this._log, this._snapshots, this._store);
-    this._projections = new projection.ProjectionRepository(this._log, this._snapshots);
-    this._subscriptions = new subscription.SubscriptionRepository(this._log, this._snapshots);
+    this._aggregates = new aggregate.AggregateRepository(this._log, this._snapshots, this._logger, this._store);
+    this._projections = new projection.ProjectionRepository(this._log, this._snapshots, this._logger);
+    this._subscriptions = new subscription.SubscriptionRepository(this._log, this._snapshots, this._logger);
   }
 
   add(unit) {
@@ -30,17 +32,28 @@ class BaseDomain {
   }
 
   execute(command) {
-    return this._aggregates
-      .getAggregateExecuting(command)
-      .then(this._notifyAccess(aggregate =>
-        aggregate.execute(command)))
+    return this._logRequest('command', 'executed', command,
+
+      () => this._aggregates
+        .getAggregateExecuting(command)
+        .then(this._notifyAccess(aggregate =>
+          aggregate.execute(command))))
+
+      .then(records => {
+        (records || []).forEach(record =>
+          this._logger.info('event', command.traceId, {[record.event.name]: record.event.payload}));
+        return records;
+      })
   }
 
   respondTo(query) {
-    return this._projections
-      .getProjectionRespondingTo(query)
-      .then(this._notifyAccess(projection =>
-        projection.respondTo(query)))
+    return this._logRequest('query', 'responded', query,
+
+      () => this._projections
+        .getProjectionRespondingTo(query)
+        .then(this._notifyAccess(projection =>
+          projection.respondTo(query))))
+
   }
 
   subscribeTo(query, subscriber) {
@@ -61,17 +74,38 @@ class BaseDomain {
         return Promise.reject(err)
       })
   }
+
+  _logRequest(name, done, request, handle) {
+    this._logger.info(name, request.traceId, {[request.name]: request.payload});
+
+    return handle()
+
+      .then(response => {
+        this._logger.info(name, request.traceId, {[done]: request.name});
+        return response
+      })
+
+      .catch(err => {
+        if (err instanceof message.Rejection) {
+          this._logger.info(name, request.traceId, {rejected: err.code});
+        } else {
+          this._logger.error(name, request.traceId, err);
+        }
+
+        return Promise.reject(err);
+      })
+  }
 }
 
 class Domain extends BaseDomain {
-  constructor(name, unitStrategy, persistenceFactory, metaPersistenceFactory) {
-    super(name, unitStrategy, persistenceFactory);
+  constructor(name, unitStrategy, persistenceFactory, metaPersistenceFactory, logger) {
+    super(name, unitStrategy, persistenceFactory, logger);
     this._name = name;
 
     this._adminLog = metaPersistenceFactory.eventLog('__admin');
 
     this._meta = new BaseDomain(name + '__meta', unitStrategy, metaPersistenceFactory);
-    this._sagas = new saga.SagaRepository(this._log, this._snapshots, this._meta);
+    this._sagas = new saga.SagaRepository(this._log, this._snapshots, this._logger, this._meta);
 
     this._meta._aggregates.add(new meta.ReactionLockAggregate());
     this._meta._aggregates.add(new meta.ModuleSubscriptionAggregate());
@@ -124,5 +158,5 @@ class Domain extends BaseDomain {
 }
 
 module.exports = {
-  Domain,
+  Domain
 };

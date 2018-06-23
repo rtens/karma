@@ -20,14 +20,14 @@ describe('Handling Domain Messages via HTTP', () => {
     let module = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Projection('foo')
-        .respondingTo('Foo', ()=>'foo', ({foo})=>'Hello ' + foo));
+        .respondingTo('Foo', ()=>'foo', ({foo}, query)=>'Hello ' + foo + query.traceId));
 
     return new k.api.http.RequestHandler()
       .handling(new k.api.http.QueryHandler(module, () => new k.Query('Foo', {foo: 'Bar'})))
 
-      .handle(new k.api.http.Request('ANY', '/'))
+      .handle(new k.api.http.Request('ANY', '/').withTraceId('_trace'))
 
-      .should.eventually.eql(new k.api.http.Response('Hello Bar'))
+      .should.eventually.eql(new k.api.http.Response('Hello Bar_trace'))
   });
 
   it('executes a Command', () => {

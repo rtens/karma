@@ -221,7 +221,7 @@ class QueryHandler extends Handler {
   }
 
   handle(request) {
-    return this._domain.respondTo(this._query(request))
+    return this._domain.respondTo(this._query(request).withTraceId(request.traceId))
   }
 }
 

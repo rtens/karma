@@ -17,6 +17,11 @@ class Query extends Message {
     this.heads = heads;
     return this
   }
+
+  withTraceId(traceId) {
+    this.traceId = traceId;
+    return this
+  }
 }
 
 class Rejection extends Error {

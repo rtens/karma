@@ -1,4 +1,5 @@
 const persistence = require('../persistence');
+const logging = require('../logging');
 
 class FakeEventStore extends persistence.EventStore {
   constructor() {
@@ -97,9 +98,22 @@ class FakeSnapshotStore extends persistence.SnapshotStore {
   }
 }
 
+class FakeLogger extends logging.Logger {
+  constructor() {
+    super();
+    this.logged = {};
+  }
+
+  log(tag, traceId, message) {
+    this.logged[tag] = this.logged[tag] || [];
+    this.logged[tag].push({traceId, message});
+  }
+}
+
 module.exports = {
   EventStore: FakeEventStore,
   EventLog: FakeEventLog,
   RecordFilter: FakeRecordFilter,
-  SnapshotStore: FakeSnapshotStore
+  SnapshotStore: FakeSnapshotStore,
+  Logger: FakeLogger
 };

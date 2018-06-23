@@ -10,9 +10,11 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Responding to a Query', () => {
-  let Module;
+  let Module, logger;
 
   beforeEach(() => {
+    logger = new fake.Logger();
+
     Module = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
@@ -26,15 +28,21 @@ describe('Responding to a Query', () => {
           eventLog: () => args.metaLog || new fake.EventLog(),
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
-        })
+        },
+        logger)
   });
 
   it('fails if no responder exists for that Query', () => {
     return Module()
 
-      .respondTo(new k.Query('Foo'))
+      .respondTo(new k.Query('Foo', 'bar').withTraceId('trace'))
 
-      .should.be.rejectedWith(Error, 'Cannot handle Query [Foo]')
+      .should.be.rejectedWith(k.Rejection, 'Cannot handle Query [Foo]')
+
+      .then(() => logger.logged['info:query'].should.eql([
+        {traceId: 'trace', message: {Foo: 'bar'}},
+        {traceId: 'trace', message: {rejected: 'QUERY_NOT_FOUND'}},
+      ]))
   });
 
   it('fails if multiple responders exist for that Query in one Projection', () => {
@@ -67,31 +75,64 @@ describe('Responding to a Query', () => {
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>null))
 
-      .respondTo(new k.Query('Foo'))
+      .respondTo(new k.Query('Foo', 'bar').withTraceId('trace'))
 
-      .should.be.rejectedWith('Cannot map [Foo]')
+      .should.be.rejectedWith(k.Rejection, 'Cannot map [Foo]')
+
+      .then(() => logger.logged['info:query'].should.eql([
+        {traceId: 'trace', message: {Foo: 'bar'}},
+        {traceId: 'trace', message: {rejected: 'CANNOT_MAP_MESSAGE'}},
+      ]))
   });
 
   it('returns a value', () => {
     return Module()
 
       .add(new k.Projection('One')
-        .respondingTo('Foo', ()=>'foo', payload => 'foo' + payload))
+        .respondingTo('Foo', ()=>'foo', (payload, query) => 'foo' + payload + query.traceId))
 
-      .respondTo(new k.Query('Foo', 'bar'))
+      .respondTo(new k.Query('Foo', 'bar').withTraceId('trace'))
 
-      .should.eventually.equal('foobar')
+      .should.eventually.equal('foobartrace')
+
+      .then(() => logger.logged['info:query'].should.eql([
+        {traceId: 'trace', message: {Foo: 'bar'}},
+        {traceId: 'trace', message: {responded: 'Foo'}}
+      ]))
   });
 
   it('may return a promise', () => {
     return Module()
 
       .add(new k.Projection('One')
-        .respondingTo('Foo', ()=>'foo', (payload)=>Promise.resolve(payload)))
+        .respondingTo('Foo', ()=>'foo', payload => Promise.resolve(payload)))
 
       .respondTo(new k.Query('Foo', 'bar'))
 
       .should.eventually.equal('bar')
+  });
+
+  it('logs message from Query responder', () => {
+    return Module()
+
+      .add(new k.Projection('One')
+        .respondingTo('Foo', ()=>'foo', (payload, query, log) => {
+          log.error('An Error');
+          log.info('Some Info');
+          log.debug('A Bug');
+        }))
+
+      .respondTo(new k.Query('Foo', 'bar').withTraceId('trace'))
+
+      .then(() => logger.logged['error:Projection-One-foo'].should.eql([
+        {traceId: 'trace', message: 'An Error'}
+      ]))
+      .then(() => logger.logged['info:Projection-One-foo'].should.eql([
+        {traceId: 'trace', message: 'Some Info'}
+      ]))
+      .then(() => logger.logged['debug:Projection-One-foo'].should.eql([
+        {traceId: 'trace', message: 'A Bug'}
+      ]))
   });
 
   it('fails if the Query is rejected', () => {
@@ -102,9 +143,14 @@ describe('Responding to a Query', () => {
           throw new k.Rejection('NOPE', 'Not good')
         }))
 
-      .respondTo(new k.Query('Foo', 'bar'))
+      .respondTo(new k.Query('Foo', 'bar').withTraceId('trace'))
 
       .should.be.rejectedWith(k.Rejection, 'Not good')
+
+      .then(() => logger.logged['info:query'].should.eql([
+        {traceId: 'trace', message: {Foo: 'bar'}},
+        {traceId: 'trace', message: {rejected: 'NOPE'}}
+      ]))
   });
 
   it('can be delayed until Projection reaches stream heads', () => {
@@ -150,6 +196,7 @@ describe('Responding to a Query', () => {
       .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
 
       .then(() => log.publish(new _event.Record(new k.Event(), 'bar', 42)))
+      .then(() => new Promise(y => setTimeout(y, 0)))
       .then(() => log.subscriptions.map(s => s.active).should.eql([false]))
   });
 

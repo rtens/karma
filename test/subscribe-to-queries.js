@@ -80,6 +80,8 @@ describe('Subscribing to a Query', () => {
 
       .then(() => log.publish(new _event.Record(new k.Event('food', 'one'))))
 
+      .then(() => new Promise(y => setTimeout(y, 0)))
+
       .then(() => responses.should.eql(['snap ', 'snap one']))
   });
 
