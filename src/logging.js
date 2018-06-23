@@ -46,7 +46,7 @@ class DebugLogger extends Logger {
 
   log(tag, traceId, message) {
     this.debugs[tag] = this.debugs[tag] || debug(tag);
-    this.debugs[tag]('<%s> %j', traceId || 'xxxxxx', message);
+    this.debugs[tag]('<%s> %j', traceId || 'xxxxxxxx', message);
   }
 
   formatError(error) {

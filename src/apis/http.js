@@ -176,7 +176,7 @@ class ApiHandler extends RequestHandler {
   }
 
   _generateTraceId() {
-    return (Math.floor(Math.random() * 0x100000000) + 0x10000000).toString(16)
+    return (Math.floor(Math.random() * 0xefffffff) + 0x10000000).toString(16)
   }
 
   handle(request) {
