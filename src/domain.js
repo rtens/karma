@@ -9,7 +9,7 @@ const logging = require('./logging');
 class BaseDomain {
   constructor(name, unitStrategy, persistenceFactory, logger) {
     this._strategy = unitStrategy;
-    this._logger = logger || new logging.Logger();
+    this._logger = logger || new logging.DebugLogger();
 
     this._log = persistenceFactory.eventLog(name);
     this._snapshots = persistenceFactory.snapshotStore(name);
@@ -76,7 +76,7 @@ class BaseDomain {
   }
 
   _logRequest(name, done, request, handle) {
-    this._logger.info(name, request.traceId, {[request.name]: request.payload});
+    this._logger.info(name, request.traceId, {[request.name]: request.payload || null});
 
     return handle()
 
@@ -104,7 +104,9 @@ class Domain extends BaseDomain {
 
     this._adminLog = metaPersistenceFactory.eventLog('__admin');
 
-    this._meta = new BaseDomain(name + '__meta', unitStrategy, metaPersistenceFactory);
+    const metaLogger = new logging.PrefixedLogger('meta', this._logger);
+
+    this._meta = new BaseDomain(name + '__meta', unitStrategy, metaPersistenceFactory, metaLogger);
     this._sagas = new saga.SagaRepository(this._log, this._snapshots, this._logger, this._meta);
 
     this._meta._aggregates.add(new meta.ReactionLockAggregate());

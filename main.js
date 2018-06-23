@@ -34,7 +34,7 @@ new karma.Domain('Demo',
 
     .executing('Foo', $=>$.target, function ({count}) {
       if (this.state.total + count > this.state.limit) {
-        throw new Error('Too much');
+        throw new karma.Rejection('Too much');
       }
       return [
         new karma.Event('food', {count, total: this.state.total + count}),
