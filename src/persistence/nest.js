@@ -2,8 +2,8 @@ const _event = require('../../src/event');
 const _persistence = require('../../src/persistence');
 
 class NestEventStore extends _persistence.EventStore {
-  constructor(moduleName, datastore) {
-    super(moduleName);
+  constructor(domainName, datastore) {
+    super(domainName);
     this._db = datastore;
   }
 
@@ -33,8 +33,8 @@ class NestEventStore extends _persistence.EventStore {
 }
 
 class NestEventLog extends _persistence.EventLog {
-  constructor(moduleName, datastore) {
-    super(moduleName);
+  constructor(domainName, datastore) {
+    super(domainName);
     this._db = datastore;
     this._subscriptions = [];
 
@@ -121,8 +121,8 @@ class NestRecordFilter extends _persistence.RecordFilter {
 }
 
 class NestSnapshotStore extends _persistence.SnapshotStore {
-  constructor(moduleName, datastore) {
-    super(moduleName);
+  constructor(domainName, datastore) {
+    super(domainName);
     this._db = datastore;
   }
 
@@ -179,16 +179,16 @@ class NestPersistenceFactory extends _persistence.PersistenceFactory {
     this._snapshotDatastore = snapshotDatastore;
   }
 
-  eventLog(moduleName) {
-    return new NestEventLog(moduleName, this._recordDatastore)
+  eventLog(domainName) {
+    return new NestEventLog(domainName, this._recordDatastore)
   }
 
-  snapshotStore(moduleName) {
-    return new NestSnapshotStore(moduleName, this._snapshotDatastore);
+  snapshotStore(domainName) {
+    return new NestSnapshotStore(domainName, this._snapshotDatastore);
   }
 
-  eventStore(moduleName) {
-    return new NestEventStore(moduleName, this._recordDatastore);
+  eventStore(domainName) {
+    return new NestEventStore(domainName, this._recordDatastore);
   }
 }
 

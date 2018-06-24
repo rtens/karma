@@ -63,7 +63,7 @@ describe('MongoDB Event Log', () => {
       })
   });
 
-  it('replays stored Records of module', () => {
+  it('replays stored Records of domain', () => {
     let records = [];
 
     return Promise.resolve()

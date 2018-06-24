@@ -17,13 +17,13 @@ describe('Handling Domain Messages via HTTP', () => {
       snapshotStore: () => new fake.SnapshotStore()
     };
 
-    let module = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
+    let domain = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo}, query)=>'Hello ' + foo + query.traceId));
 
     return new k.api.http.RequestHandler()
-      .handling(new k.api.http.QueryHandler(module, () => new k.Query('Foo', {foo: 'Bar'})))
+      .handling(new k.api.http.QueryHandler(domain, () => new k.Query('Foo', {foo: 'Bar'})))
 
       .handle(new k.api.http.Request('ANY', '/').withTraceId('_trace'))
 
@@ -38,13 +38,13 @@ describe('Handling Domain Messages via HTTP', () => {
       snapshotStore: () => new fake.SnapshotStore()
     };
 
-    let module = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
+    let domain = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
 
     return new k.api.http.RequestHandler()
-      .handling(new k.api.http.CommandHandler(module, () => new k.Command('Foo', {foo: 'Bar'})))
+      .handling(new k.api.http.CommandHandler(domain, () => new k.Command('Foo', {foo: 'Bar'})))
 
       .handle(new k.api.http.Request('ANY', '/').withTraceId('trace'))
 
@@ -64,7 +64,7 @@ describe('Handling Domain Messages via HTTP', () => {
     };
 
     let applied;
-    let module = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
+    let domain = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', () => [new k.Event(), new k.Event()]))
@@ -73,7 +73,7 @@ describe('Handling Domain Messages via HTTP', () => {
         .applying('bard', payload => applied = payload)
         .respondingTo('Bar', ()=>'bar', ({bar}) => applied + bar));
 
-    let response = new k.api.http.CommandHandler(module, () => new k.Command('Foo'))
+    let response = new k.api.http.CommandHandler(domain, () => new k.Command('Foo'))
       .respondingWith(req => new k.Query('Bar', {bar: req.path}))
 
       .handle(new k.api.http.Request('ANY', '/foo'));

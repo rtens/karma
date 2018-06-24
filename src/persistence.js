@@ -1,8 +1,8 @@
 const event = require('./event');
 
 class EventLog {
-  constructor(moduleName) {
-    this.module = moduleName;
+  constructor(domainName) {
+    this.domain = domainName;
   }
 
   //noinspection JSUnusedLocalSymbols
@@ -75,8 +75,8 @@ class CombinedRecordFilter extends RecordFilter {
 }
 
 class EventStore {
-  constructor(moduleName) {
-    this.module = moduleName;
+  constructor(domainName) {
+    this.domain = domainName;
   }
 
   record(events, streamId, onSequence, traceId) {
@@ -86,16 +86,16 @@ class EventStore {
 }
 
 class PersistenceFactory {
-  eventLog(moduleName) {
-    return new EventLog(moduleName)
+  eventLog(domainName) {
+    return new EventLog(domainName)
   }
 
-  snapshotStore(moduleName) {
-    return new SnapshotStore(moduleName);
+  snapshotStore(domainName) {
+    return new SnapshotStore(domainName);
   }
 
-  eventStore(moduleName) {
-    return new EventStore(moduleName);
+  eventStore(domainName) {
+    return new EventStore(domainName);
   }
 }
 
@@ -108,8 +108,8 @@ class Snapshot {
 }
 
 class SnapshotStore {
-  constructor(moduleName) {
-    this.module = moduleName;
+  constructor(domainName) {
+    this.domain = domainName;
   }
 
   //noinspection JSUnusedLocalSymbols

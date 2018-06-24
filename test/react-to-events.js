@@ -9,7 +9,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Reacting to an Event', () => {
-  let _Date, Module, logger;
+  let _Date, Domain, logger;
 
   beforeEach(() => {
     _Date = Date;
@@ -20,7 +20,7 @@ describe('Reacting to an Event', () => {
 
     logger = new fake.Logger();
 
-    Module = (args = {}) =>
+    Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
@@ -30,7 +30,7 @@ describe('Reacting to an Event', () => {
           eventStore: () => args.store || new fake.EventStore()
         },
         {
-          eventLog: module => module == '__admin'
+          eventLog: domain => domain == '__admin'
             ? args.adminLog || new fake.EventLog()
             : args.metaLog || new fake.EventLog(),
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
@@ -44,7 +44,7 @@ describe('Reacting to an Event', () => {
   });
 
   it('fails if a Saga has more than one reactor for the same Event', () => {
-    (() => Module()
+    (() => Domain()
 
       .add(new k.Saga('One')
         .reactingTo('food')
@@ -62,7 +62,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({log})
+    return Domain({log})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'baz', (payload, record) =>
@@ -85,7 +85,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({log, metaStore})
+    return Domain({log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', (payload) => reactions.push(payload)))
@@ -117,7 +117,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({log, metaStore})
+    return Domain({log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('not food', ()=>'foo', (payload) => reactions.push(payload)))
@@ -130,7 +130,7 @@ describe('Reacting to an Event', () => {
         events: [new k.Event('__record-consumed', {
           recordTime: new Date('2011-12-13T14:15:16Z')
         })],
-        streamId: '__Module-Test',
+        streamId: '__Domain-Test',
         onSequence: undefined,
         traceId: undefined
       }]))
@@ -145,14 +145,14 @@ describe('Reacting to an Event', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
       new _event.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-13T14:15:16Z')}),
-        '__Module-Test')
+        '__Domain-Test')
     ];
 
     let metaStore = new fake.EventStore();
 
     let reactions = [];
 
-    return Module({log, metaStore, metaLog})
+    return Domain({log, metaStore, metaLog})
 
       .add(new k.Saga('One')
         .reactingTo('not food', ()=>'foo', (payload) => reactions.push(payload)))
@@ -174,7 +174,7 @@ describe('Reacting to an Event', () => {
 
     let log = new fake.EventLog();
 
-    return Module({log, metaLog}).start()
+    return Domain({log, metaLog}).start()
 
       .then(() => log.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
   });
@@ -191,12 +191,12 @@ describe('Reacting to an Event', () => {
 
     let metaSnapshots = new fake.SnapshotStore();
 
-    let module = Module({log, metaLog, strategy, metaSnapshots});
-    return module.start()
+    let domain = Domain({log, metaLog, strategy, metaSnapshots});
+    return domain.start()
 
       .then(() => metaLog.records = [])
 
-      .then(() => module.start())
+      .then(() => domain.start())
 
       .then(() => log.replayed.should.eql([
         {lastRecordTime: new Date('2011-12-13')},
@@ -216,7 +216,7 @@ describe('Reacting to an Event', () => {
 
     let log = new fake.EventLog();
 
-    return Module({log, metaLog, adminLog}).start()
+    return Domain({log, metaLog, adminLog}).start()
 
       .then(() => log.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
 
@@ -228,7 +228,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({log})
+    return Domain({log})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', (payload) => reactions.push(payload))
@@ -246,7 +246,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({log})
+    return Domain({log})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', (payload) => reactions.push('a ' + payload)))
@@ -267,7 +267,7 @@ describe('Reacting to an Event', () => {
 
     let metaStore = new fake.EventStore();
 
-    return Module({log, metaStore})
+    return Domain({log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', () => {
@@ -315,7 +315,7 @@ describe('Reacting to an Event', () => {
 
     let metaStore = new fake.EventStore();
 
-    return Module({log, metaStore})
+    return Domain({log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', () => Promise.reject('Nope')))
@@ -331,7 +331,7 @@ describe('Reacting to an Event', () => {
 
     let metaStore = new fake.EventStore();
 
-    return Module({log, metaStore})
+    return Domain({log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', (payload, record, log) => {
@@ -368,7 +368,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({metaLog, log, metaStore})
+    return Domain({metaLog, log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'bar', (payload) => reactions.push(payload)))
@@ -418,7 +418,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({metaLog, log, strategy, metaSnapshots})
+    return Domain({metaLog, log, strategy, metaSnapshots})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'bar', (payload) => reactions.push(payload)))
@@ -450,7 +450,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({metaLog, log, metaStore})
+    return Domain({metaLog, log, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'bar', (payload) => reactions.push(payload)))
@@ -467,7 +467,7 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
-    return Module({adminLog, metaStore})
+    return Domain({adminLog, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', (payload) => reactions.push(payload)))

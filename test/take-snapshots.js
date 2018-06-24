@@ -12,7 +12,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Taking a Snapshot', () => {
-  let _Date, Module;
+  let _Date, Domain;
 
   beforeEach(() => {
     _Date = Date;
@@ -21,7 +21,7 @@ describe('Taking a Snapshot', () => {
     };
     Date.prototype = _Date.prototype;
 
-    Module = (args = {}) =>
+    Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
@@ -41,7 +41,7 @@ describe('Taking a Snapshot', () => {
     Date = _Date;
   });
 
-  it('passes Module names to the SnapshotStore', () => {
+  it('passes Domain names to the SnapshotStore', () => {
     let passedNames = [];
     let persistence = new _persistence.PersistenceFactory();
     persistence.snapshotStore = name => passedNames.push(name);
@@ -66,7 +66,7 @@ describe('Taking a Snapshot', () => {
         let taken = false;
         let strategy = {onAccess: unit => unit.takeSnapshot().then(() => taken = true)};
 
-        return Module({log, snapshots, strategy})
+        return Domain({log, snapshots, strategy})
 
           .add(new unit.Unit('One')
             .initializing(function () {
@@ -108,7 +108,7 @@ describe('Taking a Snapshot', () => {
         }];
 
         let state = [];
-        return Module({log, snapshots})
+        return Domain({log, snapshots})
 
           .add(new unit.Unit('One')
             .withVersion('v1')
@@ -138,7 +138,7 @@ describe('Taking a Snapshot', () => {
         let snapshots = new fake.SnapshotStore();
         snapshots.fetch = () => Promise.reject();
 
-        return Module({snapshots})
+        return Domain({snapshots})
 
           .add(new unit.Unit('One')
             [unit.handling]('Foo', ()=>'foo', ()=>null))
@@ -151,7 +151,7 @@ describe('Taking a Snapshot', () => {
 
         let strategy = {onAccess: unit => unit.takeSnapshot()};
 
-        var domain = Module({snapshots, strategy});
+        var domain = Domain({snapshots, strategy});
 
         return domain
 
@@ -226,7 +226,7 @@ describe('Taking a Snapshot', () => {
 
         let strategy = {onAccess: unit => unit.takeSnapshot()};
 
-        return Module({snapshots, strategy})
+        return Domain({snapshots, strategy})
 
           .add(new unit.Unit('One')
             .withVersion('v1')
@@ -266,7 +266,7 @@ describe('Taking a Snapshot', () => {
           }];
 
           let state = [];
-          return Module({log, snapshots})
+          return Domain({log, snapshots})
 
             .add(new unit.Unit('One')
               .withVersion('v1')
@@ -307,7 +307,7 @@ describe('Taking a Snapshot', () => {
 
           let strategy = {onAccess: unit => unit.takeSnapshot()};
 
-          return Module({log, snapshots, strategy})
+          return Domain({log, snapshots, strategy})
 
             .add(new unit.Unit('One')
               .initializing(function () {

@@ -8,7 +8,7 @@ const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Aggregates', () => {
 
-  const module = configure => domain => {
+  const domain = configure => domain => {
 
     domain.add(configure(new k.Aggregate('One'))
       .initializing(function () {
@@ -29,7 +29,7 @@ describe('Specifying Aggregates', () => {
   };
 
   it('asserts recorded Events', () => {
-    return new Example(module(x=>x))
+    return new Example(domain(x=>x))
 
       .when(I.post())
 
@@ -64,7 +64,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('uses recorded Events', () => {
-    return new Example(module(aggregate=>aggregate
+    return new Example(domain(aggregate=>aggregate
       .applying('bazd', function ({one, two}) {
         this.state[one] = two;
       })
@@ -87,7 +87,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('does not use recorded Events of other Stream', () => {
-    return new Example(module(aggregate =>aggregate
+    return new Example(domain(aggregate =>aggregate
       .applying('bazd', function ({one, two}) {
         this.state[one] = two;
       })
@@ -106,7 +106,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails no ID of expected Event stream does not match', () => {
-    return new Example(module(aggregate=>aggregate))
+    return new Example(domain(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
@@ -117,7 +117,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if expected Event was not recorded', () => {
-    return new Example(module(aggregate=>aggregate))
+    return new Example(domain(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
@@ -130,7 +130,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if expected do not match recorded Events', () => {
-    return new Example(module(aggregate=>aggregate))
+    return new Example(domain(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 
@@ -144,7 +144,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if Event is not expected inside Stream', () => {
-    return new Example(module(aggregate=>aggregate))
+    return new Example(domain(aggregate=>aggregate))
 
       .when(I.post('/foo'))
 

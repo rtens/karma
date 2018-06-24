@@ -10,10 +10,10 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Subscribing to a Query', () => {
-  let Module;
+  let Domain;
 
   beforeEach(() => {
-    Module = (args = {}) =>
+    Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
@@ -30,7 +30,7 @@ describe('Subscribing to a Query', () => {
   });
 
   it('fails if no responder exists for that Query', () => {
-    return Module()
+    return Domain()
 
       .subscribeTo(new k.Query('Foo'))
 
@@ -40,7 +40,7 @@ describe('Subscribing to a Query', () => {
   it('sends a value', () => {
     let responses = [];
 
-    return Module()
+    return Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', payload => 'foo' + payload))
@@ -62,7 +62,7 @@ describe('Subscribing to a Query', () => {
       snapshot: new _persistence.Snapshot(new Date(), {}, 'snap ')
     }];
 
-    return Module({log, snapshots})
+    return Domain({log, snapshots})
 
       .add(new k.Projection('One')
         .withVersion('v1')
@@ -90,7 +90,7 @@ describe('Subscribing to a Query', () => {
 
     let log = new fake.EventLog();
 
-    return Module({log})
+    return Domain({log})
 
       .add(new k.Projection('One')
         .initializing(function () {
@@ -112,15 +112,15 @@ describe('Subscribing to a Query', () => {
   it('sends value to multiple subscribers', () => {
     let responses = [];
 
-    var module = Module();
-    return module
+    var domain = Domain();
+    return domain
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', () => 'foo'))
 
       .subscribeTo(new k.Query('Foo'), response => responses.push('a ' + response))
 
-      .then(() => module.subscribeTo(new k.Query('Foo'), response => responses.push('b ' + response)))
+      .then(() => domain.subscribeTo(new k.Query('Foo'), response => responses.push('b ' + response)))
 
       .then(() => responses.should.eql(['a foo', 'b foo']))
   });
@@ -130,7 +130,7 @@ describe('Subscribing to a Query', () => {
 
     let log = new fake.EventLog();
 
-    return Module({log})
+    return Domain({log})
 
       .add(new k.Projection('One')
         .initializing(function () {
@@ -157,7 +157,7 @@ describe('Subscribing to a Query', () => {
 
     let strategy = {onAccess: unit => unit.unload()};
 
-    let domain = Module({log, strategy});
+    let domain = Domain({log, strategy});
 
     return domain
 
@@ -174,7 +174,7 @@ describe('Subscribing to a Query', () => {
 
     let strategy = {onAccess: unit => unit.unload()};
 
-    let domain = Module({log, strategy});
+    let domain = Domain({log, strategy});
 
     return domain
 
@@ -195,7 +195,7 @@ describe('Subscribing to a Query', () => {
   it('does not un-subscribes projection if not removed and all subscriptions are cancelled', () => {
     let log = new fake.EventLog();
 
-    let domain = Module({log});
+    let domain = Domain({log});
 
     return domain
 

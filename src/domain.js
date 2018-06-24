@@ -110,8 +110,8 @@ class Domain extends BaseDomain {
     this._sagas = new saga.SagaRepository(this._log, this._snapshots, this._logger, this._meta);
 
     this._meta._aggregates.add(new meta.ReactionLockAggregate());
-    this._meta._aggregates.add(new meta.ModuleSubscriptionAggregate());
-    this._meta._projections.add(new meta.ModuleSubscriptionProjection(name));
+    this._meta._aggregates.add(new meta.DomainSubscriptionAggregate());
+    this._meta._projections.add(new meta.DomainSubscriptionProjection(name));
   }
 
   add(unit) {
@@ -153,7 +153,7 @@ class Domain extends BaseDomain {
 
   _consumeRecord(record) {
     return this._meta.execute(new message.Command('consume-record', {
-      moduleName: this._name,
+      domainName: this._name,
       recordTime: record.time
     }));
   }

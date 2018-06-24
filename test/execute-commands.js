@@ -11,7 +11,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Executing a Command', () => {
-  let _Date, _setTimeout, waits, Module, logger;
+  let _Date, _setTimeout, waits, Domain, logger;
 
   beforeEach(() => {
     _Date = Date;
@@ -29,7 +29,7 @@ describe('Executing a Command', () => {
 
     logger = new fake.Logger();
 
-    Module = (args = {}) =>
+    Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
         args.strategy || new _unit.UnitStrategy(),
@@ -51,7 +51,7 @@ describe('Executing a Command', () => {
     setTimeout = _setTimeout;
   });
 
-  it('passes Module names to the EventStore', () => {
+  it('passes Domain names to the EventStore', () => {
     let passedNames = [];
     let persistence = new _persistence.PersistenceFactory();
     persistence.eventStore = name => passedNames.push(name);
@@ -62,7 +62,7 @@ describe('Executing a Command', () => {
   });
 
   it('fails if no executer is defined', () => {
-    return Module()
+    return Domain()
 
       .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
@@ -75,7 +75,7 @@ describe('Executing a Command', () => {
   });
 
   it('fails if an executer is defined twice in the same Aggregate', () => {
-    (() => Module()
+    (() => Domain()
 
       .add(new k.Aggregate('One')
         .executing('Foo')
@@ -85,7 +85,7 @@ describe('Executing a Command', () => {
   });
 
   it('fails if Aggregate has no name', () => {
-    (() => Module()
+    (() => Domain()
 
       .add(new k.Aggregate()))
 
@@ -93,7 +93,7 @@ describe('Executing a Command', () => {
   });
 
   it('fails if an executer is defined twice across Aggregate', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo'))
@@ -107,7 +107,7 @@ describe('Executing a Command', () => {
   });
 
   it('fails if the Command cannot be mapped to an Aggregate', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>null))
@@ -125,7 +125,7 @@ describe('Executing a Command', () => {
   it('executes the Command', () => {
     let executed = [];
 
-    return Module()
+    return Domain()
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', (payload, command) => {
@@ -145,7 +145,7 @@ describe('Executing a Command', () => {
   });
 
   it('logs messages from Command handler', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', (payload, command, log) => {
@@ -168,7 +168,7 @@ describe('Executing a Command', () => {
   });
 
   it('fails if the Command is rejected', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', function () {
@@ -186,7 +186,7 @@ describe('Executing a Command', () => {
   });
 
   it('fails if the Command handler throws an Error', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', function () {
@@ -205,7 +205,7 @@ describe('Executing a Command', () => {
   it('records Events', () => {
     let store = new fake.EventStore();
 
-    return Module({store})
+    return Domain({store})
 
       .add(new k.Aggregate('One')
         .executing('Foo', $=>$, payload => [
@@ -239,7 +239,7 @@ describe('Executing a Command', () => {
   it('does not record no Events', () => {
     let store = new fake.EventStore();
 
-    return Module({store})
+    return Domain({store})
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', ()=>null))
@@ -252,7 +252,7 @@ describe('Executing a Command', () => {
   it('records zero Events', () => {
     let store = new fake.EventStore();
 
-    return Module({store})
+    return Domain({store})
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', () => []))
@@ -278,7 +278,7 @@ describe('Executing a Command', () => {
       return Promise.reject(new Error('Nope'))
     };
 
-    return Module({store})
+    return Domain({store})
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', ()=>[]))
@@ -302,7 +302,7 @@ describe('Executing a Command', () => {
       y()
     });
 
-    return Module({store})
+    return Domain({store})
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', ()=>[]))
@@ -321,7 +321,7 @@ describe('Executing a Command', () => {
 
     let store = new fake.EventStore();
 
-    return Module({log, store})
+    return Domain({log, store})
 
       .add(new k.Aggregate('One')
         .initializing(function () {
@@ -359,7 +359,7 @@ describe('Executing a Command', () => {
 
     let store = new fake.EventStore();
 
-    return Module({log, store})
+    return Domain({log, store})
 
       .add(new k.Aggregate('One')
         .executing('Foo', $=>'foo', function () {

@@ -10,12 +10,12 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Responding to a Query', () => {
-  let Module, logger;
+  let Domain, logger;
 
   beforeEach(() => {
     logger = new fake.Logger();
 
-    Module = (args = {}) =>
+    Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
         args.strategy || new _unit.UnitStrategy(),
@@ -33,7 +33,7 @@ describe('Responding to a Query', () => {
   });
 
   it('fails if no responder exists for that Query', () => {
-    return Module()
+    return Domain()
 
       .respondTo(new k.Query('Foo', 'bar').withTraceId('trace'))
 
@@ -46,7 +46,7 @@ describe('Responding to a Query', () => {
   });
 
   it('fails if multiple responders exist for that Query in one Projection', () => {
-    (() => Module()
+    (() => Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo')
@@ -56,7 +56,7 @@ describe('Responding to a Query', () => {
   });
 
   it('fails if multiple responders exist for that Query across Projections', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo'))
@@ -70,7 +70,7 @@ describe('Responding to a Query', () => {
   });
 
   it('fails if the Query cannot be mapped to a Projection instance', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>null))
@@ -86,7 +86,7 @@ describe('Responding to a Query', () => {
   });
 
   it('returns a value', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', (payload, query) => 'foo' + payload + query.traceId))
@@ -102,7 +102,7 @@ describe('Responding to a Query', () => {
   });
 
   it('may return a promise', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', payload => Promise.resolve(payload)))
@@ -113,7 +113,7 @@ describe('Responding to a Query', () => {
   });
 
   it('logs message from Query responder', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', (payload, query, log) => {
@@ -136,7 +136,7 @@ describe('Responding to a Query', () => {
   });
 
   it('fails if the Query is rejected', () => {
-    return Module()
+    return Domain()
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', () => {
@@ -159,12 +159,12 @@ describe('Responding to a Query', () => {
     let log = new fake.EventLog();
 
     let applied;
-    let module = Module({log})
+    let domain = Domain({log})
       .add(new k.Projection('One')
         .applying('food', payload => applied = payload)
         .respondingTo('Foo', ()=>'foo', () => applied + ' later'));
 
-    let promise = module.respondTo(new k.Query('Foo').waitFor({bar: 42, baz: 42}))
+    let promise = domain.respondTo(new k.Query('Foo').waitFor({bar: 42, baz: 42}))
       .then(r => response = r);
 
     return new Promise(y => setTimeout(y, 0))
@@ -185,12 +185,12 @@ describe('Responding to a Query', () => {
 
     let strategy = {onAccess: unit => unit.unload()};
 
-    let module = Module({log, strategy})
+    let domain = Domain({log, strategy})
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', ()=>null));
 
-    module.respondTo(new k.Query('Foo').waitFor({bar: 42}));
-    module.respondTo(new k.Query('Foo'));
+    domain.respondTo(new k.Query('Foo').waitFor({bar: 42}));
+    domain.respondTo(new k.Query('Foo'));
 
     return new Promise(y => setTimeout(y, 0))
       .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
@@ -204,7 +204,7 @@ describe('Responding to a Query', () => {
     let log = new fake.EventLog();
     log.records = [new _event.Record(new k.Event('food'), 'bar', 42)];
 
-    return Module({log})
+    return Domain({log})
 
       .add(new k.Projection('One')
         .applying('food', ()=>null)

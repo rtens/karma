@@ -7,8 +7,8 @@ const BSON = require('bson');
 const debug = require('debug')('karma:snapshot');
 
 class MongoEventStore extends _persistence.EventStore {
-  constructor(moduleName, connectionUri, database, collectionPrefix, connectionOptions) {
-    super(moduleName);
+  constructor(domainName, connectionUri, database, collectionPrefix, connectionOptions) {
+    super(domainName);
     this._uri = connectionUri;
     this._dbName = database;
     this._collection = collectionPrefix + 'event_store';
@@ -33,7 +33,7 @@ class MongoEventStore extends _persistence.EventStore {
     let sequence = Math.floor(onSequence || 0) + 1;
 
     let document = {
-      d: this.module,
+      d: this.domain,
       a: streamId,
       v: sequence,
       e: events.map(e => ({n: e.name, a: e.payload, t: this._aboutNow(e.time) ? null : e.time})),
@@ -57,8 +57,8 @@ class MongoEventStore extends _persistence.EventStore {
 }
 
 class MongoEventLog extends _persistence.EventLog {
-  constructor(moduleName, databaseConnectionUri, oplogConnectionUri, database, collectionPrefix, connectionOptions) {
-    super(moduleName);
+  constructor(domainName, databaseConnectionUri, oplogConnectionUri, database, collectionPrefix, connectionOptions) {
+    super(domainName);
     this._dbUri = databaseConnectionUri;
     this._oplogUri = oplogConnectionUri;
     this._dbName = database;
@@ -142,11 +142,11 @@ class MongoEventLog extends _persistence.EventLog {
   }
 
   filter() {
-    return new MongoRecordFilter(this.module)
+    return new MongoRecordFilter(this.domain)
   }
 
   _notifySubscribers(recordSet, subscriptions) {
-    if (recordSet.d != this.module) return;
+    if (recordSet.d != this.domain) return;
 
     this._buffer.push({recordSet, subscriptions});
     let times = this._buffer.map(({recordSet}) => recordSet._id.getTimestamp().getTime());
@@ -202,9 +202,9 @@ class MongoEventLog extends _persistence.EventLog {
 }
 
 class MongoRecordFilter extends _persistence.RecordFilter {
-  constructor(moduleName) {
+  constructor(domainName) {
     super();
-    this.query = {d: moduleName}
+    this.query = {d: domainName}
   }
 
   after(lastRecordTime) {
@@ -226,8 +226,8 @@ class MongoRecordFilter extends _persistence.RecordFilter {
 }
 
 class MongoSnapshotStore extends _persistence.SnapshotStore {
-  constructor(moduleName, connectionUri, database, collectionPrefix, connectionOptions) {
-    super(moduleName);
+  constructor(domainName, connectionUri, database, collectionPrefix, connectionOptions) {
+    super(domainName);
     this._uri = connectionUri;
     this._dbName = database;
     this._prefix = collectionPrefix;
@@ -243,7 +243,7 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
     return new mongodb.MongoClient(this._uri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
-      .then(() => this._db.collection(this._prefix + 'snapshots_' + this.module))
+      .then(() => this._db.collection(this._prefix + 'snapshots_' + this.domain))
       .then(collection => collection.createIndex({k: 1, v: 1}))
       .catch(err => Promise.reject(new Error('SnapshotStore cannot connect to MongoDB database: ' + err)))
   }
@@ -268,12 +268,12 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
     }
 
     return this.connect().then(() =>
-      this._db.collection(this._prefix + 'snapshots_' + this.module).updateOne(filter, document, {upsert: true}))
+      this._db.collection(this._prefix + 'snapshots_' + this.domain).updateOne(filter, document, {upsert: true}))
   }
 
   fetch(key, version) {
     return this.connect().then(() => this._db
-      .collection(this._prefix + 'snapshots_' + this.module)
+      .collection(this._prefix + 'snapshots_' + this.domain)
       .findOne({k: key, v: version})
       .then(doc => doc ? new _persistence.Snapshot(doc.t, doc.h, doc.s) : Promise.reject('No snapshot')))
   }
@@ -293,17 +293,17 @@ class MongoPersistenceFactory extends _persistence.PersistenceFactory {
     this.prefix = collectionPrefix || '';
   }
 
-  eventLog(moduleName) {
-    return this._connect(new MongoEventLog(moduleName,
+  eventLog(domainName) {
+    return this._connect(new MongoEventLog(domainName,
       this.uri, this.oplogUri, this.db, this.prefix))
   }
 
-  snapshotStore(moduleName) {
-    return this._connect(new MongoSnapshotStore(moduleName, this.uri, this.db, this.prefix))
+  snapshotStore(domainName) {
+    return this._connect(new MongoSnapshotStore(domainName, this.uri, this.db, this.prefix))
   }
 
-  eventStore(moduleName) {
-    return this._connect(new MongoEventStore(moduleName, this.uri, this.db, this.prefix))
+  eventStore(domainName) {
+    return this._connect(new MongoEventStore(domainName, this.uri, this.db, this.prefix))
   }
 
   _connect(client) {

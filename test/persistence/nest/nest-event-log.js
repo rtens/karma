@@ -34,7 +34,7 @@ describe('NestDB Event Log', () => {
       .then(() => db.indexes.should.have.all.keys(['_id', 'tim']))
   });
 
-  it('replays stored Records of module', () => {
+  it('replays stored Records of domain', () => {
     let records = [];
 
     return Promise.resolve()

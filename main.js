@@ -9,7 +9,7 @@ const Datastore = require('nestdb');
 let strategy = {
   onAccess: unit => {
     unit.takeSnapshot();
-    if (unit.id == '__Module-Demo') return;
+    if (unit.id == '__Domain-Demo') return;
 
     unit.unload();
   }

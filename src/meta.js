@@ -36,9 +36,9 @@ class ReactionLockAggregate extends aggregate.Aggregate {
   }
 }
 
-class ModuleSubscriptionAggregate extends aggregate.Aggregate {
+class DomainSubscriptionAggregate extends aggregate.Aggregate {
   constructor() {
-    super('ModuleSubscription');
+    super('DomainSubscription');
 
     this
 
@@ -48,7 +48,7 @@ class ModuleSubscriptionAggregate extends aggregate.Aggregate {
         };
       })
 
-      .executing('consume-record', $=>`__Module-${$.moduleName}`, function ({recordTime}) {
+      .executing('consume-record', $=>`__Domain-${$.domainName}`, function ({recordTime}) {
         if (this.state.lastConsumed >= recordTime) {
           return
         }
@@ -62,9 +62,9 @@ class ModuleSubscriptionAggregate extends aggregate.Aggregate {
   }
 }
 
-class ModuleSubscriptionProjection extends projection.Projection {
-  constructor(moduleName) {
-    super('ModuleSubscription');
+class DomainSubscriptionProjection extends projection.Projection {
+  constructor(domainName) {
+    super('DomainSubscription');
 
     this
 
@@ -82,7 +82,7 @@ class ModuleSubscriptionProjection extends projection.Projection {
         if (recordTime > this.state.lastRecordTime) this.state.lastRecordTime = recordTime
       })
 
-      .respondingTo('last-record-time', $=>moduleName, function () {
+      .respondingTo('last-record-time', $=>domainName, function () {
         return this.state.lastRecordTime || new Date()
       })
   }
@@ -90,6 +90,6 @@ class ModuleSubscriptionProjection extends projection.Projection {
 
 module.exports = {
   ReactionLockAggregate,
-  ModuleSubscriptionAggregate,
-  ModuleSubscriptionProjection
+  DomainSubscriptionAggregate,
+  DomainSubscriptionProjection
 };

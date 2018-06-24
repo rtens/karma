@@ -11,7 +11,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Applying Events', () => {
-  let _Date, Module;
+  let _Date, Domain;
 
   beforeEach(() => {
     _Date = Date;
@@ -20,7 +20,7 @@ describe('Applying Events', () => {
     };
     Date.prototype = _Date.prototype;
 
-    Module = (args = {}) =>
+    Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
         args.strategy || new k.UnitStrategy(),
@@ -40,7 +40,7 @@ describe('Applying Events', () => {
     Date = _Date;
   });
 
-  it('passes Module names to the EventLog', () => {
+  it('passes Domain names to the EventLog', () => {
     let passedNames = [];
     let persistence = new _persistence.PersistenceFactory();
     persistence.eventLog = name => passedNames.push(name);
@@ -63,7 +63,7 @@ describe('Applying Events', () => {
         ];
 
         let state = [];
-        return Module({log})
+        return Domain({log})
 
           .add(new unit.Unit('One')
             .initializing(function () {
@@ -101,7 +101,7 @@ describe('Applying Events', () => {
         ];
 
         let consolidated = [];
-        return Module({log})
+        return Domain({log})
 
           .add(new unit.Unit('One')
             .initializing(function () {
@@ -142,14 +142,14 @@ describe('Applying Events', () => {
           }
         });
 
-        return Promise.resolve(Module({log})
+        return Promise.resolve(Domain({log})
 
           .add(new unit.Unit('One')
             [unit.handling]('Foo', ()=>'foo', () => history.push('handled'))))
 
-          .then(module => new Promise(y => {
-            module[unit.handle](new unit.Message('Foo')).then(y);
-            module[unit.handle](new unit.Message('Foo'));
+          .then(domain => new Promise(y => {
+            domain[unit.handle](new unit.Message('Foo')).then(y);
+            domain[unit.handle](new unit.Message('Foo'));
           }))
 
           .then(() => history.should.eql(['loading', 'loaded', 'handled', 'handled']))
@@ -162,8 +162,9 @@ describe('Applying Events', () => {
         ];
 
         let state = [];
-        let module = Module({log});
-        return module
+        let domain = Domain({log});
+
+        return domain
 
           .add(new unit.Unit('One')
             .initializing(function () {
@@ -178,7 +179,7 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo', 'one'))
 
-          .then(() => module[unit.handle](new unit.Message('Foo', 'two')))
+          .then(() => domain[unit.handle](new unit.Message('Foo', 'two')))
 
           .then(() => log.replayed.length.should.equal(1))
 
@@ -189,7 +190,7 @@ describe('Applying Events', () => {
         let log = new fake.EventLog();
 
         let applied = [];
-        return Module({log})
+        return Domain({log})
 
           .add(new unit.Unit('One')
             .applying('bard', (payload) => applied.push(payload))
@@ -208,7 +209,7 @@ describe('Applying Events', () => {
         let log = new fake.EventLog();
 
         let consolidated = [];
-        return Module({log})
+        return Domain({log})
 
           .add(new unit.Unit('One')
             .initializing(function () {
@@ -243,7 +244,7 @@ describe('Applying Events', () => {
         log2.filter = () => new fake.RecordFilter().named('two');
 
         let applied = [];
-        return Module({log: new _persistence.CombinedEventLog([log1, log2])})
+        return Domain({log: new _persistence.CombinedEventLog([log1, log2])})
 
           .add(new unit.Unit('One')
             .applying('bard', (payload) => applied.push(payload))
@@ -284,8 +285,8 @@ describe('Applying Events', () => {
         let notified = [];
         let strategy = {onAccess: (unit) => notified.push(['access', unit.id])};
 
-        let module = Module({log, strategy});
-        return module
+        let domain = Domain({log, strategy});
+        return domain
 
           .add(new unit.Unit('One')
             .applying('bard', ()=>notified.push('applied'))
@@ -293,9 +294,9 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => module[unit.handle](new unit.Message('Foo')))
+          .then(() => domain[unit.handle](new unit.Message('Foo')))
 
-          .then(() => module[unit.handle](new unit.Message('Foo')))
+          .then(() => domain[unit.handle](new unit.Message('Foo')))
 
           .then(() => notified.filter(n=>n[1] != '__Saga-One-foo').should.eql([
             'applied',
@@ -315,7 +316,7 @@ describe('Applying Events', () => {
         let strategy = {onAccess: (unit) => notified.push('access')};
 
         let fail = true;
-        let module = Module({log, strategy})
+        let domain = Domain({log, strategy})
 
           .add(new unit.Unit('One')
             .applying('bard', function () {
@@ -323,13 +324,13 @@ describe('Applying Events', () => {
             })
             [unit.handling]('Foo', $=>'foo', () => notified.push('handle')));
 
-        return module[unit.handle](new unit.Message('Foo'))
+        return domain[unit.handle](new unit.Message('Foo'))
 
           .should.be.rejectedWith('Nope')
 
           .then(() => fail = false)
 
-          .then(() => module[unit.handle](new unit.Message('Foo')))
+          .then(() => domain[unit.handle](new unit.Message('Foo')))
 
           .then(() => notified.slice(-2).should.eql(['handle', 'access']))
 
@@ -344,7 +345,7 @@ describe('Applying Events', () => {
         let notified = [];
         let strategy = {onAccess: (unit) => notified.push('access')};
 
-        let module = Module({log, strategy})
+        let domain = Domain({log, strategy})
 
           .add(new unit.Unit('One')
             .applying('bard', function () {
@@ -352,13 +353,13 @@ describe('Applying Events', () => {
             })
             [unit.handling]('Foo', $=>'foo', () => notified.push('handle')));
 
-        return module[unit.handle](new unit.Message('Foo'))
+        return domain[unit.handle](new unit.Message('Foo'))
 
           .then(() => log.publish(new _event.Record(new k.Event('bard', 'one'), 'foo')))
 
           .should.be.rejectedWith('Nope')
 
-          .then(() => module[unit.handle](new unit.Message('Foo')))
+          .then(() => domain[unit.handle](new unit.Message('Foo')))
 
           .then(() => notified.slice(-2).should.eql(['handle', 'access']))
 
@@ -378,8 +379,8 @@ describe('Applying Events', () => {
 
           let applied = [];
 
-          let module = Module({log, strategy});
-          return module
+          let domain = Domain({log, strategy});
+          return domain
 
             .add(new unit.Unit('One')
               .applying('food', payload => applied.push(payload))
@@ -387,7 +388,7 @@ describe('Applying Events', () => {
 
             [unit.handle](new unit.Message('Foo', 'foo'))
 
-            .then(() => module[unit.handle](new unit.Message('Foo')))
+            .then(() => domain[unit.handle](new unit.Message('Foo')))
 
             .then(() => applied.should.eql(['one', 'one']))
 
@@ -405,7 +406,7 @@ describe('Applying Events', () => {
           ];
 
           let applied = [];
-          return Module({log})
+          return Domain({log})
 
             .add(new unit.Unit('One')
               .applying('food', ()=>null)
@@ -430,7 +431,7 @@ describe('Applying Events', () => {
           ];
 
           let applied = [];
-          return Module({log})
+          return Domain({log})
 
             .add(new unit.Unit('One')
               .applying('bard', (payload) => applied.push(payload))

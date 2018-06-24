@@ -8,7 +8,7 @@ const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Projections', () => {
 
-  let module = configure => domain => {
+  let domain = configure => domain => {
 
     domain.add(configure(new k.Projection('foo')
       .initializing(function () {
@@ -23,7 +23,7 @@ describe('Specifying Projections', () => {
   };
 
   it('uses recorded Events', () => {
-    return new Example(module(projection =>
+    return new Example(domain(projection =>
       projection.applying('food', function ($) {
         this.state.push($)
       })))
@@ -37,7 +37,7 @@ describe('Specifying Projections', () => {
   });
 
   it('uses time of recorded Events', () => {
-    return new Example(module(projection =>
+    return new Example(domain(projection =>
       projection.applying('food', function ($, record) {
         this.state.push(record.event.time.getDay())
       })))

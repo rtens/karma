@@ -71,9 +71,9 @@ class SagaInstance extends unit.UnitInstance {
 }
 
 class SagaRepository extends unit.UnitRepository {
-  constructor(log, snapshots, logger, metaModule) {
+  constructor(log, snapshots, logger, metaDomain) {
     super(log, snapshots, logger);
-    this._meta = metaModule;
+    this._meta = metaDomain;
   }
 
   getSagasReactingTo(event) {
