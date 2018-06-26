@@ -95,7 +95,7 @@ describe('Specifying Sagas', () => {
         throw new Error('Should have failed')
       }, err => {
         err.message.should.equal("Unexpected Error(s): " +
-          "expected [ 'Nope' ] to be empty")
+          "expected [ 'Nope' ] to deeply equal []")
       })
 
       .then({assert: result => result.example.errors.splice(0, 1)})

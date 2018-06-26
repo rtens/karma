@@ -17,8 +17,7 @@ class LoggedErrorExpectation extends specification.Expectation {
 class NoLoggedErrorExpectation extends specification.Expectation {
 
   assert(result) {
-    //noinspection BadExpressionStatementJS
-    expect(result.example.errors, 'Unexpected Error(s)').to.be.empty;
+    expect(result.example.errors).to.eql([], 'Unexpected Error(s)');
   }
 }
 
