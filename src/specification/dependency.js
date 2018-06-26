@@ -90,7 +90,6 @@ class InvocationsExpectation extends specification.Expectation {
 
     //noinspection BadExpressionStatementJS
     expect(invocations, `Missing invocations of [${this.key}]`).to.not.be.empty;
-    expect(invocations.length).to.equal(this.invocations.length, `Unexpected invocations of [${this.key}]`);
     this._assertArgumentCallbacks(invocations);
     expect(invocations).to.eql(this.invocations, `Unexpected invocations of [${this.key}]`);
   }

@@ -157,7 +157,7 @@ describe('Specifying dependencies', () => {
         .withArguments())
 
       .promise.should.be.rejectedWith('Unexpected invocations of [foo]: ' +
-        'expected 1 to equal 2')
+        "expected [ [ 'one' ] ] to deeply equal [ [], [] ]")
   });
 
   it('fails if expected invocations does not match', () => {
