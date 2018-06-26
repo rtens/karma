@@ -21,7 +21,7 @@ class RequestAction extends specification.Action {
   }
 
   perform(example) {
-    return new RequestResult(example, example.handler.handle(this.request))
+    return new RequestResult(example, example.module.handle(this.request))
   }
 }
 

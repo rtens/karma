@@ -8,37 +8,44 @@ const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Projections', () => {
 
-  let domain = configure => domain => {
+  let Module = configure => class extends k.api.http.Module {
+    //noinspection JSUnusedGlobalSymbols
+    buildDomain() {
+      return super.buildDomain()
+        .add(configure(new k.Projection('foo'))
+          .initializing(function () {
+            this.state = [];
+          })
+          .respondingTo('Foo', ()=>'foo', function () {
+            return this.state
+          }));
+    }
 
-    domain.add(configure(new k.Projection('foo')
-      .initializing(function () {
-        this.state = [];
-      })
-      .respondingTo('Foo', ()=>'foo', function () {
-        return this.state
-      })));
-
-    return new k.api.http.RequestHandler()
-      .handling(new k.api.http.QueryHandler(domain, () => new k.Query('Foo')))
+    //noinspection JSUnusedGlobalSymbols
+    buildHandler() {
+      return new k.api.http.RequestHandler()
+        .handling(new k.api.http.QueryHandler(this.domain, request =>
+          new k.Query(request.path)))
+    }
   };
 
   it('uses recorded Events', () => {
-    return new Example(domain(projection =>
-      projection.applying('food', function ($) {
+    return new Example(Module(projection => projection
+      .applying('food', function ($) {
         this.state.push($)
       })))
 
       .given(the.Event('food', 'one'))
       .given(the.Event('food', 'two'))
 
-      .when(I.get('/foo'))
+      .when(I.get('Foo'))
 
       .then(expect.Response(['one', 'two']))
   });
 
   it('uses time of recorded Events', () => {
-    return new Example(domain(projection =>
-      projection.applying('food', function ($, record) {
+    return new Example(Module(projection => projection
+      .applying('food', function ($, record) {
         this.state.push(record.event.time.getDay())
       })))
 
@@ -48,22 +55,18 @@ describe('Specifying Projections', () => {
       ])
       .given(the.Event('food').withTime('2013-12-11'))
 
-      .when(I.get('/foo'))
+      .when(I.get('Foo'))
 
       .then(expect.Response([2, 6, 3]))
   });
 
   it('fails if the Query is rejected', () => {
-    return new Example(domain => {
-      domain.add(new k.Projection('foo')
-        .respondingTo('Foo', ()=>'foo', function () {
-          throw new k.Rejection('NOPE')
-        }));
+    return new Example(Module(projection => projection
+      .respondingTo('Bar', ()=>'foo', function () {
+        throw new k.Rejection('NOPE')
+      })))
 
-      return {handle: () => domain.respondTo(new k.Query('Foo'))}
-    })
-
-      .when(I.get('/foo'))
+      .when(I.get('Bar'))
 
       .then(() => {
         throw new Error('Should have failed')
@@ -74,4 +77,5 @@ describe('Specifying Projections', () => {
 
       .then({assert: result => result.rejection = null})
   });
-});
+})
+;

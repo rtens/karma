@@ -3,16 +3,24 @@ const promised = require('chai-as-promised');
 chai.use(promised);
 chai.should();
 
+const k = require('../..');
 const {the, Example, expect} = require('../../spec')();
 const specification = require('../../src/specification');
 
 describe('Specifying dependencies', () => {
 
+  const Module = initialize => class extends k.Module {
+    //noinspection JSUnusedGlobalSymbols
+    buildDomain() {
+      initialize(this.dependencies);
+    }
+  };
+
   it('uses injected values', () => {
     let injected = null;
 
-    new Example((domain, dependencies) =>
-      injected = dependencies.foo)
+    new Example(Module(dependencies =>
+      injected = dependencies.foo))
 
       .given(the.Value('foo', 'bar'))
 
@@ -24,8 +32,8 @@ describe('Specifying dependencies', () => {
   it('uses injected stub', () => {
     let stubbed = null;
 
-    new Example((domain, dependencies) =>
-      stubbed = dependencies.foo())
+    new Example(Module((dependencies) =>
+      stubbed = dependencies.foo()))
 
       .given(the.Stub('foo').returning('bar'))
 
@@ -37,8 +45,8 @@ describe('Specifying dependencies', () => {
   it('uses dynamic stub', () => {
     let stubbed = null;
 
-    new Example((domain, dependencies) =>
-      stubbed = dependencies.foo('foo', 'bar'))
+    new Example(Module((dependencies) =>
+      stubbed = dependencies.foo('foo', 'bar')))
 
       .given(the.Stub('foo')
         .calling((a, b) => a + b))
@@ -51,11 +59,11 @@ describe('Specifying dependencies', () => {
   it('uses dynamic stub with indexed callback', () => {
     let stubbed = [];
 
-    new Example((domain, dependencies) => {
+    new Example(Module((dependencies) => {
       stubbed.push(dependencies.foo(3, 4));
       stubbed.push(dependencies.foo(5, 6));
       stubbed.push(dependencies.foo(7, 8));
-    })
+    }))
 
       .given(the.Stub('foo')
         .callingIndexed(i => (a, b) => a + b * i))
@@ -68,8 +76,8 @@ describe('Specifying dependencies', () => {
   it('uses injected values in objects', () => {
     let injected = null;
 
-    new Example((domain, dependencies) =>
-      injected = dependencies.foo.bar.baz)
+    new Example(Module((dependencies) =>
+      injected = dependencies.foo.bar.baz))
 
       .given(the.Value('foo.bar.baz', 'ban'))
 
@@ -81,8 +89,8 @@ describe('Specifying dependencies', () => {
   it('uses injected values returned by function', () => {
     let injected = null;
 
-    new Example((domain, dependencies) =>
-      injected = dependencies.foo().bar().baz)
+    new Example(Module((dependencies) =>
+      injected = dependencies.foo().bar().baz))
 
       .given(the.Value('foo().bar().baz', 'ban'))
 
@@ -92,10 +100,10 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations of static stubs', () => {
-    return new Example((domain, dependencies) => {
+    return new Example(Module((dependencies) => {
       dependencies.foo('a').bar('one', 'uno');
       dependencies.foo('b').bar('two', 'dos');
-    })
+    }))
 
       .given(the.Stub('foo().bar'))
 
@@ -111,9 +119,9 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations of dynamic stub', () => {
-    return new Example((domain, dependencies) => {
+    return new Example(Module((dependencies) => {
       dependencies.foo('one');
-    })
+    }))
 
       .given(the.Stub('foo').calling(() => 'bar'))
 
@@ -124,7 +132,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if expected invocation is missing', () => {
-    return new Example(() => null)
+    return new Example(Module(() => null))
 
       .given(the.Stub('foo'))
 
@@ -137,8 +145,8 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if number of invocation does not match', () => {
-    return new Example((domain, dependencies) =>
-      dependencies.foo('one'))
+    return new Example(Module((dependencies) =>
+      dependencies.foo('one')))
 
       .given(the.Stub('foo'))
 
@@ -153,10 +161,10 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if expected invocations does not match', () => {
-    return new Example((domain, dependencies) => {
+    return new Example(Module((dependencies) => {
       dependencies.foo('one', 'uno');
       dependencies.foo('two', 'dos');
-    })
+    }))
 
       .given(the.Stub('foo'))
 
@@ -172,10 +180,10 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations with function', () => {
-    return new Example((domain, dependencies) => {
+    return new Example(Module((dependencies) => {
       dependencies.foo('one', 'uno');
       dependencies.foo('two', 'dos');
-    })
+    }))
 
       .given(the.Stub('foo'))
 
@@ -187,8 +195,8 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if argument function fails', () => {
-    return new Example((domain, dependencies) =>
-      dependencies.foo('one'))
+    return new Example(Module((dependencies) =>
+      dependencies.foo('one')))
 
       .given(the.Stub('foo'))
 

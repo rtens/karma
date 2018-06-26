@@ -10,8 +10,15 @@ const express = require('express');
 
 describe('Specifying an HTTP API', () => {
 
+  const Module = configure => class extends k.api.http.Module {
+    //noinspection JSUnusedGlobalSymbols
+    buildHandler() {
+      return configure(super.buildHandler(), this)
+    }
+  };
+
   it('fails if the Route of a GET request is not defined', () => {
-    return new Example(() => new k.api.http.ApiHandler())
+    return new Example(Module(api => api))
 
       .when(I.get('/foo'))
 
@@ -19,8 +26,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if the response does not match', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => 'bar'))
+    return new Example(Module(api => api
+      .handling(() => 'bar')))
 
       .when(I.get('/foo'))
 
@@ -31,8 +38,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if the response status does not match', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => new k.api.http.Response('bar').withStatus(201)))
+    return new Example(Module(api => api
+      .handling(() => new k.api.http.Response('bar').withStatus(201))))
 
       .when(I.get('/foo'))
 
@@ -44,8 +51,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('asserts the expected response', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => 'bar'))
+    return new Example(Module(api => api
+      .handling(() => 'bar')))
 
       .when(I.get('/foo'))
 
@@ -53,8 +60,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if an expected Rejection is missing', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => 'bar'))
+    return new Example(Module(api => api
+      .handling(() => 'bar')))
 
       .when(I.get('/foo'))
 
@@ -65,8 +72,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('asserts an expected Rejection', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => Promise.reject(new k.Rejection('NOPE', 'Nope'))))
+    return new Example(Module(api => api
+      .handling(() => Promise.reject(new k.Rejection('NOPE', 'Nope')))))
 
       .when(I.get('/foo'))
 
@@ -74,8 +81,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if the Rejection code does not match', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => Promise.reject(new k.Rejection('NOT_NOPE', 'Nope'))))
+    return new Example(Module(api => api
+      .handling(() => Promise.reject(new k.Rejection('NOT_NOPE', 'Nope')))))
 
       .when(I.get('/foo'))
 
@@ -86,8 +93,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if an expected Error is not logged', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => console.error('Not Nope')))
+    return new Example(Module((api, module) => api
+      .handling(() => module.logger.error('foo', 'bar', new Error('Not Nope')))))
 
       .when(I.get('/foo'))
 
@@ -100,8 +107,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('asserts a logged Error', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => console.error('Nope')))
+    return new Example(Module((api, module) => api
+      .handling(() => module.logger.error('foo', 'bar', new Error('Nope')))))
 
       .when(I.get('/foo'))
 
@@ -109,8 +116,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if an unexpected Error is logged', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => console.error('Nope')))
+    return new Example(Module((api, module) => api
+      .handling(() => module.logger.error('foo', 'bar', new Error('Nope')))))
 
       .when(I.get('/foo'))
 
@@ -125,8 +132,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('uses headers and query arguments of GET request', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(req => `${req.query.greeting} ${req.headers.name}`))
+    return new Example(Module(api => api
+      .handling(req => `${req.query.greeting} ${req.headers.name}`)))
 
       .when(I.get('/greet')
         .withHeaders({name: 'foo'})
@@ -136,7 +143,7 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if the Route of a POST request is not defined', () => {
-    return new Example(() => new k.api.http.ApiHandler())
+    return new Example(Module(api => api))
 
       .when(I.post('/foo'))
 
@@ -144,8 +151,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('uses headers and query arguments of POST request', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(req => `${req.query.greeting} ${req.headers.name}`))
+    return new Example(Module(api => api
+      .handling(req => `${req.query.greeting} ${req.headers.name}`)))
 
       .when(I.post('/greet')
         .withHeaders({name: 'foo'})
@@ -155,8 +162,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('uses body of POST request', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(req => `Hello ${req.body.name}`))
+    return new Example(Module(api => api
+      .handling(req => `Hello ${req.body.name}`)))
 
       .when(I.post('/foo').withBody({name: 'bar'}))
 
@@ -164,8 +171,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if header is missing', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => null))
+    return new Example(Module(api => api
+      .handling(() => null)))
 
       .when(I.get('/foo'))
 
@@ -176,8 +183,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('fails if header value doe not match', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => new k.api.http.Response().withHeader('foo', 'bar')))
+    return new Example(Module(api => api
+      .handling(() => new k.api.http.Response().withHeader('foo', 'bar'))))
 
       .when(I.get('/foo'))
 
@@ -188,8 +195,8 @@ describe('Specifying an HTTP API', () => {
   });
 
   it('asserts headers of response', () => {
-    return new Example(() => new k.api.http.ApiHandler()
-      .handling(() => new k.api.http.Response().withHeader('foo', 'bar')))
+    return new Example(Module(api => api
+      .handling(() => new k.api.http.Response().withHeader('foo', 'bar'))))
 
       .when(I.get('/foo'))
 

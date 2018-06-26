@@ -8,12 +8,23 @@ const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Sagas', () => {
 
+  const Module = (saga, domain = x=>x) => class extends k.Module {
+    //noinspection JSUnusedGlobalSymbols
+    buildDomain() {
+      return domain(super.buildDomain())
+        .add(saga(new k.Saga('One')))
+    }
+
+    handle() {
+      return Promise.resolve(this.domain.execute(new k.Command('Foo')))
+    }
+  };
+
   it('uses a published Event to trigger the reaction', () => {
     let reacted = [];
 
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', $=>reacted.push($))))
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', $=>reacted.push($))))
 
       .when(I.publish(the.Event('food', 'bar')))
 
@@ -21,11 +32,10 @@ describe('Specifying Sagas', () => {
   });
 
   it('asserts expected failure of reaction', () => {
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', () => {
-          throw new Error('Nope');
-        })))
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', () => {
+        throw new Error('Nope');
+      })))
 
       .when(I.publish(the.Event('food')))
 
@@ -33,11 +43,10 @@ describe('Specifying Sagas', () => {
   });
 
   it('fails if expected failure is missing', () => {
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', () => {
-          throw new Error('Not Nope');
-        })))
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', () => {
+        throw new Error('Not Nope');
+      })))
 
       .when(I.publish(the.Event('food')))
 
@@ -48,11 +57,10 @@ describe('Specifying Sagas', () => {
   });
 
   it('fails is reaction fails unexpectedly', () => {
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', () => {
-          throw new Error('Nope');
-        })))
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', () => {
+        throw new Error('Nope');
+      })))
 
       .when(I.publish(the.Event('food')))
 
@@ -62,14 +70,14 @@ describe('Specifying Sagas', () => {
         err.message.should.equal("Reaction failed: food")
       })
 
+      .then({assert: result => result.example.errors.splice(0, 2)})
       .then({assert: result => result.example.metaStore.recorded.splice(0, 2)})
   });
 
   it('asserts logged Errors', () => {
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', () =>
-          console.error('Nope'))))
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', (payload, record, log) =>
+        log.error(new Error('Nope')))))
 
       .when(I.publish(the.Event('food')))
 
@@ -77,10 +85,9 @@ describe('Specifying Sagas', () => {
   });
 
   it('fails if unexpected Error is logged', () => {
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', () =>
-          console.error('Nope'))))
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', (payload, record, log) =>
+        log.error(new Error('Nope')))))
 
       .when(I.publish(the.Event('food')))
 
@@ -97,9 +104,8 @@ describe('Specifying Sagas', () => {
   it('does not use recorded Events to trigger the reaction', () => {
     let reacted = [];
 
-    return new Example(domain =>
-      domain.add(new k.Saga('One')
-        .reactingTo('food', ()=>'foo', $=>reacted.push($))))
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', $=>reacted.push($))))
 
       .given(the.Event('food', 'not'))
 
@@ -111,19 +117,18 @@ describe('Specifying Sagas', () => {
   it('does not use Events recorded by a Command to trigger the reaction', () => {
     let reacted = [];
 
-    return new Example(domain => {
+    return new Example(Module(
 
-      domain.add(new k.Saga('One')
-          .reactingTo('food', ()=>'foo', $=>reacted.push($)));
+      saga => saga
+        .reactingTo('food', ()=>'foo', $=>reacted.push($)),
 
-      domain.add(new k.Aggregate('One')
-          .executing('Foo', ()=>'foo', () => [new k.Event('food', 'not')]));
+      domain => domain
+        .add(new k.Aggregate('One')
+          .executing('Foo', ()=>'foo', () => [new k.Event('food', 'not')]))))
 
-      return {handle: () => domain.execute(new k.Command('Foo'))};
-    })
-
-      .when(I.post('/foo'))
+      .when(I.post())
 
       .promise.then(() => reacted.should.eql([]))
   })
-});
+})
+;

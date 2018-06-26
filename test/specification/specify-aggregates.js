@@ -8,30 +8,37 @@ const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Aggregates', () => {
 
-  const domain = configure => domain => {
+  const Module = configure => class extends k.api.http.Module {
+    //noinspection JSUnusedGlobalSymbols
+    buildDomain() {
+      return super.buildDomain()
+        .add(configure(new k.Aggregate('One'))
+          .initializing(function () {
+            this.state = {
+              foo: 'bar',
+              bar: 'foo'
+            };
+          })
+          .executing('Foo', ()=>'foo', function () {
+            return [
+              new k.Event('food', {foo: this.state.foo}),
+              new k.Event('bard', {bar: this.state.bar})
+            ]
+          }));
+    }
 
-    domain.add(configure(new k.Aggregate('One'))
-      .initializing(function () {
-        this.state = {
-          foo: 'bar',
-          bar: 'foo'
-        };
-      })
-      .executing('Foo', ()=>'foo', function () {
-        return [
-          new k.Event('food', {foo: this.state.foo}),
-          new k.Event('bard', {bar: this.state.bar})
-        ]
-      }));
-
-    return new k.api.http.RequestHandler()
-      .handling(new k.api.http.CommandHandler(domain, () => new k.Command('Foo')))
+    //noinspection JSUnusedGlobalSymbols
+    buildHandler() {
+      return new k.api.http.RequestHandler()
+        .handling(new k.api.http.CommandHandler(this.domain, request =>
+          new k.Command(request.path)))
+    }
   };
 
   it('asserts recorded Events', () => {
-    return new Example(domain(x=>x))
+    return new Example(Module(aggregate => aggregate))
 
-      .when(I.post())
+      .when(I.post('Foo'))
 
       .then(expect.Response())
 
@@ -42,16 +49,12 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if the Command is rejected', () => {
-    return new Example(domain => {
-      domain.add(new k.Aggregate('One')
-        .executing('Foo', ()=>'foo', () => {
-          throw new k.Rejection('NOPE')
-        }));
+    return new Example(Module(aggreagte => aggreagte
+      .executing('Bar', ()=>'foo', () => {
+        throw new k.Rejection('NOPE')
+      })))
 
-      return {handle: () => domain.execute(new k.Command('Foo'))}
-    })
-
-      .when(I.post('/foo'))
+      .when(I.post('Bar'))
 
       .then(() => {
         throw new Error('Should have failed')
@@ -64,7 +67,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('uses recorded Events', () => {
-    return new Example(domain(aggregate=>aggregate
+    return new Example(Module(aggregate => aggregate
       .applying('bazd', function ({one, two}) {
         this.state[one] = two;
       })
@@ -78,7 +81,7 @@ describe('Specifying Aggregates', () => {
         the.Event('band', {uno: 'bar', dos: 'ban'}),
       ]))
 
-      .when(I.post('/foo'))
+      .when(I.post('Foo'))
 
       .then(expect.EventStream('foo', [
         expect.Event('food', {foo: 'baz'}),
@@ -87,7 +90,7 @@ describe('Specifying Aggregates', () => {
   });
 
   it('does not use recorded Events of other Stream', () => {
-    return new Example(domain(aggregate =>aggregate
+    return new Example(Module(aggregate => aggregate
       .applying('bazd', function ({one, two}) {
         this.state[one] = two;
       })
@@ -97,7 +100,7 @@ describe('Specifying Aggregates', () => {
         the.Event('bazd', {one: 'foo', two: 'baz'}),
       ]))
 
-      .when(I.post('/foo'))
+      .when(I.post('Foo'))
 
       .then(expect.EventStream('foo', [
         expect.Event('food', {foo: 'bar'}),
@@ -106,8 +109,8 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if no stream was recorded', () => {
-    return new Example(domain => new k.api.http.RequestHandler()
-      .handling(() => null))
+    return new Example(Module(aggreagte => aggreagte
+      .executing('Bar', ()=>'foo', () => null)))
 
       .when(I.post())
 
@@ -118,9 +121,9 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails no ID of expected Event stream does not match', () => {
-    return new Example(domain(aggregate=>aggregate))
+    return new Example(Module(aggregate => aggregate))
 
-      .when(I.post('/foo'))
+      .when(I.post('Foo'))
 
       .then(expect.EventStream('not foo', []))
 
@@ -129,9 +132,9 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if expected Event was not recorded', () => {
-    return new Example(domain(aggregate=>aggregate))
+    return new Example(Module(aggregate => aggregate))
 
-      .when(I.post('/foo'))
+      .when(I.post('Foo'))
 
       .then(expect.EventStream('foo', [
         expect.Event('not food')
@@ -142,9 +145,9 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if expected do not match recorded Events', () => {
-    return new Example(domain(aggregate=>aggregate))
+    return new Example(Module(aggregate => aggregate))
 
-      .when(I.post('/foo'))
+      .when(I.post('Foo'))
 
       .then(expect.EventStream('foo', [
         expect.Event('food', {foo: 'not'}),
@@ -156,9 +159,9 @@ describe('Specifying Aggregates', () => {
   });
 
   it('fails if Event is not expected inside Stream', () => {
-    return new Example(domain(aggregate=>aggregate))
+    return new Example(Module(aggregate => aggregate))
 
-      .when(I.post('/foo'))
+      .when(I.post('Foo'))
 
       .then(expect.Event())
 

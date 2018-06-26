@@ -10,6 +10,8 @@ const express = require('./src/apis/express');
 const http = require('./src/apis/http');
 
 module.exports = {
+  Module: domain.Module,
+
   Domain: domain.Domain,
   Event: event.Event,
 

@@ -1,4 +1,5 @@
 const message = require('../message');
+const domain = require('../domain');
 
 class Request {
   constructor(method, path) {
@@ -245,6 +246,17 @@ class CommandHandler extends Handler {
   }
 }
 
+class Module extends domain.Module {
+
+  buildHandler() {
+    return new ApiHandler()
+  }
+
+  handle(request) {
+    return this.buildHandler().handle(request)
+  }
+}
+
 module.exports = {
   Request,
   Response,
@@ -254,5 +266,6 @@ module.exports = {
   QueryHandler,
   CommandHandler,
   ApiHandler,
-  NotFoundError
+  NotFoundError,
+  Module
 };

@@ -1,4 +1,6 @@
 const message = require('../message');
+const domain = require('../domain');
+const express = require('express');
 
 class ApiHandler {
   constructor(app, options = {}) {
@@ -49,6 +51,18 @@ class ApiHandler {
   }
 }
 
+class Module extends domain.Module {
+
+  handle({request, response}) {
+    return this.buildHandler(express()).handle(request, response)
+  }
+
+  buildHandler(app) {
+    return new ApiHandler(app)
+  }
+}
+
 module.exports = {
-  ApiHandler
+  ApiHandler,
+  Module
 };

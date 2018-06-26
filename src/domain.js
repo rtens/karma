@@ -160,6 +160,28 @@ class Domain extends BaseDomain {
   }
 }
 
+class Module {
+  constructor(name, persistenceFactory, metaPersistenceFactory, unitStrategy, logger, dependencies) {
+    this.name = name;
+    this.persistence = persistenceFactory;
+    this.metaPersistence = metaPersistenceFactory;
+    this.strategy = unitStrategy;
+    this.logger = logger;
+    this.dependencies = dependencies;
+
+    this.domain = this.buildDomain();
+  }
+
+  buildDomain() {
+    return new Domain(this.name, this.persistence, this.metaPersistence, this.strategy, this.logger)
+  }
+
+  handle(request) {
+    return Promise.reject('Cannot handle ' + request)
+  }
+}
+
 module.exports = {
-  Domain
+  Domain,
+  Module
 };

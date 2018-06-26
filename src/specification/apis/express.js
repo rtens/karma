@@ -11,13 +11,13 @@ class RequestAction extends specification.Action {
   constructor(method, route) {
     super();
 
-    this.request  = httpMocks.createRequest({
+    this.request = httpMocks.createRequest({
       method: method.toUpperCase(),
       url: route,
     });
 
     this.response = httpMocks.createResponse({
-      // eventEmitter: events.EventEmitter
+      eventEmitter: events.EventEmitter
     });
   }
 
@@ -37,7 +37,10 @@ class RequestAction extends specification.Action {
       new Promise(y => setTimeout(() =>
         y(this.response), 10)),
 
-      example.handler.handle(this.request, this.response),
+      example.module.handle({
+        request: this.request,
+        response: this.response
+      }),
     ]))
   }
 }

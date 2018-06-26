@@ -7,13 +7,13 @@ const message = require('../message');
 const fake = require('./fakes');
 
 class Example {
-  constructor(module) {
-    this.module = module;
+  constructor(Module) {
+    this.Module = Module;
 
     this._setUpDate();
     this._setUpErrorLogging();
     this._setUpDependencies();
-    this._setUpDomain();
+    this._setUpPersistence();
   }
 
   _setUpDate() {
@@ -29,28 +29,22 @@ class Example {
   }
 
   _setUpErrorLogging() {
-    this.errors = [];
-    console.error = message => this.errors.push(message);
+    let errors = this.errors = [];
+
+    this.logger = new class extends fake.Logger {
+      error(tag, traceId, error) {
+        super.error(tag, traceId, error);
+        errors.push(error.message);
+      }
+    }();
   }
 
-  _setUpDomain() {
+  _setUpPersistence() {
     this.store = new fake.EventStore();
     this.log = new fake.EventLog();
 
     this.metaStore = new fake.EventStore();
     this.metaLog = new fake.EventLog();
-
-    this.domain = new domain.Domain('Example',
-      {
-        eventStore: () => this.store,
-        eventLog: () => this.log,
-        snapshotStore: () => new fake.SnapshotStore(),
-      },
-      {
-        eventStore: () => this.metaStore,
-        eventLog: () => this.metaLog,
-        snapshotStore: () => new fake.SnapshotStore(),
-      });
   }
 
   _setUpDependencies() {
@@ -65,7 +59,25 @@ class Example {
   }
 
   when(action) {
-    this.handler = this.module(this.domain, this.dependencies);
+    const persistence = {
+      eventStore: () => this.store,
+      eventLog: () => this.log,
+      snapshotStore: () => new fake.SnapshotStore(),
+    };
+
+    const metaPersistence = {
+      eventStore: () => this.metaStore,
+      eventLog: () => this.metaLog,
+      snapshotStore: () => new fake.SnapshotStore(),
+    };
+
+    this.module = new this.Module(
+      'Example',
+      persistence,
+      metaPersistence,
+      new unit.UnitStrategy(),
+      this.logger,
+      this.dependencies);
 
     return action.perform(this)
   }

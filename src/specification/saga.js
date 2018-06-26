@@ -13,7 +13,7 @@ class PublishEventAction extends specification.Action {
     const consumed = new event.Event('__record-consumed', {recordTime: 1});
     example.metaLog.records.push(new event.Record(consumed, 'Example'));
 
-    const reaction = example.domain.start()
+    const reaction = example.module.domain.start()
       .then(() => example.log.publish(new event.Record(this.event.event)));
 
     return new ReactionResult(example, reaction)
@@ -24,7 +24,6 @@ class ReactionResult extends specification.Result {
 
   //noinspection JSUnusedGlobalSymbols
   finalAssertion() {
-    new logging.NoLoggedErrorExpectation().assert(this);
     this.example.metaStore.recorded
       .forEach(r => r.events
         .filter(e => e.name == '__reaction-failed')
@@ -32,11 +31,13 @@ class ReactionResult extends specification.Result {
           const error = new Error('Reaction failed: ' + e.payload.record.event.name);
           error.stack = e.payload.error;
           throw error
-        }))
+        }));
+
+    new logging.NoLoggedErrorExpectation().assert(this);
   }
 }
 
-class ReactionFailureExpectation extends specification.Expectation {
+class ReactionFailureExpectation extends logging.LoggedErrorExpectation {
   constructor(message) {
     super();
     this.message = message;
@@ -55,6 +56,8 @@ class ReactionFailureExpectation extends specification.Expectation {
       .reduce((flat, errs) => [...flat, ...errs], []);
 
     expect(failures).to.contain(this.message, 'Missing reaction failure');
+
+    super.assert(result);
   }
 }
 
