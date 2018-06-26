@@ -4,7 +4,10 @@ const _event = require('../../src/event');
 const mongodb = require('mongodb');
 const mongoOplog = require('mongo-oplog');
 const BSON = require('bson');
-const debug = require('debug')('karma:snapshot');
+const debug = {
+  snapshot: require('debug')('karma:snapshot'),
+  replay: require('debug')('karma:replay')
+};
 
 class MongoEventStore extends _persistence.EventStore {
   constructor(domainName, connectionUri, database, collectionPrefix, connectionOptions) {
@@ -126,12 +129,32 @@ class MongoEventLog extends _persistence.EventLog {
   }
 
   _replay(filter, applier) {
-    return Promise.resolve(this._db
+    let cursor = this._db
       .collection(this._collection)
       .find(filter.query)
-      .sort({_id: 1}))
+      .sort({_id: 1});
 
-      .then(cursor => new Promise((y, n) => cursor.forEach(recordSet => {
+    let first = Promise.resolve();
+
+    let totalCount = 0;
+    let currentCount = 0;
+    if (debug.replay.enabled) {
+      first = new Promise(y => cursor.count((err, count) => {
+        debug.replay('%d %j', count, filter.query);
+        totalCount = count;
+        y();
+      }));
+    }
+
+    return first
+      .then(() => new Promise((y, n) => cursor.forEach(recordSet => {
+        if (debug.replay.enabled) {
+          currentCount++;
+          let percent = (currentCount / totalCount) * 100;
+          if (currentCount > 1000 && percent % 10 == 0)
+            debug.replay('%d%% %d/%d', percent, currentCount, totalCount);
+        }
+
         try {
           this._notifySubscribers(recordSet, [{applier}])
         } catch (err) {
@@ -263,8 +286,8 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
       }
     };
 
-    if (debug.enabled) {
-      debug('%j', {key, version, size: new BSON().calculateObjectSize(document.$set)});
+    if (debug.snapshot.enabled) {
+      debug.snapshot('%j', {key, version, size: new BSON().calculateObjectSize(document.$set)});
     }
 
     return this.connect().then(() =>
