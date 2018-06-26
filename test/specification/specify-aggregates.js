@@ -105,6 +105,18 @@ describe('Specifying Aggregates', () => {
       ]))
   });
 
+  it('fails if no stream was recorded', () => {
+    return new Example(domain => new k.api.http.RequestHandler()
+      .handling(() => null))
+
+      .when(I.post())
+
+      .then(expect.EventStream('foo', []))
+
+      .promise.should.be.rejectedWith("No streams recorded: " +
+        "expected undefined to exist")
+  });
+
   it('fails no ID of expected Event stream does not match', () => {
     return new Example(domain(aggregate=>aggregate))
 
