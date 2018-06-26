@@ -23,7 +23,6 @@ describe('Reacting to an Event', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new fake.EventLog(),
           snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
@@ -36,6 +35,7 @@ describe('Reacting to an Event', () => {
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
         },
+        args.strategy || new k.UnitStrategy(),
         logger)
   });
 

@@ -23,7 +23,6 @@ describe('Applying Events', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new fake.EventLog(),
           snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
@@ -33,7 +32,8 @@ describe('Applying Events', () => {
           eventLog: () => args.metaLog || new fake.EventLog(),
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
-        })
+        },
+        args.strategy || new k.UnitStrategy())
   });
 
   afterEach(() => {
@@ -45,7 +45,7 @@ describe('Applying Events', () => {
     let persistence = new _persistence.PersistenceFactory();
     persistence.eventLog = name => passedNames.push(name);
 
-    new k.Domain('Foo', new k.UnitStrategy, persistence, persistence);
+    new k.Domain('Foo', persistence, persistence);
 
     passedNames.should.eql(['Foo', '__admin', 'Foo__meta']);
   });

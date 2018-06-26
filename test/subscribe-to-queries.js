@@ -16,7 +16,6 @@ describe('Subscribing to a Query', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new fake.EventLog(),
           snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
@@ -26,7 +25,8 @@ describe('Subscribing to a Query', () => {
           eventLog: () => args.metaLog || new fake.EventLog(),
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
-        })
+        },
+        args.strategy || new k.UnitStrategy())
   });
 
   it('fails if no responder exists for that Query', () => {

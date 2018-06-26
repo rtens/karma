@@ -17,7 +17,7 @@ describe('Handling Domain Messages via HTTP', () => {
       snapshotStore: () => new fake.SnapshotStore()
     };
 
-    let domain = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
+    let domain = new k.Domain('Test', persistence, persistence)
 
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo}, query)=>'Hello ' + foo + query.traceId));
@@ -38,7 +38,7 @@ describe('Handling Domain Messages via HTTP', () => {
       snapshotStore: () => new fake.SnapshotStore()
     };
 
-    let domain = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
+    let domain = new k.Domain('Test', persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
@@ -64,7 +64,7 @@ describe('Handling Domain Messages via HTTP', () => {
     };
 
     let applied;
-    let domain = new k.Domain('Test', new k.UnitStrategy(), persistence, persistence)
+    let domain = new k.Domain('Test', persistence, persistence)
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', () => [new k.Event(), new k.Event()]))

@@ -41,7 +41,6 @@ class Example {
     this.metaLog = new fake.EventLog();
 
     this.domain = new domain.Domain('Example',
-      new unit.UnitStrategy(),
       {
         eventStore: () => this.store,
         eventLog: () => this.log,

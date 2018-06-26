@@ -18,7 +18,6 @@ describe('Responding to a Query', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        args.strategy || new _unit.UnitStrategy(),
         {
           eventLog: () => args.log || new fake.EventLog(),
           snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
@@ -29,6 +28,7 @@ describe('Responding to a Query', () => {
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
         },
+        args.strategy || new _unit.UnitStrategy(),
         logger)
   });
 

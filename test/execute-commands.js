@@ -32,7 +32,6 @@ describe('Executing a Command', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        args.strategy || new _unit.UnitStrategy(),
         {
           eventLog: () => args.log || new fake.EventLog(),
           snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
@@ -43,6 +42,7 @@ describe('Executing a Command', () => {
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
         },
+        args.strategy || new _unit.UnitStrategy(),
         logger)
   });
 
@@ -56,7 +56,7 @@ describe('Executing a Command', () => {
     let persistence = new _persistence.PersistenceFactory();
     persistence.eventStore = name => passedNames.push(name);
 
-    new k.Domain('Foo', new _unit.UnitStrategy, persistence, persistence);
+    new k.Domain('Foo', persistence, persistence);
 
     passedNames.should.eql(['Foo', 'Foo__meta']);
   });

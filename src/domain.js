@@ -1,4 +1,5 @@
 const message = require('./message');
+const unit = require('./unit');
 const aggregate = require('./units/aggregate');
 const projection = require('./units/projection');
 const subscription = require('./units/subscription');
@@ -7,8 +8,8 @@ const meta = require('./meta');
 const logging = require('./logging');
 
 class BaseDomain {
-  constructor(name, unitStrategy, persistenceFactory, logger) {
-    this._strategy = unitStrategy;
+  constructor(name, persistenceFactory, unitStrategy, logger) {
+    this._strategy = unitStrategy || new unit.UnitStrategy();
     this._logger = logger || new logging.DebugLogger();
 
     this._log = persistenceFactory.eventLog(name);
@@ -98,15 +99,15 @@ class BaseDomain {
 }
 
 class Domain extends BaseDomain {
-  constructor(name, unitStrategy, persistenceFactory, metaPersistenceFactory, logger) {
-    super(name, unitStrategy, persistenceFactory, logger);
+  constructor(name, persistenceFactory, metaPersistenceFactory, unitStrategy, logger) {
+    super(name, persistenceFactory, unitStrategy, logger);
     this._name = name;
 
     this._adminLog = metaPersistenceFactory.eventLog('__admin');
 
     const metaLogger = new logging.PrefixedLogger('meta', this._logger);
 
-    this._meta = new BaseDomain(name + '__meta', unitStrategy, metaPersistenceFactory, metaLogger);
+    this._meta = new BaseDomain(name + '__meta', metaPersistenceFactory, this._strategy, metaLogger);
     this._sagas = new saga.SagaRepository(this._log, this._snapshots, this._logger, this._meta);
 
     this._meta._aggregates.add(new meta.ReactionLockAggregate());

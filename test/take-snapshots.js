@@ -4,7 +4,6 @@ chai.use(promised);
 chai.should();
 
 const _event = require('../src/event');
-const _unit = require('../src/unit');
 const _persistence = require('../src/persistence');
 
 const units = require('./common/units');
@@ -24,7 +23,6 @@ describe('Taking a Snapshot', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        args.strategy || new k.UnitStrategy(),
         {
           eventLog: () => args.log || new fake.EventLog(),
           snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
@@ -34,7 +32,8 @@ describe('Taking a Snapshot', () => {
           eventLog: () => args.metaLog || new fake.EventLog(),
           snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
           eventStore: () => args.metaStore || new fake.EventStore()
-        })
+        },
+        args.strategy || new k.UnitStrategy())
   });
 
   afterEach(() => {
@@ -46,7 +45,7 @@ describe('Taking a Snapshot', () => {
     let persistence = new _persistence.PersistenceFactory();
     persistence.snapshotStore = name => passedNames.push(name);
 
-    new k.Domain('Foo', new _unit.UnitStrategy, persistence, persistence);
+    new k.Domain('Foo', persistence, persistence);
 
     passedNames.should.eql(['Foo', 'Foo__meta']);
   });

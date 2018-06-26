@@ -16,12 +16,12 @@ let strategy = {
 };
 
 new karma.Domain('Demo',
-  strategy,
   // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
   // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))
 
   new nest.PersistenceFactory(new Datastore({filename: 'data/Demo/store'}), new Datastore({filename: 'data/Demo/snapshots'})),
-  new nest.PersistenceFactory(new Datastore({filename: 'data/Demo/meta_store'}), new Datastore({filename: 'data/Demo/meta_snapshots'})))
+  new nest.PersistenceFactory(new Datastore({filename: 'data/Demo/meta_store'}), new Datastore({filename: 'data/Demo/meta_snapshots'})),
+  strategy)
 
   .add(new karma.Aggregate('Bob')
 
