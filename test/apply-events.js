@@ -23,31 +23,17 @@ describe('Applying Events', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        {
-          eventLog: () => args.log || new fake.EventLog(),
-          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
-          eventStore: () => args.store || new fake.EventStore()
-        },
-        {
-          eventLog: () => args.metaLog || new fake.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
-          eventStore: () => args.metaStore || new fake.EventStore()
-        },
+        args.log || new fake.EventLog(),
+        args.snapshots || new fake.SnapshotStore(),
+        args.store || new fake.EventStore(),
+        args.metaLog || new fake.EventLog(),
+        args.metaSnapshots || new fake.SnapshotStore(),
+        args.metaStore || new fake.EventStore(),
         args.strategy || new k.UnitStrategy())
   });
 
   afterEach(() => {
     Date = _Date;
-  });
-
-  it('passes Domain names to the EventLog', () => {
-    let passedNames = [];
-    let persistence = new _persistence.PersistenceFactory();
-    persistence.eventLog = name => passedNames.push(name);
-
-    new k.Domain('Foo', persistence, persistence);
-
-    passedNames.should.eql(['Foo', '__admin', 'Foo__meta']);
   });
 
   Object.values(units).forEach(unit =>
@@ -56,10 +42,10 @@ describe('Applying Events', () => {
       it('uses recorded Events', () => {
         let log = new fake.EventLog();
         log.records = [
-          new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
-          new _event.Record(new k.Event('bard', 'duplicate'), 'foo', 21),
-          new _event.Record(new k.Event('bard', 'two'), 'foo', 22),
-          new _event.Record(new k.Event('not applied', 'tre'), 'foo', 23)
+          new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
+          new _event.Record(new k.Event('bard', 'duplicate'), 'Test', 'foo', 21),
+          new _event.Record(new k.Event('bard', 'two'), 'Test', 'foo', 22),
+          new _event.Record(new k.Event('not applied', 'Test', 'tre'), 'foo', 23)
         ];
 
         let state = [];
@@ -96,8 +82,8 @@ describe('Applying Events', () => {
       it('consolidates when loaded', () => {
         let log = new fake.EventLog();
         log.records = [
-          new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
-          new _event.Record(new k.Event('bard', 'two'), 'foo', 22),
+          new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
+          new _event.Record(new k.Event('bard', 'two'), 'Test', 'foo', 22),
         ];
 
         let consolidated = [];
@@ -158,7 +144,7 @@ describe('Applying Events', () => {
       it('keeps the reconstituted Unit', () => {
         let log = new fake.EventLog();
         log.records = [
-          new _event.Record(new k.Event('bard', 'a '), 'foo', 21)
+          new _event.Record(new k.Event('bard', 'a '), 'Test', 'foo', 21)
         ];
 
         let state = [];
@@ -198,7 +184,7 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => log.publish(new _event.Record(new k.Event('bard', 'one'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo')))
 
           .then(() => applied.should.eql(['one']))
 
@@ -225,61 +211,19 @@ describe('Applying Events', () => {
 
           [unit.handle](new unit.Message('Foo'))
 
-          .then(() => log.publish(new _event.Record(new k.Event('bard', 'One'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'One'), 'Test', 'foo')))
 
-          .then(() => log.publish(new _event.Record(new k.Event('bard', 'Two'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'Two'), 'Test', 'foo')))
 
           .then(() => consolidated.should.eql(['Zero', 'ZeroOne', 'ZeroOneTwo']))
 
           .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
       });
 
-      it('uses Events from combined EventLogs', () => {
-        let log1 = new fake.EventLog();
-        log1.records = [new _event.Record(new k.Event('bard', '1a'), 'foo')];
-        log1.filter = () => new fake.RecordFilter().named('one');
-
-        let log2 = new fake.EventLog();
-        log2.records = [new _event.Record(new k.Event('bard', '2a'), 'foo')];
-        log2.filter = () => new fake.RecordFilter().named('two');
-
-        let applied = [];
-        return Domain({log: new _persistence.CombinedEventLog([log1, log2])})
-
-          .add(new unit.Unit('One')
-            .applying('bard', (payload) => applied.push(payload))
-            [unit.handling]('Foo', $=>'foo', ()=>null))
-
-          [unit.handle](new unit.Message('Foo'))
-
-          .then(() => applied.should.eql(['1a', '2a']))
-
-          .then(() => log1.replayed.should.eql([{
-            ...{name: 'one'},
-            ...(unit.name == 'an Aggregate'
-              ? {streamId: 'foo'}
-              : {eventNames: ['bard']}),
-          }]))
-          .then(() => log2.replayed.should.eql([{
-            ...{name: 'two'},
-            ...(unit.name == 'an Aggregate'
-              ? {streamId: 'foo'}
-              : {eventNames: ['bard']}),
-          }]))
-
-          .then(() => log1.publish(new _event.Record(new k.Event('bard', '1b'), 'foo')))
-          .then(() => log2.publish(new _event.Record(new k.Event('bard', '2b'), 'foo')))
-
-          .then(() => applied.should.eql(['1a', '2a', '1b', '2b']))
-
-          .then(() => log1.subscriptions.map(s => s.active).should.eql([true]))
-          .then(() => log2.subscriptions.map(s => s.active).should.eql([true]))
-      });
-
       it('notifies the UnitStrategy', () => {
         let log = new fake.EventLog('Foobar');
         log.records = [
-          new _event.Record(new k.Event('bard'), 'foo')
+          new _event.Record(new k.Event('bard'), 'Test', 'foo')
         ];
 
         let notified = [];
@@ -309,7 +253,7 @@ describe('Applying Events', () => {
       it('unloads the Unit if failing during replay', () => {
         let log = new fake.EventLog();
         log.records = [
-          new _event.Record(new k.Event('bard'), 'foo', 21),
+          new _event.Record(new k.Event('bard'), 'Test', 'foo', 21),
         ];
 
         let notified = [];
@@ -355,7 +299,7 @@ describe('Applying Events', () => {
 
         return domain[unit.handle](new unit.Message('Foo'))
 
-          .then(() => log.publish(new _event.Record(new k.Event('bard', 'one'), 'foo')))
+          .then(() => log.publish(new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo')))
 
           .should.be.rejectedWith('Nope')
 
@@ -372,7 +316,7 @@ describe('Applying Events', () => {
         it('is redone if Unit is unloaded', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('food', 'one'), 'foo')
+            new _event.Record(new k.Event('food', 'one'), 'Test', 'foo')
           ];
 
           let strategy = {onAccess: unit => unit.unload()};
@@ -401,8 +345,8 @@ describe('Applying Events', () => {
         it('uses recorded Events of any stream', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
-            new _event.Record(new k.Event('bard', 'two'), 'bar', 22),
+            new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
+            new _event.Record(new k.Event('bard', 'two'), 'Test', 'bar', 22),
           ];
 
           let applied = [];
@@ -426,8 +370,8 @@ describe('Applying Events', () => {
         it('uses only Events of own stream', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
-            new _event.Record(new k.Event('bard', 'two'), 'bar', 22),
+            new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
+            new _event.Record(new k.Event('bard', 'two'), 'Test', 'bar', 22),
           ];
 
           let applied = [];
@@ -442,6 +386,7 @@ describe('Applying Events', () => {
             .then(() => applied.should.eql(['one']))
 
             .then(() => log.replayed.should.eql([{
+              domainName: 'Test',
               streamId: 'foo'
             }]))
         });

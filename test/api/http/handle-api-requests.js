@@ -5,7 +5,7 @@ chai.should();
 
 const k = require('../../..');
 
-describe('Handling HTTP API requests', () => {
+describe.skip('Handling HTTP API requests', () => {
 
   it('generates a trace ID', () => {
     let traceId, i = 1;

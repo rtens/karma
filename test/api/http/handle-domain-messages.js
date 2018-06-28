@@ -8,7 +8,7 @@ const _event = require('../../../src/event');
 const fake = require('../../../src/specification/fakes');
 const k = require('../../..');
 
-describe('Handling Domain Messages via HTTP', () => {
+describe.skip('Handling Domain Messages via HTTP', () => {
 
   it('responds to a Query', () => {
     let persistence = {

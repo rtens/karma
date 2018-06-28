@@ -6,7 +6,7 @@ chai.should();
 const k = require('../..');
 const {the, Example, I, expect} = require('../../spec')();
 
-describe('Specifying Aggregates', () => {
+describe.skip('Specifying Aggregates', () => {
 
   const Module = configure => class extends k.api.http.Module {
     //noinspection JSUnusedGlobalSymbols

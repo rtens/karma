@@ -6,7 +6,7 @@ chai.should();
 const k = require('../../../index.js');
 const {Example, I, expect} = require('../../../spec')({api: 'express'});
 
-describe('Specifying an express API', () => {
+describe.skip('Specifying an express API', () => {
 
   const Module = configure => class extends k.api.express.Module {
     //noinspection JSUnusedGlobalSymbols

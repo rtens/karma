@@ -1,8 +1,8 @@
 const projection = require('./projection');
 
 class SubscriptionInstance extends projection.ProjectionInstance {
-  constructor(id, definition, log, snapshots, logger) {
-    super(id, definition, log, snapshots, logger);
+  constructor(domain, id, definition, log, snapshots, logger) {
+    super(domain, id, definition, log, snapshots, logger);
     this._subscriptions = [];
     this._unloaded = false;
   }
@@ -56,7 +56,7 @@ class SubscriptionRepository extends projection.ProjectionRepository {
 
   //noinspection JSUnusedGlobalSymbols
   _createInstance(projectionId, definition) {
-    return new SubscriptionInstance(projectionId, definition, this._log, this._snapshots, this._logger);
+    return new SubscriptionInstance(this.domain, projectionId, definition, this._log, this._snapshots, this._logger);
   }
 }
 

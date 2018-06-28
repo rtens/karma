@@ -8,9 +8,10 @@ class Event extends message.Message {
 }
 
 class Record {
-  constructor(event, streamId, sequence, traceId, time = new Date()) {
+  constructor(event, domainName, streamId, sequence, traceId, time = new Date()) {
     this.time = time;
     this.event = event;
+    this.domainName = domainName;
     this.streamId = streamId;
     this.sequence = sequence;
     this.traceId = traceId;

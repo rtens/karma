@@ -23,31 +23,17 @@ describe('Taking a Snapshot', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        {
-          eventLog: () => args.log || new fake.EventLog(),
-          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
-          eventStore: () => args.store || new fake.EventStore()
-        },
-        {
-          eventLog: () => args.metaLog || new fake.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
-          eventStore: () => args.metaStore || new fake.EventStore()
-        },
+        args.log || new fake.EventLog(),
+        args.snapshots || new fake.SnapshotStore(),
+        args.store || new fake.EventStore(),
+        args.metaLog || new fake.EventLog(),
+        args.metaSnapshots || new fake.SnapshotStore(),
+        args.metaStore || new fake.EventStore(),
         args.strategy || new k.UnitStrategy())
   });
 
   afterEach(() => {
     Date = _Date;
-  });
-
-  it('passes Domain names to the SnapshotStore', () => {
-    let passedNames = [];
-    let persistence = new _persistence.PersistenceFactory();
-    persistence.snapshotStore = name => passedNames.push(name);
-
-    new k.Domain('Foo', persistence, persistence);
-
-    passedNames.should.eql(['Foo', 'Foo__meta']);
   });
 
   Object.values(units).forEach(unit =>
@@ -56,8 +42,8 @@ describe('Taking a Snapshot', () => {
       it('stores the Snapshot by key and version', () => {
         let log = new fake.EventLog();
         log.records = [
-          new _event.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
-          new _event.Record(new k.Event('not applied', 'not'), 'bar', 22, null, new Date('2011-12-13')),
+          new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21, null, new Date('2011-12-13')),
+          new _event.Record(new k.Event('not applied', 'not'), 'Test', 'bar', 22, null, new Date('2011-12-13')),
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -82,7 +68,8 @@ describe('Taking a Snapshot', () => {
           .then(() => taken.should.eql(true))
 
           .then(() => snapshots.stored.should.eql([{
-            key: unit.Unit.name + '-One-foo',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: {
               lastRecordTime: new Date('2011-12-13'),
@@ -95,13 +82,14 @@ describe('Taking a Snapshot', () => {
       it('reconstitutes from Snapshot and Events', () => {
         let log = new fake.EventLog();
         log.records = [
-          new _event.Record(new k.Event('bard', 'not'), 'foo', 21),
-          new _event.Record(new k.Event('bard', 'one'), 'foo', 23)
+          new _event.Record(new k.Event('bard', 'not'), 'Test', 'foo', 21),
+          new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 23)
         ];
 
         let snapshots = new fake.SnapshotStore();
         snapshots.snapshots = [{
-          key: unit.Unit.name + '-One-foo',
+          domainName: 'Test',
+          unitKey: unit.Unit.name + '-One-foo',
           version: 'v1',
           snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21}, ['snap'])
         }];
@@ -126,7 +114,8 @@ describe('Taking a Snapshot', () => {
           .then(() => state.should.eql([['snap', 'one']]))
 
           .then(() => snapshots.fetched.should.eql([{
-            key: unit.Unit.name + '-One-foo',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-One-foo',
             version: 'v1',
           }]))
 
@@ -199,19 +188,23 @@ describe('Taking a Snapshot', () => {
           .then(() => domain[unit.handle](new unit.Message('Ban')))
 
           .then(() => snapshots.stored.should.eql([{
-            key: unit.Unit.name + '-One-foo',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-One-foo',
             version: '291e2ac4a7d46552cb02fdf71f132f7c',
             snapshot: {lastRecordTime: null, heads: {}, state: 'one'}
           }, {
-            key: unit.Unit.name + '-Two-bar',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-Two-bar',
             version: '291e2ac4a7d46552cb02fdf71f132f7c',
             snapshot: {lastRecordTime: null, heads: {}, state: 'one'}
           }, {
-            key: unit.Unit.name + '-Three-baz',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-Three-baz',
             version: '3c47bcfe065e01cf7bf92fc63df63fb8',
             snapshot: {lastRecordTime: null, heads: {}, state: 'two'}
           }, {
-            key: unit.Unit.name + '-Four-ban',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-Four-ban',
             version: '31502f324858e9b8b5bec31feaca68ad',
             snapshot: {lastRecordTime: null, heads: {}, state: 'two'}
           }]))
@@ -241,7 +234,8 @@ describe('Taking a Snapshot', () => {
           .then(() => setTimeout = _setTimeout)
 
           .then(() => snapshots.stored.should.eql([{
-            key: unit.Unit.name + '-One-foo',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: {lastRecordTime: null, heads: {}, state: {}}
           }]))
@@ -251,15 +245,16 @@ describe('Taking a Snapshot', () => {
         it('reconstitutes from Snapshot and Events of multiple streams', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('bard', 'not'), 'foo', 21),
-            new _event.Record(new k.Event('bard', 'one'), 'foo', 23),
-            new _event.Record(new k.Event('bard', 'not'), 'bar', 22),
-            new _event.Record(new k.Event('bard', 'two'), 'bar', 23),
+            new _event.Record(new k.Event('bard', 'not'), 'Test', 'foo', 21),
+            new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 23),
+            new _event.Record(new k.Event('bard', 'not'), 'Test', 'bar', 22),
+            new _event.Record(new k.Event('bard', 'two'), 'Test', 'bar', 23),
           ];
 
           let snapshots = new fake.SnapshotStore();
           snapshots.snapshots = [{
-            key: unit.Unit.name + '-One-foo',
+            domainName: 'Test',
+            unitKey: unit.Unit.name + '-One-foo',
             version: 'v1',
             snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21, bar: 22}, ['snap'])
           }];
@@ -284,7 +279,8 @@ describe('Taking a Snapshot', () => {
             .then(() => state.should.eql([['snap', 'one', 'two']]))
 
             .then(() => snapshots.fetched.should.eql([{
-              key: unit.Unit.name + '-One-foo',
+              domainName: 'Test',
+              unitKey: unit.Unit.name + '-One-foo',
               version: 'v1',
             }]))
 
@@ -298,8 +294,8 @@ describe('Taking a Snapshot', () => {
         it('saves a Snapshot with multiple heads', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('bard', 'one'), 'foo', 21, null, new Date('2011-12-13')),
-            new _event.Record(new k.Event('bard', 'two'), 'bar', 42, null, new Date('2011-12-14')),
+            new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21, null, new Date('2011-12-13')),
+            new _event.Record(new k.Event('bard', 'two'), 'Test', 'bar', 42, null, new Date('2011-12-14')),
           ];
 
           let snapshots = new fake.SnapshotStore();
@@ -321,7 +317,8 @@ describe('Taking a Snapshot', () => {
             [unit.handle](new unit.Message('Foo', 'foo'))
 
             .then(() => snapshots.stored.should.eql([{
-              key: unit.Unit.name + '-One-foo',
+              domainName: 'Test',
+              unitKey: unit.Unit.name + '-One-foo',
               version: 'v1',
               snapshot: {
                 lastRecordTime: new Date('2011-12-14'),

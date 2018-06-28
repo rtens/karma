@@ -6,7 +6,7 @@ chai.should();
 const k = require('../..');
 const {the, Example, I, expect} = require('../../spec')();
 
-describe('Specifying Sagas', () => {
+describe.skip('Specifying Sagas', () => {
 
   const Module = (saga, domain = x=>x) => class extends k.Module {
     //noinspection JSUnusedGlobalSymbols

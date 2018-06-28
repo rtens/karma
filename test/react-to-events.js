@@ -23,18 +23,12 @@ describe('Reacting to an Event', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        {
-          eventLog: () => args.log || new fake.EventLog(),
-          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
-          eventStore: () => args.store || new fake.EventStore()
-        },
-        {
-          eventLog: domain => domain == '__admin'
-            ? args.adminLog || new fake.EventLog()
-            : args.metaLog || new fake.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
-          eventStore: () => args.metaStore || new fake.EventStore()
-        },
+        args.log || new fake.EventLog(),
+        args.snapshots || new fake.SnapshotStore(),
+        args.store || new fake.EventStore(),
+        args.metaLog || new fake.EventLog(),
+        args.metaSnapshots || new fake.SnapshotStore(),
+        args.metaStore || new fake.EventStore(),
         args.strategy || new k.UnitStrategy(),
         logger)
   });
@@ -56,8 +50,8 @@ describe('Reacting to an Event', () => {
   it('invokes the reactor for recorded Events', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'foo', 23),
-      new _event.Record(new k.Event('food', 'two'), 'bar', 21),
+      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23),
+      new _event.Record(new k.Event('food', 'two'), 'Test', 'bar', 21),
     ];
 
     let reactions = [];
@@ -78,7 +72,7 @@ describe('Reacting to an Event', () => {
   it('locks Reactions', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
+      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
     ];
 
     let metaStore = new fake.EventStore();
@@ -101,6 +95,7 @@ describe('Reacting to an Event', () => {
           streamId: 'foo',
           sequence: 23
         })],
+        domainName: 'Test__meta',
         streamId: '__Saga-One-foo',
         onSequence: undefined,
         traceId: undefined
@@ -110,7 +105,7 @@ describe('Reacting to an Event', () => {
   it('records time of last Record if no reaction exists for it', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
+      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23, null, new Date('2011-12-13T14:15:16Z'))
     ];
 
     let metaStore = new fake.EventStore();
@@ -130,6 +125,7 @@ describe('Reacting to an Event', () => {
         events: [new k.Event('__record-consumed', {
           recordTime: new Date('2011-12-13T14:15:16Z')
         })],
+        domainName: 'Test__meta',
         streamId: '__Domain-Test',
         onSequence: undefined,
         traceId: undefined
@@ -139,7 +135,7 @@ describe('Reacting to an Event', () => {
   it('does not record time of last Record already recorded', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'foo', 23, null, new Date('2011-12-13T14:15:15Z'))
+      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23, null, new Date('2011-12-13T14:15:15Z'))
     ];
 
     let metaLog = new fake.EventLog();
@@ -212,15 +208,13 @@ describe('Reacting to an Event', () => {
       new _event.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-12')})),
     ];
 
-    let adminLog = new fake.EventLog();
-
     let log = new fake.EventLog();
 
-    return Domain({log, metaLog, adminLog}).start()
+    return Domain({log, metaLog}).start()
 
       .then(() => log.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
 
-      .then(() => adminLog.replayed.should.eql([{lastRecordTime: new Date('2011-12-13')}]))
+      .then(() => metaLog.replayed.slice(1).should.eql([{lastRecordTime: new Date('2011-12-13')}]))
   });
 
   it('invokes the reactor for published Events', () => {
@@ -236,7 +230,7 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'foo', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 42)))
 
       .then(() => reactions.should.eql(['one']))
   });
@@ -263,7 +257,7 @@ describe('Reacting to an Event', () => {
 
   it('marks throwing reactions as failed', () => {
     let log = new fake.EventLog();
-    log.records = [new _event.Record(new k.Event('food', 'one'), 'bar', 23, 'trace')];
+    log.records = [new _event.Record(new k.Event('food', 'one'), 'Test', 'bar', 23, 'trace')];
 
     let metaStore = new fake.EventStore();
 
@@ -283,6 +277,7 @@ describe('Reacting to an Event', () => {
           streamId: 'bar',
           sequence: 23
         })],
+        domainName: 'Test__meta',
         streamId: '__Saga-One-foo',
         onSequence: undefined,
         traceId: undefined
@@ -293,12 +288,14 @@ describe('Reacting to an Event', () => {
           record: {
             event: {name: 'food', payload: 'one', time: new Date()},
             sequence: 23,
+            domainName: 'Test',
             streamId: 'bar',
             traceId: 'trace',
             time: new Date()
           },
           error: 'An Error stack'
         })],
+        domainName: 'Test__meta',
         streamId: '__Saga-One-foo',
         onSequence: undefined,
         traceId: undefined
@@ -311,7 +308,7 @@ describe('Reacting to an Event', () => {
 
   it('marks reactions with rejected Promises as failed', () => {
     let log = new fake.EventLog();
-    log.records = [new _event.Record(new k.Event('food', 'one'), 'foo', 23, 'trace')];
+    log.records = [new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23, 'trace')];
 
     let metaStore = new fake.EventStore();
 
@@ -327,7 +324,7 @@ describe('Reacting to an Event', () => {
 
   it('logs messages from reaction', () => {
     let log = new fake.EventLog();
-    log.records = [new _event.Record(new k.Event('food', 'one'), 'foo', 23, 'trace')];
+    log.records = [new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23, 'trace')];
 
     let metaStore = new fake.EventStore();
 
@@ -356,12 +353,12 @@ describe('Reacting to an Event', () => {
   it('does not invoke reactor if reaction is locked', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
+      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), 'Test__meta', '__Saga-One-bar', 3),
     ];
 
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'foo', 21)
+      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 21)
     ];
 
     let metaStore = new fake.EventStore();
@@ -375,9 +372,9 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Test', 'foo', 22)))
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'two'), 'bar', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'two'), 'Test', 'bar', 22)))
 
       .then(() => reactions.should.eql(['one', 'two']))
 
@@ -388,6 +385,7 @@ describe('Reacting to an Event', () => {
           streamId: 'foo',
           sequence: 21
         })],
+        domainName: 'Test__meta',
         streamId: '__Saga-One-bar',
         onSequence: 3,
         traceId: undefined
@@ -398,6 +396,7 @@ describe('Reacting to an Event', () => {
           streamId: 'bar',
           sequence: 22
         })],
+        domainName: 'Test__meta',
         streamId: '__Saga-One-bar',
         onSequence: 3,
         traceId: undefined
@@ -407,7 +406,7 @@ describe('Reacting to an Event', () => {
   it('keeps state of locked Reactions', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), '__Saga-One-bar', 3),
+      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 22}), 'Test__meta', '__Saga-One-bar', 3),
     ];
 
     let log = new fake.EventLog();
@@ -425,11 +424,11 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Test', 'foo', 22)))
 
       .then(() => metaLog.records = [])
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Test', 'foo', 22)))
 
       .then(() => reactions.should.eql([]))
   });
@@ -437,13 +436,13 @@ describe('Reacting to an Event', () => {
   it('invokes reactor if reaction has failed after being locked', () => {
     let metaLog = new fake.EventLog();
     metaLog.records = [
-      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 21}), '__Saga-One-bar', 3),
-      new _event.Record(new k.Event('__reaction-failed', {streamId: 'foo', sequence: 21}), '__Saga-One-bar', 4),
+      new _event.Record(new k.Event('__reaction-locked', {streamId: 'foo', sequence: 21}), 'Test__meta', '__Saga-One-bar', 3),
+      new _event.Record(new k.Event('__reaction-failed', {streamId: 'foo', sequence: 21}), 'Test__meta', '__Saga-One-bar', 4),
     ];
 
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'foo', 21)
+      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 21)
     ];
 
     let metaStore = new fake.EventStore();
@@ -461,20 +460,20 @@ describe('Reacting to an Event', () => {
   });
 
   it('retries reaction', () => {
-    let adminLog = new fake.EventLog();
+    let metaLog = new fake.EventLog();
 
     let metaStore = new fake.EventStore();
 
     let reactions = [];
 
-    return Domain({adminLog, metaStore})
+    return Domain({metaLog, metaStore})
 
       .add(new k.Saga('One')
         .reactingTo('food', ()=>'foo', (payload) => reactions.push(payload)))
 
       .start()
 
-      .then(() => adminLog.publish(new _event.Record(new k.Event('__reaction-retry-requested', {
+      .then(() => metaLog.publish(new _event.Record(new k.Event('__reaction-retry-requested', {
         sagaId: 'foo',
         sagaKey: '__Saga-One-foo',
         record: {

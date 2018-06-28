@@ -4,7 +4,6 @@ chai.use(promised);
 chai.should();
 
 const _event = require('../src/event');
-const _persistence = require('../src/persistence');
 const _unit = require('../src/unit');
 
 const fake = require('./../src/specification/fakes');
@@ -32,16 +31,12 @@ describe('Executing a Command', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        {
-          eventLog: () => args.log || new fake.EventLog(),
-          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
-          eventStore: () => args.store || new fake.EventStore()
-        },
-        {
-          eventLog: () => args.metaLog || new fake.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
-          eventStore: () => args.metaStore || new fake.EventStore()
-        },
+        args.log || new fake.EventLog(),
+        args.snapshots || new fake.SnapshotStore(),
+        args.store || new fake.EventStore(),
+        args.metaLog || new fake.EventLog(),
+        args.metaSnapshots || new fake.SnapshotStore(),
+        args.metaStore || new fake.EventStore(),
         args.strategy || new _unit.UnitStrategy(),
         logger)
   });
@@ -49,16 +44,6 @@ describe('Executing a Command', () => {
   afterEach(() => {
     Date = _Date;
     setTimeout = _setTimeout;
-  });
-
-  it('passes Domain names to the EventStore', () => {
-    let passedNames = [];
-    let persistence = new _persistence.PersistenceFactory();
-    persistence.eventStore = name => passedNames.push(name);
-
-    new k.Domain('Foo', persistence, persistence);
-
-    passedNames.should.eql(['Foo', 'Foo__meta']);
   });
 
   it('fails if no executer is defined', () => {
@@ -216,8 +201,8 @@ describe('Executing a Command', () => {
       .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
       .then(records => records.should.eql([
-        new _event.Record(new k.Event('food', 'one'), 'one', 1, 'trace'),
-        new _event.Record(new k.Event('bard', 'two'), 'one', 2, 'trace'),
+        new _event.Record(new k.Event('food', 'one'), 'Test', 'one', 1, 'trace'),
+        new _event.Record(new k.Event('bard', 'two'), 'Test', 'one', 2, 'trace'),
       ]))
 
       .then(() => store.recorded.should.eql([{
@@ -225,6 +210,7 @@ describe('Executing a Command', () => {
           {name: 'food', payload: 'one', time: new Date()},
           {name: 'bard', payload: 'two', time: new Date()},
         ],
+        domainName: 'Test',
         streamId: 'one',
         onSequence: undefined,
         traceId: 'trace'
@@ -261,6 +247,7 @@ describe('Executing a Command', () => {
 
       .then(() => store.recorded.should.eql([{
         events: [],
+        domainName: 'Test',
         streamId: 'foo',
         onSequence: undefined,
         traceId: 'trace'
@@ -315,8 +302,9 @@ describe('Executing a Command', () => {
   it('applies only Events of Aggregate stream', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
-      new _event.Record(new k.Event('bard', 'not'), 'bar', 22)
+      new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
+      new _event.Record(new k.Event('bard', 'not'), 'Nope', 'foo', 22),
+      new _event.Record(new k.Event('bard', 'not'), 'Test', 'bar', 22)
     ];
 
     let store = new fake.EventStore();
@@ -338,12 +326,14 @@ describe('Executing a Command', () => {
 
       .then(() => store.recorded.should.eql([{
         events: [new k.Event('food', ['one'])],
+        domainName: 'Test',
         streamId: 'foo',
         onSequence: 21,
         traceId: undefined
       }]))
 
       .then(() => log.replayed.should.eql([{
+        domainName: 'Test',
         streamId: 'foo'
       }]))
   });
@@ -351,10 +341,11 @@ describe('Executing a Command', () => {
   it('records Event with the sequence of the last event on stream', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('bard', 'one'), 'foo', 21),
-      new _event.Record(new k.Event('bard', 'two'), 'foo', 22),
-      new _event.Record(new k.Event('food', 'tre'), 'foo', 23),
-      new _event.Record(new k.Event('bard', 'not'), 'bar', 24),
+      new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
+      new _event.Record(new k.Event('bard', 'two'), 'Test', 'foo', 22),
+      new _event.Record(new k.Event('food', 'tre'), 'Test', 'foo', 23),
+      new _event.Record(new k.Event('bard', 'not'), 'Nope', 'foo', 24),
+      new _event.Record(new k.Event('bard', 'not'), 'Test', 'bar', 25),
     ];
 
     let store = new fake.EventStore();
@@ -370,6 +361,7 @@ describe('Executing a Command', () => {
 
       .then(() => store.recorded.should.eql([{
         events: [new k.Event('food')],
+        domainName: 'Test',
         streamId: 'foo',
         onSequence: 23,
         traceId: undefined

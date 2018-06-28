@@ -18,16 +18,12 @@ describe('Responding to a Query', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        {
-          eventLog: () => args.log || new fake.EventLog(),
-          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
-          eventStore: () => args.store || new fake.EventStore()
-        },
-        {
-          eventLog: () => args.metaLog || new fake.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
-          eventStore: () => args.metaStore || new fake.EventStore()
-        },
+        args.log || new fake.EventLog(),
+        args.snapshots || new fake.SnapshotStore(),
+        args.store || new fake.EventStore(),
+        args.metaLog || new fake.EventLog(),
+        args.metaSnapshots || new fake.SnapshotStore(),
+        args.metaStore || new fake.EventStore(),
         args.strategy || new _unit.UnitStrategy(),
         logger)
   });
@@ -170,13 +166,13 @@ describe('Responding to a Query', () => {
     return new Promise(y => setTimeout(y, 0))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new _event.Record(new k.Event(), 'bar', 41)))
+      .then(() => log.publish(new _event.Record(new k.Event(), 'Test', 'bar', 41)))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'baz', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'Test', 'baz', 42)))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new _event.Record(new k.Event(), 'bar', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event(), 'Test', 'bar', 42)))
       .then(() => promise.should.eventually.equal('one later'))
   });
 
@@ -195,14 +191,14 @@ describe('Responding to a Query', () => {
     return new Promise(y => setTimeout(y, 0))
       .then(() => log.subscriptions.map(s => s.active).should.eql([true]))
 
-      .then(() => log.publish(new _event.Record(new k.Event(), 'bar', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event(), 'Test', 'bar', 42)))
       .then(() => new Promise(y => setTimeout(y, 0)))
       .then(() => log.subscriptions.map(s => s.active).should.eql([false]))
   });
 
   it('is not delayed if heads are already reached', () => {
     let log = new fake.EventLog();
-    log.records = [new _event.Record(new k.Event('food'), 'bar', 42)];
+    log.records = [new _event.Record(new k.Event('food'), 'Test', 'bar', 42)];
 
     return Domain({log})
 

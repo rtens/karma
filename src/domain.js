@@ -8,17 +8,17 @@ const meta = require('./meta');
 const logging = require('./logging');
 
 class BaseDomain {
-  constructor(name, persistenceFactory, unitStrategy, logger) {
+  constructor(name, eventLog, snapshotStore, eventStore, unitStrategy, logger) {
     this._strategy = unitStrategy || new unit.UnitStrategy();
     this._logger = logger || new logging.DebugLogger();
 
-    this._log = persistenceFactory.eventLog(name);
-    this._snapshots = persistenceFactory.snapshotStore(name);
-    this._store = persistenceFactory.eventStore(name);
+    this._log = eventLog;
+    this._snapshots = snapshotStore;
+    this._store = eventStore;
 
-    this._aggregates = new aggregate.AggregateRepository(this._log, this._snapshots, this._logger, this._store);
-    this._projections = new projection.ProjectionRepository(this._log, this._snapshots, this._logger);
-    this._subscriptions = new subscription.SubscriptionRepository(this._log, this._snapshots, this._logger);
+    this._aggregates = new aggregate.AggregateRepository(name, this._log, this._snapshots, this._logger, this._store);
+    this._projections = new projection.ProjectionRepository(name, this._log, this._snapshots, this._logger);
+    this._subscriptions = new subscription.SubscriptionRepository(name, this._log, this._snapshots, this._logger);
   }
 
   add(unit) {
@@ -99,16 +99,14 @@ class BaseDomain {
 }
 
 class Domain extends BaseDomain {
-  constructor(name, persistenceFactory, metaPersistenceFactory, unitStrategy, logger) {
-    super(name, persistenceFactory, unitStrategy, logger);
+  constructor(name, eventLog, snapshotStore, eventStore, metaEventLog, metaSnapshotStore, metaEventStore, unitStrategy, logger) {
+    super(name, eventLog, snapshotStore, eventStore, unitStrategy, logger);
     this._name = name;
-
-    this._adminLog = metaPersistenceFactory.eventLog('__admin');
 
     const metaLogger = new logging.PrefixedLogger('meta', this._logger);
 
-    this._meta = new BaseDomain(name + '__meta', metaPersistenceFactory, this._strategy, metaLogger);
-    this._sagas = new saga.SagaRepository(this._log, this._snapshots, this._logger, this._meta);
+    this._meta = new BaseDomain(name + '__meta', metaEventLog, metaSnapshotStore, metaEventStore, this._strategy, metaLogger);
+    this._sagas = new saga.SagaRepository(name, this._log, this._snapshots, this._logger, this._meta);
 
     this._meta._aggregates.add(new meta.ReactionLockAggregate());
     this._meta._aggregates.add(new meta.DomainSubscriptionAggregate());
@@ -131,7 +129,7 @@ class Domain extends BaseDomain {
         return Promise.all([
           this._log.subscribe(this._log.filter().after(lastRecordTime),
             record => this.reactTo(record)),
-          this._adminLog.subscribe(this._adminLog.filter().after(lastRecordTime),
+          this._meta._log.subscribe(this._meta._log.filter().after(lastRecordTime),
             record => this.reactToAdmin(record))
         ])
       })

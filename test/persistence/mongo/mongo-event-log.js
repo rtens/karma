@@ -13,7 +13,7 @@ const mongodb = require('mongodb');
 
 const objectId = time => mongodb.ObjectID.createFromTime(new Date(time).getTime() / 1000);
 
-describe('MongoDB Event Log', () => {
+describe.skip('MongoDB Event Log', () => {
   let log, onDb;
 
   beforeEach(() => {

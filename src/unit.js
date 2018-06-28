@@ -61,7 +61,8 @@ class Unit {
 }
 
 class UnitInstance {
-  constructor(id, definition, log, snapshots, logger) {
+  constructor(domain, id, definition, log, snapshots, logger) {
+    this.domain = domain;
     this.id = id;
     this.definition = definition;
     this.state = {};
@@ -104,7 +105,7 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
-    return this._snapshots.fetch(this._key, this.definition.version)
+    return this._snapshots.fetch(this.domain, this._key, this.definition.version)
       .then(snapshot => {
         this._lastRecordTime = snapshot.lastRecordTime;
         this._heads = snapshot.heads;
@@ -150,7 +151,7 @@ class UnitInstance {
   }
 
   takeSnapshot() {
-    return this._snapshots.store(this._key, this.definition.version,
+    return this._snapshots.store(this.domain, this._key, this.definition.version,
       new persistence.Snapshot(this._lastRecordTime, this._heads, this.state));
   }
 
@@ -184,7 +185,8 @@ class UnitInstance {
 }
 
 class UnitRepository {
-  constructor(log, snapshots, logger) {
+  constructor(domain, log, snapshots, logger) {
+    this.domain = domain;
     this._log = log;
     this._snapshots = snapshots;
     this._logger = logger;
@@ -224,7 +226,7 @@ class UnitRepository {
   }
 
   _createInstance(unitId, definition) {
-    return new UnitInstance(unitId, definition, this._log, this._snapshots);
+    return new UnitInstance(this.domain, unitId, definition, this._log, this._snapshots);
   }
 }
 

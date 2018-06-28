@@ -7,7 +7,7 @@ const k = require('../..');
 const {the, Example, expect} = require('../../spec')();
 const specification = require('../../src/specification');
 
-describe('Specifying dependencies', () => {
+describe.skip('Specifying dependencies', () => {
 
   const Module = initialize => class extends k.Module {
     //noinspection JSUnusedGlobalSymbols

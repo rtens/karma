@@ -24,8 +24,8 @@ class Saga extends unit.Unit {
 }
 
 class SagaInstance extends unit.UnitInstance {
-  constructor(id, definition, log, snapshots, logger, meta) {
-    super(id, definition, log, snapshots, logger);
+  constructor(domain, id, definition, log, snapshots, logger, meta) {
+    super(domain, id, definition, log, snapshots, logger);
     this._meta = meta;
   }
 
@@ -71,8 +71,8 @@ class SagaInstance extends unit.UnitInstance {
 }
 
 class SagaRepository extends unit.UnitRepository {
-  constructor(log, snapshots, logger, metaDomain) {
-    super(log, snapshots, logger);
+  constructor(domain, log, snapshots, logger, metaDomain) {
+    super(domain, log, snapshots, logger);
     this._meta = metaDomain;
   }
 
@@ -82,7 +82,7 @@ class SagaRepository extends unit.UnitRepository {
 
   //noinspection JSUnusedGlobalSymbols
   _createInstance(sagaId, definition) {
-    return new SagaInstance(sagaId, definition, this._log, this._snapshots, this._logger, this._meta);
+    return new SagaInstance(this.domain, sagaId, definition, this._log, this._snapshots, this._logger, this._meta);
   }
 }
 

@@ -11,7 +11,7 @@ const _mongo = require('../../../src/persistence/mongo');
 
 const mongodb = require('mongodb');
 
-describe('MongoDB Snapshot Store', () => {
+describe.skip('MongoDB Snapshot Store', () => {
   let snapshots, onDb;
 
   beforeEach(() => {

@@ -10,7 +10,7 @@ const Datastore = require('nestdb');
 if (!process.env.TEST_DATA_DIR)
   console.log('Set $TEST_DATA_DIR to test persistent NestDB Snapshot Store');
 
-describe('NestDB Snapshot Store', () => {
+describe.skip('NestDB Snapshot Store', () => {
   let db, snapshots;
 
   beforeEach(() => {

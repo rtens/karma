@@ -7,9 +7,9 @@ class FakeEventStore extends persistence.EventStore {
     this.recorded = [];
   }
 
-  record(events, streamId, onSequence, traceId) {
-    this.recorded.push({events, streamId, onSequence, traceId});
-    return new Promise(y => process.nextTick(y(super.record(events, streamId, onSequence, traceId))))
+  record(events, domainName, streamId, onSequence, traceId) {
+    this.recorded.push({events, domainName, streamId, onSequence, traceId});
+    return new Promise(y => process.nextTick(y(super.record(events, domainName, streamId, onSequence, traceId))))
   }
 }
 
@@ -50,6 +50,7 @@ class FakeEventLog extends persistence.EventLog {
 }
 
 class FakeRecordFilter extends persistence.RecordFilter {
+  //noinspection JSUnusedGlobalSymbols
   named(name) {
     this.name = name;
     return this
@@ -65,13 +66,15 @@ class FakeRecordFilter extends persistence.RecordFilter {
     return this
   }
 
-  ofStream(streamId) {
+  ofStream(domainName, streamId) {
+    this.domainName = domainName;
     this.streamId = streamId;
     return this
   }
 
   matches(record) {
     return (!this.streamId || record.streamId == this.streamId)
+      && (!this.domainName || record.domainName == this.domainName)
       && (!this.lastRecordTime || record.time >= this.lastRecordTime);
   }
 }
@@ -84,15 +87,17 @@ class FakeSnapshotStore extends persistence.SnapshotStore {
     this.stored = [];
   }
 
-  store(key, version, snapshot) {
-    this.stored.push({key, version, snapshot});
-    this.snapshots.push({key, version, snapshot});
-    return super.store(key, version, snapshot);
+  store(domainName, unitKey, version, snapshot) {
+    this.stored.push({domainName, unitKey, version, snapshot});
+    this.snapshots.push({domainName, unitKey, version, snapshot});
+    return super.store(domainName, unitKey, version, snapshot);
   }
 
-  fetch(key, version) {
-    this.fetched.push({key, version});
-    let found = this.snapshots.find(s => s.key == key && s.version == version);
+  fetch(domainName, unitKey, version) {
+    this.fetched.push({domainName, unitKey, version});
+    let found = this.snapshots
+      .find(s => s.domainName == domainName && s.unitKey == unitKey && s.version == version);
+
     if (!found) return Promise.reject(new Error('No snapshot'));
     return new Promise(y => process.nextTick(() => y(found.snapshot)))
   }

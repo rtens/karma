@@ -16,16 +16,12 @@ describe('Subscribing to a Query', () => {
     Domain = (args = {}) =>
       new k.Domain(
         args.name || 'Test',
-        {
-          eventLog: () => args.log || new fake.EventLog(),
-          snapshotStore: () => args.snapshots || new fake.SnapshotStore(),
-          eventStore: () => args.store || new fake.EventStore()
-        },
-        {
-          eventLog: () => args.metaLog || new fake.EventLog(),
-          snapshotStore: () => args.metaSnapshots || new fake.SnapshotStore(),
-          eventStore: () => args.metaStore || new fake.EventStore()
-        },
+        args.log || new fake.EventLog(),
+        args.snapshots || new fake.SnapshotStore(),
+        args.store || new fake.EventStore(),
+        args.metaLog || new fake.EventLog(),
+        args.metaSnapshots || new fake.SnapshotStore(),
+        args.metaStore || new fake.EventStore(),
         args.strategy || new k.UnitStrategy())
   });
 
@@ -57,7 +53,8 @@ describe('Subscribing to a Query', () => {
 
     let snapshots = new fake.SnapshotStore();
     snapshots.snapshots = [{
-      key: 'Projection-One-foo',
+      domainName: 'Test',
+      unitKey: 'Projection-One-foo',
       version: 'v1',
       snapshot: new _persistence.Snapshot(new Date(), {}, 'snap ')
     }];

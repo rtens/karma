@@ -168,32 +168,32 @@ class NestSnapshotStore extends _persistence.SnapshotStore {
   }
 }
 
-class NestPersistenceFactory extends _persistence.PersistenceFactory {
-  constructor(recordDatastore, snapshotDatastore) {
-    super();
-
-    recordDatastore.load();
-    snapshotDatastore.load();
-
-    this._recordDatastore = recordDatastore;
-    this._snapshotDatastore = snapshotDatastore;
-  }
-
-  eventLog(domainName) {
-    return new NestEventLog(domainName, this._recordDatastore)
-  }
-
-  snapshotStore(domainName) {
-    return new NestSnapshotStore(domainName, this._snapshotDatastore);
-  }
-
-  eventStore(domainName) {
-    return new NestEventStore(domainName, this._recordDatastore);
-  }
-}
+// class NestPersistenceFactory extends _persistence.PersistenceFactory {
+//   constructor(recordDatastore, snapshotDatastore) {
+//     super();
+//
+//     recordDatastore.load();
+//     snapshotDatastore.load();
+//
+//     this._recordDatastore = recordDatastore;
+//     this._snapshotDatastore = snapshotDatastore;
+//   }
+//
+//   eventLog(domainName) {
+//     return new NestEventLog(domainName, this._recordDatastore)
+//   }
+//
+//   snapshotStore(domainName) {
+//     return new NestSnapshotStore(domainName, this._snapshotDatastore);
+//   }
+//
+//   eventStore(domainName) {
+//     return new NestEventStore(domainName, this._recordDatastore);
+//   }
+// }
 
 module.exports = {
-  PersistenceFactory: NestPersistenceFactory,
+  // PersistenceFactory: NestPersistenceFactory,
   EventLog: NestEventLog,
   SnapshotStore: NestSnapshotStore,
   EventStore: NestEventStore

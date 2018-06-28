@@ -23,15 +23,15 @@ class Aggregate extends unit.Unit {
 }
 
 class AggregateInstance extends unit.UnitInstance {
-  constructor(id, definition, log, snapshots, logger, store) {
-    super(id, definition, log, snapshots, logger);
+  constructor(domain, id, definition, log, snapshots, logger, store) {
+    super(domain, id, definition, log, snapshots, logger);
     this._store = store;
   }
 
   //noinspection JSUnusedGlobalSymbols
   _recordFilter() {
     return this._log.filter()
-      .ofStream(this.id)
+      .ofStream(this.domain, this.id)
   }
 
   apply(record) {
@@ -54,7 +54,7 @@ class AggregateInstance extends unit.UnitInstance {
 
     if (!Array.isArray(events)) return Promise.resolve([]);
 
-    return this._store.record(events, this.id, this._heads[this.id], command.traceId)
+    return this._store.record(events, this.domain, this.id, this._heads[this.id], command.traceId)
       .catch(e => {
         if (tries >= 10) throw e;
         return new Promise(y => setTimeout(() => y(this._execute(command, tries + 1)),
@@ -64,8 +64,8 @@ class AggregateInstance extends unit.UnitInstance {
 }
 
 class AggregateRepository extends unit.UnitRepository {
-  constructor(log, snapshots, logger, store) {
-    super(log, snapshots, logger);
+  constructor(domain, log, snapshots, logger, store) {
+    super(domain, log, snapshots, logger);
     this._store = store;
   }
 
@@ -85,7 +85,7 @@ class AggregateRepository extends unit.UnitRepository {
 
   //noinspection JSUnusedGlobalSymbols
   _createInstance(aggregateId, definition) {
-    return new AggregateInstance(aggregateId, definition, this._log, this._snapshots, this._logger, this._store);
+    return new AggregateInstance(this.domain, aggregateId, definition, this._log, this._snapshots, this._logger, this._store);
   }
 }
 

@@ -1,18 +1,19 @@
 const event = require('./event');
 
 class EventLog {
-  constructor(domainName) {
-    this.domain = domainName;
-  }
 
   //noinspection JSUnusedLocalSymbols
   subscribe(filter, applier) {
-    return Promise.resolve({cancel: ()=>null})
+    return Promise.resolve(new EventLogSubscription())
   }
 
   filter() {
     return new RecordFilter()
   }
+}
+
+class EventLogSubscription {
+  cancel() {}
 }
 
 class RecordFilter {
@@ -27,75 +28,17 @@ class RecordFilter {
   }
 
   //noinspection JSUnusedLocalSymbols
-  ofStream(streamId) {
-    return this
-  }
-}
-
-class CombinedEventLog extends EventLog {
-  constructor(eventLogs) {
-    super();
-    this._logs = eventLogs;
-  }
-
-  subscribe(filter, applier) {
-    return Promise.all(this._logs.map((log, i) => log.subscribe(filter.at(i), applier)))
-      .then(subscriptions => ({cancel: () => subscriptions.forEach(s => s.cancel())}))
-  }
-
-  filter() {
-    return new CombinedRecordFilter(this._logs.map(l=>l.filter()))
-  }
-}
-
-class CombinedRecordFilter extends RecordFilter {
-  constructor(filters) {
-    super();
-    this._filters = filters;
-  }
-
-  at(index) {
-    return this._filters[index];
-  }
-
-  after(lastRecordTime) {
-    this._filters.forEach(f=>f.after(lastRecordTime));
-    return this
-  }
-
-  nameIn(eventNames) {
-    this._filters.forEach(f=>f.nameIn(eventNames));
-    return this
-  }
-
-  ofStream(streamId) {
-    this._filters.forEach(f=>f.ofStream(streamId));
+  ofStream(domainName, streamId) {
     return this
   }
 }
 
 class EventStore {
-  constructor(domainName) {
-    this.domain = domainName;
-  }
 
-  record(events, streamId, onSequence, traceId) {
+  record(events, domainName, streamId, onSequence, traceId) {
+    onSequence = (onSequence || 0) + 1;
     return Promise.resolve(events.map((e, i) =>
-      new event.Record(e, streamId, (onSequence || 0) + 1 + i, traceId)))
-  }
-}
-
-class PersistenceFactory {
-  eventLog(domainName) {
-    return new EventLog(domainName)
-  }
-
-  snapshotStore(domainName) {
-    return new SnapshotStore(domainName);
-  }
-
-  eventStore(domainName) {
-    return new EventStore(domainName);
+      new event.Record(e, domainName, streamId, onSequence + i, traceId)))
   }
 }
 
@@ -108,17 +51,14 @@ class Snapshot {
 }
 
 class SnapshotStore {
-  constructor(domainName) {
-    this.domain = domainName;
-  }
 
   //noinspection JSUnusedLocalSymbols
-  store(key, version, snapshot) {
+  store(domainName, key, version, snapshot) {
     return Promise.resolve()
   }
 
   //noinspection JSUnusedLocalSymbols
-  fetch(key, version) {
+  fetch(domainName, key, version) {
     return Promise.reject(new Error('No snapshot'))
   }
 }
@@ -126,9 +66,8 @@ class SnapshotStore {
 module.exports = {
   EventStore,
   EventLog,
-  CombinedEventLog,
+  EventLogSubscription,
   RecordFilter,
-  PersistenceFactory,
   Snapshot,
   SnapshotStore
 };

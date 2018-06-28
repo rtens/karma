@@ -22,8 +22,8 @@ class Projection extends unit.Unit {
 }
 
 class ProjectionInstance extends unit.UnitInstance {
-  constructor(id, definition, log, snapshots, logger) {
-    super(id, definition, log, snapshots, logger);
+  constructor(domain, id, definition, log, snapshots, logger) {
+    super(domain, id, definition, log, snapshots, logger);
     this._waiters = [];
     this._unloaded = false;
   }
@@ -71,7 +71,7 @@ class ProjectionRepository extends unit.UnitRepository {
 
   //noinspection JSUnusedGlobalSymbols
   _createInstance(projectionId, definition) {
-    return new ProjectionInstance(projectionId, definition, this._log, this._snapshots, this._logger);
+    return new ProjectionInstance(this.domain, projectionId, definition, this._log, this._snapshots, this._logger);
   }
 }
 

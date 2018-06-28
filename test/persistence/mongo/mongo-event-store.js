@@ -11,7 +11,7 @@ const _mongo = require('../../../src/persistence/mongo');
 
 const mongodb = require('mongodb');
 
-describe('MongoDB Event Store', () => {
+describe.skip('MongoDB Event Store', () => {
   let _Date, store, onDb;
 
   beforeEach(() => {

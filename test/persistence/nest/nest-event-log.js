@@ -10,7 +10,7 @@ const Datastore = require('nestdb');
 if (!process.env.TEST_DATA_DIR)
   console.log('Set $TEST_DATA_DIR to test persistent NestDB Event Log');
 
-describe('NestDB Event Log', () => {
+describe.skip('NestDB Event Log', () => {
   let db, log;
 
   beforeEach(() => {
