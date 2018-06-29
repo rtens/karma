@@ -223,6 +223,7 @@ class QueryHandler extends Handler {
 
   handle(request) {
     return this._domain.respondTo(this._query(request).withTraceId(request.traceId))
+      .then(response => response instanceof Response ? response : new Response(response))
   }
 }
 
@@ -240,9 +241,16 @@ class CommandHandler extends Handler {
 
   handle(request) {
     return this._domain.execute(this._command(request).withTraceId(request.traceId))
-      .then(records => this._query ? this._domain.respondTo(this._query(request).waitFor({
-        [records[records.length - 1].streamId]: records[records.length - 1].sequence
-      })) : null)
+      .then(records => this._query
+        ? this._waitForResponse(records, this._query(request))
+        : new Response())
+  }
+
+  _waitForResponse(records, query) {
+    const lastRecord = records[records.length - 1];
+    const heads = {[lastRecord.streamId]: lastRecord.sequence};
+
+    return this._domain.respondTo(query.waitFor(heads))
   }
 }
 

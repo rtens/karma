@@ -10,7 +10,7 @@ const Datastore = require('nestdb');
 if (!process.env.TEST_DATA_DIR)
   console.log('Set $TEST_DATA_DIR to test persistent NestDB Event Log');
 
-describe.skip('NestDB Event Log', () => {
+describe('NestDB Event Log', () => {
   let db, log;
 
   beforeEach(() => {
@@ -20,7 +20,7 @@ describe.skip('NestDB Event Log', () => {
       db = new Datastore();
     }
 
-    log = new _nest.EventLog('Test', db);
+    log = new _nest.EventLog(db);
     return new Promise((y, n) => db.load(err => err ? n(err) : y()))
   });
 
@@ -43,7 +43,7 @@ describe.skip('NestDB Event Log', () => {
         {
           tid: 'trace',
           tim: new Date('2013-12-11'),
-          _id: JSON.stringify({sid: 'foo', seq: 21}),
+          _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 21}),
           evs: [
             {nam: 'food', pay: {a: 'b'}, tim: new Date('2011-12-13')},
             {nam: 'bard', pay: {c: 123}}
@@ -56,10 +56,10 @@ describe.skip('NestDB Event Log', () => {
       .then(() => records.should.eql([
 
         new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2011-12-13')),
-          'foo', 21, 'trace', new Date('2013-12-11')),
+          'Test', 'foo', 21, 'trace', new Date('2013-12-11')),
 
         new _event.Record(new _event.Event('bard', {c: 123}, new Date('2013-12-11')),
-          'foo', 22, 'trace', new Date('2013-12-11'))
+          'Test', 'foo', 22, 'trace', new Date('2013-12-11'))
       ]))
   });
 
@@ -93,7 +93,7 @@ describe.skip('NestDB Event Log', () => {
           {
             tid: 'trace',
             tim: new Date('2013-12-11'),
-            _id: JSON.stringify({sid: 'foo', seq: 21}),
+            _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 21}),
             evs: [
               {nam: 'food', pay: {a: 'b'}, tim: new Date('2011-12-13')},
               {nam: 'bard', pay: {c: 123}}
@@ -105,51 +105,61 @@ describe.skip('NestDB Event Log', () => {
       .then(() => records.should.eql([
 
         new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2011-12-13')),
-          'foo', 21, 'trace', new Date('2013-12-11')),
+          'Test', 'foo', 21, 'trace', new Date('2013-12-11')),
 
         new _event.Record(new _event.Event('bard', {c: 123}, new Date('2013-12-11')),
-          'foo', 22, 'trace', new Date('2013-12-11'))
+          'Test', 'foo', 22, 'trace', new Date('2013-12-11'))
       ]))
   });
 
-  it('filters Records by last Record time, Event names and stream ID', () => {
+  it('filters Records by last Record time, Event names and streams', () => {
     let records = [];
 
     let filter = log.filter()
       .after(new Date('2013-12-15'))
       .nameIn(['food', 'bard'])
-      .ofStream('foo');
+      .onStream('Test', 'foo');
 
     return Promise.resolve()
 
       .then(() => new Promise(y => db.insert([
         {
-          tim: new Date('2013-12-15'), _id: JSON.stringify({sid: 'foo', seq: 1}),
+          tim: new Date('2013-12-15'), _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 1}),
           evs: [{nam: 'food', pay: 'not'}]
         },
         {
-          tim: new Date('2013-12-16'), _id: JSON.stringify({sid: 'foo', seq: 2}),
+          tim: new Date('2013-12-16'), _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 2}),
           evs: [{nam: 'food', pay: 'one'}]
         },
         {
-          tim: new Date('2013-12-17'), _id: JSON.stringify({sid: 'foo', seq: 3}),
+          tim: new Date('2013-12-17'), _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 3}),
           evs: [{nam: 'nope', pay: 'not'}]
         },
         {
-          tim: new Date('2013-12-18'), _id: JSON.stringify({sid: 'bar', seq: 4}),
+          tim: new Date('2013-12-18'), _id: JSON.stringify({dom: 'Test', sid: 'bar', seq: 4}),
           evs: [{nam: 'food', pay: 'not'}]
         },
         {
-          tim: new Date('2013-12-19'), _id: JSON.stringify({sid: 'foo', seq: 5}),
+          tim: new Date('2013-12-19'), _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 5}),
           evs: [{nam: 'bard', pay: 'two'}, {nam: 'nope', pay: 'not'}]
+        },
+        {
+          tim: new Date('2013-12-19'), _id: JSON.stringify({dom: 'Nope', sid: 'foo', seq: 6}),
+          evs: [{nam: 'bard', pay: 'not'}]
         },
       ], y)))
 
       .then(() => log.subscribe(filter, record => records.push(record)))
 
       .then(() => new Promise(y => db.insert([
-        {tim: new Date('2013-12-15'), _id: JSON.stringify({sid: 'foo', seq: 6}), evs: [{nam: 'food', pay: 'not'}]},
-        {tim: new Date('2013-12-19'), _id: JSON.stringify({sid: 'foo', seq: 7}), evs: [{nam: 'food', pay: 'tre'}]}
+        {
+          tim: new Date('2013-12-15'), _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 7}),
+          evs: [{nam: 'food', pay: 'not'}]
+        },
+        {
+          tim: new Date('2013-12-19'), _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 8}),
+          evs: [{nam: 'food', pay: 'tre'}]
+        }
       ], y)))
 
       .then(() => records.map(r=>r.event.payload).should.eql(['one', 'two', 'tre']))
@@ -206,7 +216,7 @@ describe.skip('NestDB Event Log', () => {
   it('notifies multiple Logs', () => {
     let records = [];
 
-    let log2 = new _nest.EventLog('Test2', db);
+    let log2 = new _nest.EventLog(db);
 
     return Promise.resolve()
 
@@ -218,7 +228,7 @@ describe.skip('NestDB Event Log', () => {
           {
             tid: 'trace',
             tim: new Date('2011-12-13'),
-            _id: JSON.stringify({sid: 'foo', seq: 21}),
+            _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 21}),
             evs: [{nam: 'food'}],
           }
         ], y))
@@ -227,7 +237,7 @@ describe.skip('NestDB Event Log', () => {
       .then(() => records.should.eql([
 
         new _event.Record(new _event.Event('food', undefined, new Date('2011-12-13')),
-          'foo', 21, 'trace', new Date('2011-12-13')),
+          'Test', 'foo', 21, 'trace', new Date('2011-12-13')),
       ]))
   });
 });

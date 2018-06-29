@@ -12,11 +12,16 @@ class EventContext extends specification.Context {
     return this
   }
 
+  onStream(streamId) {
+    this.streamId = streamId;
+    return this
+  }
+
   configure(example) {
     const sequence = example.log.records.length;
     const time = 0;
 
-    example.log.records.push(new event.Record(this.event, null, sequence, null, time));
+    example.log.records.push(new event.Record(this.event, example.domainName, this.streamId, sequence, null, time));
   }
 }
 
@@ -29,7 +34,7 @@ class EventStreamContext extends specification.Context {
 
   configure(example) {
     this.events.forEach(e =>
-      example.log.records.push(new event.Record(e.event, this.streamId)))
+      e.onStream(this.streamId).configure(example))
   }
 }
 

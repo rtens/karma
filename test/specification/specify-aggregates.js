@@ -6,7 +6,7 @@ chai.should();
 const k = require('../..');
 const {the, Example, I, expect} = require('../../spec')();
 
-describe.skip('Specifying Aggregates', () => {
+describe('Specifying Aggregates', () => {
 
   const Module = configure => class extends k.api.http.Module {
     //noinspection JSUnusedGlobalSymbols
@@ -29,9 +29,8 @@ describe.skip('Specifying Aggregates', () => {
 
     //noinspection JSUnusedGlobalSymbols
     buildHandler() {
-      return new k.api.http.RequestHandler()
-        .handling(new k.api.http.CommandHandler(this.domain, request =>
-          new k.Command(request.path)))
+      return new k.api.http.CommandHandler(this.domain, request =>
+          new k.Command(request.path))
     }
   };
 

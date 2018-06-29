@@ -5,7 +5,7 @@ chai.should();
 
 const k = require('../../..');
 
-describe.skip('Handling HTTP requests', () => {
+describe('Handling HTTP requests', () => {
 
   it('fails if not handler matches', () => {
     return new k.api.http.RequestHandler()

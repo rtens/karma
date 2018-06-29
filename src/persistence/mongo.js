@@ -10,10 +10,10 @@ const debug = {
 };
 
 class MongoEventStore extends _persistence.EventStore {
-  constructor(domainName, connectionUri, database, collectionPrefix, connectionOptions) {
-    super(domainName);
+  constructor(connectionUri, databaseName, collectionPrefix, connectionOptions) {
+    super();
     this._uri = connectionUri;
-    this._dbName = database;
+    this._dbName = databaseName;
     this._collection = collectionPrefix + 'event_store';
     this._options = connectionOptions;
 
@@ -32,11 +32,11 @@ class MongoEventStore extends _persistence.EventStore {
       .catch(err => Promise.reject(new Error('EventStore cannot connect to MongoDB database: ' + err)))
   }
 
-  record(events, streamId, onSequence, traceId) {
+  record(events, domainName, streamId, onSequence, traceId) {
     let sequence = Math.floor(onSequence || 0) + 1;
 
     let document = {
-      d: this.domain,
+      d: domainName,
       a: streamId,
       v: sequence,
       e: events.map(e => ({n: e.name, a: e.payload, t: this._aboutNow(e.time) ? null : e.time})),
@@ -46,7 +46,7 @@ class MongoEventStore extends _persistence.EventStore {
     return this.connect()
       .then(() => this._db.collection(this._collection).insertOne(document))
       .catch(err => Promise.reject(err.code == 11000 ? new Error('Out of sequence') : err))
-      .then(() => events.map((e, i) => new _event.Record(e, streamId, sequence + i, traceId)))
+      .then(() => events.map((e, i) => new _event.Record(e, domainName, streamId, sequence + i, traceId)))
   }
 
   close() {
@@ -60,8 +60,8 @@ class MongoEventStore extends _persistence.EventStore {
 }
 
 class MongoEventLog extends _persistence.EventLog {
-  constructor(domainName, databaseConnectionUri, oplogConnectionUri, database, collectionPrefix, connectionOptions) {
-    super(domainName);
+  constructor(databaseConnectionUri, oplogConnectionUri, database, collectionPrefix, connectionOptions) {
+    super();
     this._dbUri = databaseConnectionUri;
     this._oplogUri = oplogConnectionUri;
     this._dbName = database;
@@ -85,8 +85,8 @@ class MongoEventLog extends _persistence.EventLog {
       .then(client => this._db = client.db(this._dbName))
       .then(() => this._db.collection(this._collection))
       .then(collection => Promise.all([
-        collection.createIndex({d: 1, a: 1, _id: 1}),
-        collection.createIndex({d: 1, 'e.n': 1, _id: 1})
+        collection.createIndex({_id: 1, d: 1, a: 1}),
+        collection.createIndex({_id: 1, 'e.n': 1})
       ]))
 
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB database: ' + err)))
@@ -165,12 +165,10 @@ class MongoEventLog extends _persistence.EventLog {
   }
 
   filter() {
-    return new MongoRecordFilter(this.domain)
+    return new MongoRecordFilter()
   }
 
   _notifySubscribers(recordSet, subscriptions) {
-    if (recordSet.d != this.domain) return;
-
     this._buffer.push({recordSet, subscriptions});
     let times = this._buffer.map(({recordSet}) => recordSet._id.getTimestamp().getTime());
     let first = Math.min(...times);
@@ -206,7 +204,7 @@ class MongoEventLog extends _persistence.EventLog {
 
     return new _event.Record(
       new _event.Event(event.n, event.a, event.t || recordSet._id.getTimestamp()),
-      recordSet.a, sequence, recordSet.c, recordSet._id.getTimestamp());
+      recordSet.d, recordSet.a, sequence, recordSet.c, recordSet._id.getTimestamp());
   }
 
   close() {
@@ -225,9 +223,9 @@ class MongoEventLog extends _persistence.EventLog {
 }
 
 class MongoRecordFilter extends _persistence.RecordFilter {
-  constructor(domainName) {
+  constructor() {
     super();
-    this.query = {d: domainName}
+    this.query = {};
   }
 
   after(lastRecordTime) {
@@ -242,15 +240,16 @@ class MongoRecordFilter extends _persistence.RecordFilter {
     return this
   }
 
-  ofStream(streamId) {
+  onStream(domainName, streamId) {
+    this.query.d = domainName;
     this.query.a = streamId;
     return this
   }
 }
 
 class MongoSnapshotStore extends _persistence.SnapshotStore {
-  constructor(domainName, connectionUri, database, collectionPrefix, connectionOptions) {
-    super(domainName);
+  constructor(connectionUri, database, collectionPrefix, connectionOptions) {
+    super();
     this._uri = connectionUri;
     this._dbName = database;
     this._prefix = collectionPrefix;
@@ -258,6 +257,7 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
 
     this._client = null;
     this._db = null;
+    this._snapshots = null;
   }
 
   connect() {
@@ -266,19 +266,21 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
     return new mongodb.MongoClient(this._uri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
-      .then(() => this._db.collection(this._prefix + 'snapshots_' + this.domain))
-      .then(collection => collection.createIndex({k: 1, v: 1}))
+      .then(() => this._snapshots = this._db.collection(this._prefix + 'snapshots'))
+      .then(() => this._snapshots.createIndex({d: 1, k: 1, v: 1}))
       .catch(err => Promise.reject(new Error('SnapshotStore cannot connect to MongoDB database: ' + err)))
   }
 
-  store(key, version, snapshot) {
+  store(domainName, unitKey, version, snapshot) {
     let filter = {
-      k: key,
+      d: domainName,
+      k: unitKey,
       v: version
     };
     let document = {
       $set: {
-        k: key,
+        d: domainName,
+        k: unitKey,
         v: version,
         t: snapshot.lastRecordTime,
         h: snapshot.heads,
@@ -287,18 +289,18 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
     };
 
     if (debug.snapshot.enabled) {
-      debug.snapshot('%j', {key, version, size: new BSON().calculateObjectSize(document.$set)});
+      debug.snapshot('%j', {domainName, unitKey, version, size: new BSON().calculateObjectSize(document.$set)});
     }
 
     return this.connect().then(() =>
-      this._db.collection(this._prefix + 'snapshots_' + this.domain).updateOne(filter, document, {upsert: true}))
+      this._snapshots.updateOne(filter, document, {upsert: true}))
   }
 
-  fetch(key, version) {
-    return this.connect().then(() => this._db
-      .collection(this._prefix + 'snapshots_' + this.domain)
-      .findOne({k: key, v: version})
-      .then(doc => doc ? new _persistence.Snapshot(doc.t, doc.h, doc.s) : Promise.reject('No snapshot')))
+  fetch(domainName, unitKey, version) {
+    return this.connect().then(() =>
+      this._snapshots
+        .findOne({d: domainName, k: unitKey, v: version})
+        .then(doc => doc ? new _persistence.Snapshot(doc.t, doc.h, doc.s) : Promise.reject('No snapshot')))
   }
 
   close() {
@@ -307,36 +309,7 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
   }
 }
 
-class MongoPersistenceFactory extends _persistence.PersistenceFactory {
-  constructor(databaseConnectionUri, oplogConnectionUri, databaseName, collectionPrefix) {
-    super();
-    this.uri = databaseConnectionUri;
-    this.oplogUri = oplogConnectionUri;
-    this.db = databaseName;
-    this.prefix = collectionPrefix || '';
-  }
-
-  eventLog(domainName) {
-    return this._connect(new MongoEventLog(domainName,
-      this.uri, this.oplogUri, this.db, this.prefix))
-  }
-
-  snapshotStore(domainName) {
-    return this._connect(new MongoSnapshotStore(domainName, this.uri, this.db, this.prefix))
-  }
-
-  eventStore(domainName) {
-    return this._connect(new MongoEventStore(domainName, this.uri, this.db, this.prefix))
-  }
-
-  _connect(client) {
-    client.connect().catch(console.error);
-    return client
-  }
-}
-
 module.exports = {
-  PersistenceFactory: MongoPersistenceFactory,
   EventLog: MongoEventLog,
   SnapshotStore: MongoSnapshotStore,
   EventStore: MongoEventStore

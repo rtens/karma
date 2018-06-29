@@ -2,16 +2,17 @@ const _event = require('../../src/event');
 const _persistence = require('../../src/persistence');
 
 class NestEventStore extends _persistence.EventStore {
-  constructor(domainName, datastore) {
-    super(domainName);
+  constructor(datastore) {
+    super();
     this._db = datastore;
   }
 
-  record(events, streamId, onSequence, traceId) {
+  record(events, domainName, streamId, onSequence, traceId) {
     let insertion = {
       tid: traceId,
       tim: new Date(),
       _id: JSON.stringify({
+        dom: domainName,
         sid: streamId,
         seq: (onSequence || 0) + 1
       }),
@@ -24,7 +25,7 @@ class NestEventStore extends _persistence.EventStore {
 
     return Promise.resolve()
       .then(() => new Promise((y, n) => this._db.insert(insertion, (err) => err ? n(err) : y())))
-      .then(() => super.record(events, streamId, onSequence, traceId))
+      .then(() => super.record(events, domainName, streamId, onSequence, traceId))
       .catch(err => {
         if (err.errorType == 'uniqueViolated') return Promise.reject('Out of sequence');
         return err
@@ -33,8 +34,8 @@ class NestEventStore extends _persistence.EventStore {
 }
 
 class NestEventLog extends _persistence.EventLog {
-  constructor(domainName, datastore) {
-    super(domainName);
+  constructor(datastore) {
+    super();
     this._db = datastore;
     this._subscriptions = [];
 
@@ -85,7 +86,7 @@ class NestEventLog extends _persistence.EventLog {
   _inflateRecord(recordSet, event, i) {
     return new _event.Record(
       new _event.Event(event.nam, event.pay, event.tim || recordSet.tim),
-      recordSet._id.sid, recordSet._id.seq + i, recordSet.tid, recordSet.tim);
+      recordSet._id.dom, recordSet._id.sid, recordSet._id.seq + i, recordSet.tid, recordSet.tim);
   }
 }
 
@@ -106,8 +107,8 @@ class NestRecordFilter extends _persistence.RecordFilter {
     return this
   }
 
-  ofStream(streamId) {
-    this.recordMatchers.push(record => record._id.sid == streamId);
+  onStream(domainName, streamId) {
+    this.recordMatchers.push(record => record._id.dom == domainName && record._id.sid == streamId);
     return this
   }
 
@@ -126,9 +127,10 @@ class NestSnapshotStore extends _persistence.SnapshotStore {
     this._db = datastore;
   }
 
-  store(key, version, snapshot) {
+  store(domainName, key, version, snapshot) {
     let query = {
       _id: JSON.stringify({
+        dom: domainName,
         key: key,
         ver: version
       })
@@ -136,6 +138,7 @@ class NestSnapshotStore extends _persistence.SnapshotStore {
 
     let update = {
       _id: JSON.stringify({
+        dom: domainName,
         key: key,
         ver: version
       }),
@@ -148,9 +151,10 @@ class NestSnapshotStore extends _persistence.SnapshotStore {
       this._db.update(query, update, {upsert: true}, (err) => err ? n(err) : y()))
   }
 
-  fetch(key, version) {
+  fetch(domainName, key, version) {
     let query = {
       _id: JSON.stringify({
+        dom: domainName,
         key: key,
         ver: version
       })

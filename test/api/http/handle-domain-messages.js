@@ -8,63 +8,53 @@ const _event = require('../../../src/event');
 const fake = require('../../../src/specification/fakes');
 const k = require('../../..');
 
-describe.skip('Handling Domain Messages via HTTP', () => {
+describe('Handling Domain Messages via HTTP', () => {
+
+  const Domain = (args = {}) => new k.Domain('Test',
+    args.log || new fake.EventLog(),
+    args.snapshots || new fake.SnapshotStore(),
+    args.store || new fake.EventStore(),
+    args.metaLog || new fake.EventLog(),
+    args.metaSnapshots || new fake.SnapshotStore(),
+    args.metaStore || new fake.EventStore());
 
   it('responds to a Query', () => {
-    let persistence = {
-      eventLog: () => new fake.EventLog(),
-      eventStore: () => new fake.EventStore(),
-      snapshotStore: () => new fake.SnapshotStore()
-    };
-
-    let domain = new k.Domain('Test', persistence, persistence)
+    let domain = Domain()
 
       .add(new k.Projection('foo')
         .respondingTo('Foo', ()=>'foo', ({foo}, query)=>'Hello ' + foo + query.traceId));
 
-    return new k.api.http.RequestHandler()
-      .handling(new k.api.http.QueryHandler(domain, () => new k.Query('Foo', {foo: 'Bar'})))
+    return new k.api.http.QueryHandler(domain, () => new k.Query('Foo', {foo: 'Bar'}))
 
-      .handle(new k.api.http.Request('ANY', '/').withTraceId('_trace'))
+      .handle(new k.api.http.Request('ANY', '/').withTraceId(' trace'))
 
-      .should.eventually.eql(new k.api.http.Response('Hello Bar_trace'))
+      .should.eventually.eql(new k.api.http.Response('Hello Bar trace'))
   });
 
   it('executes a Command', () => {
     let store = new fake.EventStore();
-    let persistence = {
-      eventLog: () => new fake.EventLog(),
-      eventStore: () => store,
-      snapshotStore: () => new fake.SnapshotStore()
-    };
 
-    let domain = new k.Domain('Test', persistence, persistence)
+    let domain = Domain({store})
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', ({foo}) => [new k.Event('food', foo)]));
 
-    return new k.api.http.RequestHandler()
-      .handling(new k.api.http.CommandHandler(domain, () => new k.Command('Foo', {foo: 'Bar'})))
+    return new k.api.http.CommandHandler(domain, () => new k.Command('Foo', {foo: 'Bar'}))
 
       .handle(new k.api.http.Request('ANY', '/').withTraceId('trace'))
 
       .should.eventually.eql(new k.api.http.Response())
 
-      .then(() => store.recorded.map(r=>[r.events[0].payload, r.traceId]).should.eql([['Bar', 'trace']]))
+      .then(() => store.recorded.map(r=>[r.events[0].payload, r.traceId])
+        .should.eql([['Bar', 'trace']]))
   });
 
   it('responds with a Query after executing a Command', () => {
     let log = new fake.EventLog();
-    log.records = [new _event.Record(new k.Event(), 'foo', 40)];
-
-    let persistence = {
-      eventLog: () => log,
-      eventStore: () => new fake.EventStore(),
-      snapshotStore: () => new fake.SnapshotStore()
-    };
+    log.records = [new _event.Record(new k.Event(), 'Test', 'foo', 40)];
 
     let applied;
-    let domain = new k.Domain('Test', persistence, persistence)
+    let domain = Domain({log})
 
       .add(new k.Aggregate('foo')
         .executing('Foo', ()=>'foo', () => [new k.Event(), new k.Event()]))
@@ -80,7 +70,7 @@ describe.skip('Handling Domain Messages via HTTP', () => {
 
     return new Promise(y => setTimeout(y, 0))
 
-      .then(() => log.publish(new _event.Record(new k.Event('bard', 'One'), 'foo', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('bard', 'One'), 'Test', 'foo', 42)))
 
       .then(() => response.should.eventually.eql('One/foo'))
   });

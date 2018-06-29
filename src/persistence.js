@@ -28,7 +28,7 @@ class RecordFilter {
   }
 
   //noinspection JSUnusedLocalSymbols
-  ofStream(domainName, streamId) {
+  onStream(domainName, streamId) {
     return this
   }
 }

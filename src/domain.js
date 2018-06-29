@@ -159,10 +159,14 @@ class Domain extends BaseDomain {
 }
 
 class Module {
-  constructor(name, persistenceFactory, metaPersistenceFactory, unitStrategy, logger, dependencies) {
+  constructor(name, eventLog, snapshotStore, eventStore, metaEventLog, metaSnapshotStore, metaEventStore, unitStrategy, logger, dependencies) {
     this.name = name;
-    this.persistence = persistenceFactory;
-    this.metaPersistence = metaPersistenceFactory;
+    this.eventLog = eventLog;
+    this.snapshotStore = snapshotStore;
+    this.eventStore = eventStore;
+    this.metaEventLog = metaEventLog;
+    this.metaSnapshotStore = metaSnapshotStore;
+    this.metaEventStore = metaEventStore;
     this.strategy = unitStrategy;
     this.logger = logger;
     this.dependencies = dependencies;
@@ -171,11 +175,14 @@ class Module {
   }
 
   buildDomain() {
-    return new Domain(this.name, this.persistence, this.metaPersistence, this.strategy, this.logger)
+    return new Domain(this.name,
+      this.eventLog, this.snapshotStore, this.eventStore,
+      this.metaEventLog, this.metaSnapshotStore, this.metaEventStore,
+      this.strategy, this.logger)
   }
 
   handle(request) {
-    return Promise.reject('Cannot handle ' + request)
+    return Promise.reject(new Error('Cannot handle request'))
   }
 }
 

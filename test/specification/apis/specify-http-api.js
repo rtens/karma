@@ -8,7 +8,7 @@ const {Example, I, expect} = require('../../../spec')({api: 'http'});
 
 const express = require('express');
 
-describe.skip('Specifying an HTTP API', () => {
+describe('Specifying an HTTP API', () => {
 
   const Module = configure => class extends k.api.http.Module {
     //noinspection JSUnusedGlobalSymbols

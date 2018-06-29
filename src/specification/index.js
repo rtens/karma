@@ -9,6 +9,7 @@ const fake = require('./fakes');
 class Example {
   constructor(Module) {
     this.Module = Module;
+    this.domainName = 'Example';
 
     this._setUpDate();
     this._setUpErrorLogging();
@@ -59,22 +60,14 @@ class Example {
   }
 
   when(action) {
-    const persistence = {
-      eventStore: () => this.store,
-      eventLog: () => this.log,
-      snapshotStore: () => new fake.SnapshotStore(),
-    };
-
-    const metaPersistence = {
-      eventStore: () => this.metaStore,
-      eventLog: () => this.metaLog,
-      snapshotStore: () => new fake.SnapshotStore(),
-    };
-
     this.module = new this.Module(
-      'Example',
-      persistence,
-      metaPersistence,
+      this.domainName,
+      this.log,
+      new fake.SnapshotStore(),
+      this.store,
+      this.metaLog,
+      new fake.SnapshotStore(),
+      this.metaStore,
       new unit.UnitStrategy(),
       this.logger,
       this.dependencies);

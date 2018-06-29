@@ -13,12 +13,12 @@ const mongodb = require('mongodb');
 
 const objectId = time => mongodb.ObjectID.createFromTime(new Date(time).getTime() / 1000);
 
-describe.skip('MongoDB Event Log', () => {
+describe('MongoDB Event Log', () => {
   let log, onDb;
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 10000);
-    log = new _mongo.EventLog('Test', process.env.TEST_MONGODB_URI, process.env.TEST_MONGODB_OPLOG_URI, db, 'bla_');
+    log = new _mongo.EventLog(process.env.TEST_MONGODB_URI, process.env.TEST_MONGODB_OPLOG_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -58,8 +58,8 @@ describe.skip('MongoDB Event Log', () => {
       .then(() => onDb(db => db.collection('bla_event_store').indexes()))
 
       .then(indexes => {
-        indexes.map(i=>i.key).should.contain.deep({d: 1, a: 1, _id: 1});
-        indexes.map(i=>i.key).should.contain.deep({d: 1, 'e.n': 1, _id: 1});
+        indexes.map(i=>i.key).should.contain.deep({_id: 1, d: 1, a: 1});
+        indexes.map(i=>i.key).should.contain.deep({_id: 1, 'e.n': 1});
       })
   });
 
@@ -69,26 +69,34 @@ describe.skip('MongoDB Event Log', () => {
     return Promise.resolve()
       .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
         _id: objectId('2017-12-11'),
-        d: 'Test',
+        d: 'One',
         a: 'foo',
         v: 21,
         e: [
           {n: 'food', a: {a: 'b'}, t: new Date('2017-12-13')},
           {n: 'bard', a: {c: 421}}
         ],
-        c: 'trace'
+        c: 'trace1'
       }, {
-        d: 'Not Test',
-        e: [{n: 'food'},],
+        _id: objectId('2017-12-13'),
+        d: 'Two',
+        a: 'foo',
+        v: 42,
+        e: [
+          {n: 'bazd', a: null}
+        ],
+        c: 'trace2'
       }])))
 
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => records.should.eql([
         new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2017-12-13')),
-          'foo', 21, 'trace', new Date('2017-12-11')),
+          'One', 'foo', 21, 'trace1', new Date('2017-12-11')),
         new _event.Record(new _event.Event('bard', {c: 421}, new Date('2017-12-11')),
-          'foo', 21.5, 'trace', new Date('2017-12-11'))
+          'One', 'foo', 21.5, 'trace1', new Date('2017-12-11')),
+        new _event.Record(new _event.Event('bazd', null, new Date('2017-12-13')),
+          'Two', 'foo', 42, 'trace2', new Date('2017-12-13'))
       ]))
   });
 
@@ -129,7 +137,7 @@ describe.skip('MongoDB Event Log', () => {
     let filter = log.filter()
       .after(new Date('2013-12-13T14:15:16Z'))
       .nameIn(['food', 'bard'])
-      .ofStream('foo');
+      .onStream('Test', 'foo');
 
     return Promise.resolve()
       .then(() => onDb(db => db.collection('bla_event_store').insertMany([
@@ -156,7 +164,7 @@ describe.skip('MongoDB Event Log', () => {
 
       .then(() => onDb(db => db.collection('bla_event_store').insertMany([{
         _id: objectId('2017-12-11'),
-        d: 'Test',
+        d: 'One',
         a: 'foo',
         v: 23,
         e: [
@@ -166,11 +174,8 @@ describe.skip('MongoDB Event Log', () => {
         c: 'trace'
       }, {
         _id: objectId('2017-12-12'),
-        d: 'Test',
+        d: 'Two',
         a: 'foo',
-        e: [{n: 'food'}]
-      }, {
-        d: 'Not Test',
         e: [{n: 'food'}]
       }])))
 
@@ -178,11 +183,11 @@ describe.skip('MongoDB Event Log', () => {
 
       .then(() => records.should.eql([
         new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2017-12-13')),
-          'foo', 23, 'trace', new Date('2017-12-11')),
+          'One', 'foo', 23, 'trace', new Date('2017-12-11')),
         new _event.Record(new _event.Event('bard', {c: 421}, new Date('2017-12-11')),
-          'foo', 23.5, 'trace', new Date('2017-12-11')),
+          'One', 'foo', 23.5, 'trace', new Date('2017-12-11')),
         new _event.Record(new _event.Event('food', undefined, new Date('2017-12-12')),
-          'foo', 0, undefined, new Date('2017-12-12'))
+          'Two', 'foo', 0, undefined, new Date('2017-12-12'))
       ]))
   });
 

@@ -11,12 +11,12 @@ const _mongo = require('../../../src/persistence/mongo');
 
 const mongodb = require('mongodb');
 
-describe.skip('MongoDB Snapshot Store', () => {
+describe('MongoDB Snapshot Store', () => {
   let snapshots, onDb;
 
   beforeEach(() => {
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    snapshots = new _mongo.SnapshotStore('Test', process.env.TEST_MONGODB_URI, db, 'bla_');
+    snapshots = new _mongo.SnapshotStore(process.env.TEST_MONGODB_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -45,24 +45,25 @@ describe.skip('MongoDB Snapshot Store', () => {
   it('creates indexed collection', () => {
     return snapshots.connect()
 
-      .then(() => onDb(db => db.collection('bla_snapshots_Test').indexes()))
+      .then(() => onDb(db => db.collection('bla_snapshots').indexes()))
 
       .then(indexes => {
-        indexes[1].key.should.eql({k: 1, v: 1});
+        indexes[1].key.should.eql({d: 1, k: 1, v: 1});
         should.not.equal(indexes[1].unique, null)
       })
   });
 
   it('stores Snapshots in a collection', () => {
-    return snapshots.store('foo', 'v1',
+    return snapshots.store('Test', 'foo', 'v1',
       new _persistence.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'}))
 
-      .then(() => onDb(db => db.collection('bla_snapshots_Test').find().toArray()))
+      .then(() => onDb(db => db.collection('bla_snapshots').find().toArray()))
 
       .then(docs => docs
         .map(d=>({...d, _id: d._id.constructor.name})).should
         .eql([{
           _id: 'ObjectID',
+          d: 'Test',
           k: 'foo',
           v: 'v1',
           t: new Date('2011-12-13T14:15:16Z'),
@@ -72,7 +73,8 @@ describe.skip('MongoDB Snapshot Store', () => {
   });
 
   it('fetches Snapshots from a collection', () => {
-    return onDb(db => db.collection('bla_snapshots_Test').insertOne({
+    return onDb(db => db.collection('bla_snapshots').insertOne({
+      d: 'Test',
       k: 'foo',
       v: 'v1',
       t: new Date('2011-12-13T14:15:16Z'),
@@ -80,25 +82,26 @@ describe.skip('MongoDB Snapshot Store', () => {
       s: {foo: 'bar'}
     }))
 
-      .then(() => snapshots.fetch('foo', 'v1'))
+      .then(() => snapshots.fetch('Test', 'foo', 'v1'))
 
       .then(snapshot => snapshot.should.eql(
         new _persistence.Snapshot(new Date('2011-12-13T14:15:16Z'), {foo: 42}, {foo: 'bar'})))
   });
 
   it('updates existing Snapshots in a collection', () => {
-    return snapshots.store('foo', 'v1',
+    return snapshots.store('Test', 'foo', 'v1',
       new _persistence.Snapshot(new Date('2011-12-13'), {foo: 21}, {foo: 'bar'}))
 
-      .then(() => snapshots.store('foo', 'v1',
+      .then(() => snapshots.store('Test', 'foo', 'v1',
         new _persistence.Snapshot(new Date('2011-12-14'), {foo: 42}, {foo: 'baz', bar: 'bam'})))
 
-      .then(() => onDb(db => db.collection('bla_snapshots_Test').find().toArray()))
+      .then(() => onDb(db => db.collection('bla_snapshots').find().toArray()))
 
       .then(docs => docs
         .map(d=>({...d, _id: d._id.constructor.name})).should
         .eql([{
           _id: 'ObjectID',
+          d: 'Test',
           k: 'foo',
           v: 'v1',
           t: new Date('2011-12-14'),
@@ -108,12 +111,13 @@ describe.skip('MongoDB Snapshot Store', () => {
   });
 
   it('fails if the Snapshot does not exist', () => {
-    return onDb(db => db.collection('bla_snapshots_Test').insertOne({
-      k: 'foo',
-      v: 'v1'
-    }))
+    return onDb(db => db.collection('bla_snapshots').insertMany([
+      {d: 'Test', k: 'foo', v: 'v2'},
+      {d: 'Nope', k: 'foo', v: 'v1'},
+      {d: 'Test', k: 'bar', v: 'v1'},
+    ]))
 
-      .then(() => snapshots.fetch('foo', 'v2'))
+      .then(() => snapshots.fetch('Test', 'foo', 'v1'))
 
       .should.be.rejectedWith('No snapshot')
   });

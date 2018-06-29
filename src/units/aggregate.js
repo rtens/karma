@@ -31,7 +31,7 @@ class AggregateInstance extends unit.UnitInstance {
   //noinspection JSUnusedGlobalSymbols
   _recordFilter() {
     return this._log.filter()
-      .ofStream(this.domain, this.id)
+      .onStream(this.domain, this.id)
   }
 
   apply(record) {

@@ -10,7 +10,7 @@ const Datastore = require('nestdb');
 if (!process.env.TEST_DATA_DIR)
   console.log('Set $TEST_DATA_DIR to test persistent NestDB Event Store');
 
-describe.skip('NestDB Event Store', () => {
+describe('NestDB Event Store', () => {
   let _Date, db, store;
 
   beforeEach(() => {
@@ -27,7 +27,7 @@ describe.skip('NestDB Event Store', () => {
       db = new Datastore();
     }
 
-    store = new _nest.EventStore('Test', db);
+    store = new _nest.EventStore(db);
     return new Promise((y, n) => db.load(err => err ? n(err) : y()))
   });
 
@@ -42,11 +42,13 @@ describe.skip('NestDB Event Store', () => {
       new _event.Event('bard', {c: 123}, new Date('2016-12-06')),
     ];
 
-    return store.record(events, 'foo', undefined, 'trace')
+    return store.record(events, 'Test', 'foo', undefined, 'trace')
 
       .then(records => records.should.eql([
-        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2011-12-13T14:15:16Z')), 'foo', 1, 'trace'),
-        new _event.Record(new _event.Event('bard', {c: 123}, new Date('2016-12-06')), 'foo', 2, 'trace')
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2011-12-13T14:15:16Z')),
+          'Test', 'foo', 1, 'trace'),
+        new _event.Record(new _event.Event('bard', {c: 123}, new Date('2016-12-06')),
+          'Test', 'foo', 2, 'trace')
       ]))
 
       .then(() => new Promise((y, n) => db.find({}, (err, docs) => err ? n(err) : y(docs))))
@@ -55,7 +57,7 @@ describe.skip('NestDB Event Store', () => {
         .should.eql([{
           tid: 'trace',
           tim: new Date(),
-          _id: JSON.stringify({sid: 'foo', seq: 1}),
+          _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 1}),
           evs: [
             {nam: 'food', pay: {a: 'b'}, tim: new Date('2011-12-13T14:15:16Z')},
             {nam: 'bard', pay: {c: 123}, tim: undefined}
@@ -64,7 +66,7 @@ describe.skip('NestDB Event Store', () => {
   });
 
   it('stores records on sequence', () => {
-    return store.record([new _event.Event('food', {a: 'b'})], 'foo', 42, 'trace')
+    return store.record([new _event.Event('food', {a: 'b'})], 'Test', 'foo', 42, 'trace')
 
       .then(() => new Promise((y, n) => db.find({}, (err, docs) => err ? n(err) : y(docs))))
 
@@ -72,7 +74,7 @@ describe.skip('NestDB Event Store', () => {
         .should.eql([{
           tid: 'trace',
           tim: new Date(),
-          _id: JSON.stringify({sid: 'foo', seq: 43}),
+          _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 43}),
           evs: [
             {nam: 'food', pay: {a: 'b'}, tim: undefined}
           ],
@@ -80,7 +82,7 @@ describe.skip('NestDB Event Store', () => {
   });
 
   it('records empty events', () => {
-    return store.record([], 'foo', null, 'trace')
+    return store.record([], 'Test', 'foo', null, 'trace')
 
       .then(records => records.should.eql([]))
 
@@ -90,19 +92,19 @@ describe.skip('NestDB Event Store', () => {
         .should.eql([{
           tid: 'trace',
           tim: new Date(),
-          _id: JSON.stringify({sid: 'foo', seq: 1}),
+          _id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 1}),
           evs: []
         }]))
   });
 
   it('rejects Records on occupied heads', () => {
-    let record = {_id: JSON.stringify({sid: 'foo', seq: 42})};
+    let record = {_id: JSON.stringify({dom: 'Test', sid: 'foo', seq: 42})};
 
     return Promise.resolve()
 
       .then(() => new Promise((y, n) => db.insert(record, (err, doc) => err ? n(err) : y(doc))))
 
-      .then(() => store.record([], 'foo', 41))
+      .then(() => store.record([], 'Test', 'foo', 41))
 
       .should.be.rejectedWith('Out of sequence')
   });

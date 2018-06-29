@@ -11,7 +11,7 @@ const _mongo = require('../../../src/persistence/mongo');
 
 const mongodb = require('mongodb');
 
-describe.skip('MongoDB Event Store', () => {
+describe('MongoDB Event Store', () => {
   let _Date, store, onDb;
 
   beforeEach(() => {
@@ -23,7 +23,7 @@ describe.skip('MongoDB Event Store', () => {
     Date.prototype = _Date.prototype;
 
     let db = 'karma3_' + Date.now() + Math.round(Math.random() * 1000);
-    store = new _mongo.EventStore('Test', process.env.TEST_MONGODB_URI, db, 'bla_');
+    store = new _mongo.EventStore(process.env.TEST_MONGODB_URI, db, 'bla_');
 
     onDb = execute => {
       let result = null;
@@ -63,11 +63,13 @@ describe.skip('MongoDB Event Store', () => {
     return store.record([
       new _event.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')),
       new _event.Event('bard', {c: 421}, new Date('2013-12-11')),
-    ], 'foo', null, 'trace')
+    ], 'Test', 'foo', null, 'trace')
 
       .then(records => records.should.eql([
-        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')), 'foo', 1, 'trace'),
-        new _event.Record(new _event.Event('bard', {c: 421}, new Date('2013-12-11')), 'foo', 2, 'trace')
+        new _event.Record(new _event.Event('food', {a: 'b'}, new Date('2001-02-03T12:00:00.500Z')),
+          'Test', 'foo', 1, 'trace'),
+        new _event.Record(new _event.Event('bard', {c: 421}, new Date('2013-12-11')),
+          'Test', 'foo', 2, 'trace')
       ]))
 
       .then(() => onDb(db => db.collection('bla_event_store').find().toArray()))
@@ -94,7 +96,7 @@ describe.skip('MongoDB Event Store', () => {
       v: 42
     }))
 
-      .then(() => store.record([], 'foo', 41))
+      .then(() => store.record([], 'Test', 'foo', 41))
 
       .should.be.rejectedWith('Out of sequence')
   });
@@ -105,7 +107,7 @@ describe.skip('MongoDB Event Store', () => {
       db.collection('bla_event_store').insertOne({a: 'bar', v: 42}),
     ]))
 
-      .then(() => store.record([], 'foo', 46.7))
+      .then(() => store.record([], 'Test', 'foo', 46.7))
 
       .then(() => onDb(db => db.collection('bla_event_store').find().toArray()))
 

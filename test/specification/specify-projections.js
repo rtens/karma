@@ -6,7 +6,7 @@ chai.should();
 const k = require('../..');
 const {the, Example, I, expect} = require('../../spec')();
 
-describe.skip('Specifying Projections', () => {
+describe('Specifying Projections', () => {
 
   let Module = configure => class extends k.api.http.Module {
     //noinspection JSUnusedGlobalSymbols
@@ -23,9 +23,8 @@ describe.skip('Specifying Projections', () => {
 
     //noinspection JSUnusedGlobalSymbols
     buildHandler() {
-      return new k.api.http.RequestHandler()
-        .handling(new k.api.http.QueryHandler(this.domain, request =>
-          new k.Query(request.path)))
+      return new k.api.http.QueryHandler(this.domain, request =>
+        new k.Query(request.path))
     }
   };
 
@@ -77,5 +76,4 @@ describe.skip('Specifying Projections', () => {
 
       .then({assert: result => result.rejection = null})
   });
-})
-;
+});

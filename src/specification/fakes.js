@@ -66,7 +66,7 @@ class FakeRecordFilter extends persistence.RecordFilter {
     return this
   }
 
-  ofStream(domainName, streamId) {
+  onStream(domainName, streamId) {
     this.domainName = domainName;
     this.streamId = streamId;
     return this
