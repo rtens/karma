@@ -51,7 +51,7 @@ class ApiHandler {
   }
 }
 
-class Module extends domain.Module {
+class ExpressModule extends domain.Module {
 
   handle({request, response}) {
     return this.buildHandler(express()).handle(request, response)
@@ -64,5 +64,5 @@ class Module extends domain.Module {
 
 module.exports = {
   ApiHandler,
-  Module
+  Module: ExpressModule
 };

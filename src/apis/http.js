@@ -254,7 +254,7 @@ class CommandHandler extends Handler {
   }
 }
 
-class Module extends domain.Module {
+class HttpModule extends domain.Module {
 
   buildHandler() {
     return new ApiHandler()
@@ -275,5 +275,5 @@ module.exports = {
   CommandHandler,
   ApiHandler,
   NotFoundError,
-  Module
+  Module: HttpModule
 };
