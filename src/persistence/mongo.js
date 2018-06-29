@@ -10,7 +10,7 @@ const debug = {
 };
 
 class MongoEventStore extends _persistence.EventStore {
-  constructor(connectionUri, databaseName, collectionPrefix, connectionOptions) {
+  constructor(connectionUri, databaseName, collectionPrefix = '', connectionOptions = {}) {
     super();
     this._uri = connectionUri;
     this._dbName = databaseName;
@@ -60,7 +60,7 @@ class MongoEventStore extends _persistence.EventStore {
 }
 
 class MongoEventLog extends _persistence.EventLog {
-  constructor(databaseConnectionUri, oplogConnectionUri, database, collectionPrefix, connectionOptions) {
+  constructor(databaseConnectionUri, oplogConnectionUri, database, collectionPrefix = '', connectionOptions = {}) {
     super();
     this._dbUri = databaseConnectionUri;
     this._oplogUri = oplogConnectionUri;
@@ -248,7 +248,7 @@ class MongoRecordFilter extends _persistence.RecordFilter {
 }
 
 class MongoSnapshotStore extends _persistence.SnapshotStore {
-  constructor(connectionUri, database, collectionPrefix, connectionOptions) {
+  constructor(connectionUri, database, collectionPrefix = '', connectionOptions = {}) {
     super();
     this._uri = connectionUri;
     this._dbName = database;
