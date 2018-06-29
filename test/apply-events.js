@@ -345,8 +345,9 @@ describe('Applying Events', () => {
         it('uses recorded Events of any stream', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
-            new _event.Record(new k.Event('bard', 'two'), 'Test', 'bar', 22),
+            new _event.Record(new k.Event('bard', 'one'), 'Foo', 'foo', 21),
+            new _event.Record(new k.Event('bard', 'two'), 'Foo', 'bar', 22),
+            new _event.Record(new k.Event('bard', 'tre'), 'Bar', 'foo', 21),
           ];
 
           let applied = [];
@@ -359,7 +360,7 @@ describe('Applying Events', () => {
 
             [unit.handle](new unit.Message('Foo'))
 
-            .then(() => applied.should.eql(['one', 'two']))
+            .then(() => applied.should.eql(['one', 'two', 'tre']))
 
             .then(() => log.replayed.should.eql([{
               eventNames: ['food', 'bard']
@@ -370,12 +371,13 @@ describe('Applying Events', () => {
         it('uses only Events of own stream', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21),
-            new _event.Record(new k.Event('bard', 'two'), 'Test', 'bar', 22),
+            new _event.Record(new k.Event('bard', 'one'), 'Foo', 'foo', 21),
+            new _event.Record(new k.Event('bard', 'two'), 'Foo', 'bar', 22),
+            new _event.Record(new k.Event('bard', 'tre'), 'Bar', 'foo', 23),
           ];
 
           let applied = [];
-          return Domain({log})
+          return Domain({name: 'Foo', log})
 
             .add(new unit.Unit('One')
               .applying('bard', (payload) => applied.push(payload))
@@ -386,7 +388,7 @@ describe('Applying Events', () => {
             .then(() => applied.should.eql(['one']))
 
             .then(() => log.replayed.should.eql([{
-              domainName: 'Test',
+              domainName: 'Foo',
               streamId: 'foo'
             }]))
         });

@@ -135,13 +135,14 @@ describe('Reacting to an Event', () => {
   it('does not record time of last Record already recorded', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23, null, new Date('2011-12-13T14:15:15Z'))
+      new _event.Record(new k.Event('food', 'one'),
+        'Test', 'foo', 23, null, new Date('2011-12-13T14:15:15Z'))
     ];
 
     let metaLog = new fake.EventLog();
     metaLog.records = [
       new _event.Record(new k.Event('__record-consumed', {recordTime: new Date('2011-12-13T14:15:16Z')}),
-        '__Domain-Test')
+        'Test__meta', '__Domain-Test')
     ];
 
     let metaStore = new fake.EventStore();

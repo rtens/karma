@@ -73,9 +73,7 @@ class FakeRecordFilter extends persistence.RecordFilter {
   }
 
   matches(record) {
-    return (!this.streamId || record.streamId == this.streamId)
-      && (!this.domainName || record.domainName == this.domainName)
-      && (!this.lastRecordTime || record.time >= this.lastRecordTime);
+    return !this.lastRecordTime || record.time >= this.lastRecordTime
   }
 }
 

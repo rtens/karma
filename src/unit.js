@@ -161,8 +161,8 @@ class UnitInstance {
     let appliers = this.definition._appliers[record.event.name];
     if (!appliers) return;
 
-    if (record.sequence <= this._heads[record.streamId]) return;
-
+    this._heads[record.domainName] = this._heads[record.domainName] || {};
+    if (record.sequence <= this._heads[record.domainName][record.streamId]) return;
 
     try {
       appliers.forEach(applier => applier.call(this, record.event.payload, record));
@@ -172,7 +172,7 @@ class UnitInstance {
       throw err
     }
 
-    this._heads[record.streamId] = record.sequence;
+    this._heads[record.domainName][record.streamId] = record.sequence;
   }
 
   _unitLogger(traceId) {

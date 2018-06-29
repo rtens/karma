@@ -105,7 +105,7 @@ describe('Specifying Sagas', () => {
     let reacted = [];
 
     return new Example(Module(saga => saga
-      .reactingTo('food', ()=>'foo', $=>reacted.push($))))
+      .reactingTo('food', ()=>'foo', $ => reacted.push($))))
 
       .given(the.Event('food', 'not'))
 

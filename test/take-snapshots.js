@@ -42,8 +42,10 @@ describe('Taking a Snapshot', () => {
       it('stores the Snapshot by key and version', () => {
         let log = new fake.EventLog();
         log.records = [
-          new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21, null, new Date('2011-12-13')),
-          new _event.Record(new k.Event('not applied', 'not'), 'Test', 'bar', 22, null, new Date('2011-12-13')),
+          new _event.Record(new k.Event('bard', 'one'),
+            'Test', 'foo', 21, null, new Date('2011-12-13')),
+          new _event.Record(new k.Event('not applied', 'not'),
+            'Test', 'bar', 22, null, new Date('2011-12-13')),
         ];
 
         let snapshots = new fake.SnapshotStore();
@@ -73,7 +75,7 @@ describe('Taking a Snapshot', () => {
             version: 'v1',
             snapshot: {
               lastRecordTime: new Date('2011-12-13'),
-              heads: {foo: 21},
+              heads: {Test: {foo: 21}},
               state: ['one']
             }
           }]))
@@ -91,7 +93,8 @@ describe('Taking a Snapshot', () => {
           domainName: 'Test',
           unitKey: unit.Unit.name + '-One-foo',
           version: 'v1',
-          snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21}, ['snap'])
+          snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'),
+            {Test: {foo: 21}}, ['snap'])
         }];
 
         let state = [];
@@ -256,7 +259,8 @@ describe('Taking a Snapshot', () => {
             domainName: 'Test',
             unitKey: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'), {foo: 21, bar: 22}, ['snap'])
+            snapshot: new _persistence.Snapshot(new Date('2011-12-13T12:00:00'),
+              {Test: {foo: 21, bar: 22}}, ['snap'])
           }];
 
           let state = [];
@@ -294,8 +298,10 @@ describe('Taking a Snapshot', () => {
         it('saves a Snapshot with multiple heads', () => {
           let log = new fake.EventLog();
           log.records = [
-            new _event.Record(new k.Event('bard', 'one'), 'Test', 'foo', 21, null, new Date('2011-12-13')),
-            new _event.Record(new k.Event('bard', 'two'), 'Test', 'bar', 42, null, new Date('2011-12-14')),
+            new _event.Record(new k.Event('bard', 'one'),
+              'Test', 'foo', 21, null, new Date('2011-12-13')),
+            new _event.Record(new k.Event('bard', 'two'),
+              'Test', 'bar', 42, null, new Date('2011-12-14')),
           ];
 
           let snapshots = new fake.SnapshotStore();
@@ -322,7 +328,7 @@ describe('Taking a Snapshot', () => {
               version: 'v1',
               snapshot: {
                 lastRecordTime: new Date('2011-12-14'),
-                heads: {foo: 21, bar: 42},
+                heads: {Test: {foo: 21, bar: 42}},
                 state: ['one', 'two']
               }
             }]))

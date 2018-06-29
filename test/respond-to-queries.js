@@ -206,7 +206,7 @@ describe('Responding to a Query', () => {
         .applying('food', ()=>null)
         .respondingTo('Foo', ()=>'foo', ()=>'now'))
 
-      .respondTo(new k.Query('Foo').waitFor({bar: 42}))
+      .respondTo(new k.Query('Foo').waitFor({Test: {bar: 42}}))
 
       .should.eventually.equal('now')
   });

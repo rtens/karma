@@ -35,9 +35,9 @@ class AggregateInstance extends unit.UnitInstance {
   }
 
   apply(record) {
-    if (record.streamId != this.id) return;
+    if (!(record.domainName == this.domain && record.streamId == this.id)) return;
     super.apply(record);
-    this._heads = {[this.id]: record.sequence};
+    this._heads = {[this.domain]: {[this.id]: record.sequence}};
   }
 
   execute(command) {
@@ -54,7 +54,8 @@ class AggregateInstance extends unit.UnitInstance {
 
     if (!Array.isArray(events)) return Promise.resolve([]);
 
-    return this._store.record(events, this.domain, this.id, this._heads[this.id], command.traceId)
+    this._heads[this.domain] = this._heads[this.domain] || {};
+    return this._store.record(events, this.domain, this.id, this._heads[this.domain][this.id], command.traceId)
       .catch(e => {
         if (tries >= 10) throw e;
         return new Promise(y => setTimeout(() => y(this._execute(command, tries + 1)),
