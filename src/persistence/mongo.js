@@ -136,10 +136,13 @@ class MongoEventLog extends _persistence.EventLog {
 
     let first = Promise.resolve();
 
-    let totalCount = 0;
+    let totalCount = 1000000;
     let currentCount = 0;
+
     if (debug.replay.enabled) {
       first = new Promise(y => cursor.count((err, count) => {
+        if (err) return debug.replay('Error counting [%j]: %s', filter.query, err);
+
         debug.replay('%d %j', count, filter.query);
         totalCount = count;
         y();
@@ -150,9 +153,9 @@ class MongoEventLog extends _persistence.EventLog {
       .then(() => new Promise((y, n) => cursor.forEach(recordSet => {
         if (debug.replay.enabled) {
           currentCount++;
-          let percent = (currentCount / totalCount) * 100;
-          if (currentCount > 1000 && percent % 10 == 0)
-            debug.replay('%d%% %d/%d', percent, currentCount, totalCount);
+          const increment = Math.max(10000, Math.ceil(.01 * totalCount));
+          if (currentCount == totalCount || currentCount % increment == 0)
+            debug.replay('%d%% * %d', Math.floor((currentCount / totalCount) * 100), totalCount);
         }
 
         try {
