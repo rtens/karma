@@ -141,7 +141,7 @@ class MongoEventLog extends _persistence.EventLog {
 
     if (debug.replay.enabled) {
       first = new Promise(y => cursor.count((err, count) => {
-        if (err) return debug.replay('Error counting [%j]: %s', filter.query, err);
+        if (err) return y(debug.replay('Error counting [%j]: %s', filter.query, err));
 
         debug.replay('%d %j', count, filter.query);
         totalCount = count;
