@@ -99,6 +99,24 @@ describe('Specifying dependencies', () => {
     injected.should.equal('ban');
   });
 
+  it('combines injected values', () => {
+    let injected = [];
+
+    new Example(Module(dependencies => {
+      injected.push(dependencies.foo());
+      injected.push(dependencies.foo.bar());
+      injected.push(dependencies.foo.baz);
+    }))
+
+      .given(the.Stub('foo').returning('one'))
+      .given(the.Stub('foo.bar').returning('two'))
+      .given(the.Value('foo.baz', 'tre'))
+
+      .when(anyAction);
+
+    injected.should.eql(['one', 'two', 'tre'])
+  });
+
   it('asserts expected invocations of static stubs', () => {
     return new Example(Module(dependencies => {
       dependencies.foo('a').bar('one', 'uno');

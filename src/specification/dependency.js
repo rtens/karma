@@ -9,32 +9,34 @@ class ValueDependencyContext extends specification.Context {
   }
 
   configure(example) {
-    let object = example.dependencies;
-    let keys = this.key.split('.');
-
-    this.putDependency(example, object, keys, []);
+    this.putDependency(example, example.dependencies, this.key.split('.'), []);
   }
 
-  putDependency(example, object, keys, myKeys) {
-    let key = keys.shift();
-    myKeys = [...myKeys, key];
+  putDependency(example, object, keysLeft, keysUp) {
+    let key = keysLeft.shift();
+    keysUp = [...keysUp, key];
 
-    if (!key.endsWith('()')) {
-      object[key] = this.dependency(example, keys, myKeys);
-      return object;
+    if (key.endsWith('()')) {
+      key = key.substr(0, key.length - 2);
+      object[key] = this.buildStub(example, keysLeft, keysUp, object[key]);
+    } else {
+      object[key] = this.buildDependency(example, keysLeft, keysUp, object[key]);
     }
 
-    let stub = new StubDependencyContext(myKeys.join('.'))
-      .returning(this.dependency(example, keys, myKeys));
-
-    example.stubs[stub.key] = stub;
-    object[key.substr(0, key.length - 2)] = stub.value;
     return object;
   }
 
-  dependency(example, keys, myKeys) {
+  buildStub(example, keys, myKeys, object) {
+    let stub = new StubDependencyContext(myKeys.join('.'))
+      .returning(this.buildDependency(example, keys, myKeys, object));
+
+    example.stubs[stub.key] = stub;
+    return stub.value;
+  }
+
+  buildDependency(example, keys, myKeys, object = {}) {
     if (!keys.length) return this.value;
-    return this.putDependency(example, {}, keys, myKeys);
+    return this.putDependency(example, object, keys, myKeys);
   }
 }
 
