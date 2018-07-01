@@ -32,7 +32,7 @@ describe('Specifying dependencies', () => {
   it('uses injected stub', () => {
     let stubbed = null;
 
-    new Example(Module((dependencies) =>
+    new Example(Module(dependencies =>
       stubbed = dependencies.foo()))
 
       .given(the.Stub('foo').returning('bar'))
@@ -45,7 +45,7 @@ describe('Specifying dependencies', () => {
   it('uses dynamic stub', () => {
     let stubbed = null;
 
-    new Example(Module((dependencies) =>
+    new Example(Module(dependencies =>
       stubbed = dependencies.foo('foo', 'bar')))
 
       .given(the.Stub('foo')
@@ -59,7 +59,7 @@ describe('Specifying dependencies', () => {
   it('uses dynamic stub with indexed callback', () => {
     let stubbed = [];
 
-    new Example(Module((dependencies) => {
+    new Example(Module(dependencies => {
       stubbed.push(dependencies.foo(3, 4));
       stubbed.push(dependencies.foo(5, 6));
       stubbed.push(dependencies.foo(7, 8));
@@ -76,7 +76,7 @@ describe('Specifying dependencies', () => {
   it('uses injected values in objects', () => {
     let injected = null;
 
-    new Example(Module((dependencies) =>
+    new Example(Module(dependencies =>
       injected = dependencies.foo.bar.baz))
 
       .given(the.Value('foo.bar.baz', 'ban'))
@@ -89,7 +89,7 @@ describe('Specifying dependencies', () => {
   it('uses injected values returned by function', () => {
     let injected = null;
 
-    new Example(Module((dependencies) =>
+    new Example(Module(dependencies =>
       injected = dependencies.foo().bar().baz))
 
       .given(the.Value('foo().bar().baz', 'ban'))
@@ -100,7 +100,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations of static stubs', () => {
-    return new Example(Module((dependencies) => {
+    return new Example(Module(dependencies => {
       dependencies.foo('a').bar('one', 'uno');
       dependencies.foo('b').bar('two', 'dos');
     }))
@@ -119,7 +119,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations of dynamic stub', () => {
-    return new Example(Module((dependencies) => {
+    return new Example(Module(dependencies => {
       dependencies.foo('one');
     }))
 
@@ -145,7 +145,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if number of invocation does not match', () => {
-    return new Example(Module((dependencies) =>
+    return new Example(Module(dependencies =>
       dependencies.foo('one')))
 
       .given(the.Stub('foo'))
@@ -161,7 +161,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if expected invocations does not match', () => {
-    return new Example(Module((dependencies) => {
+    return new Example(Module(dependencies => {
       dependencies.foo('one', 'uno');
       dependencies.foo('two', 'dos');
     }))
@@ -180,7 +180,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('asserts expected invocations with function', () => {
-    return new Example(Module((dependencies) => {
+    return new Example(Module(dependencies => {
       dependencies.foo('one', 'uno');
       dependencies.foo('two', 'dos');
     }))
@@ -195,7 +195,7 @@ describe('Specifying dependencies', () => {
   });
 
   it('fails if argument function fails', () => {
-    return new Example(Module((dependencies) =>
+    return new Example(Module(dependencies =>
       dependencies.foo('one')))
 
       .given(the.Stub('foo'))
@@ -208,6 +208,29 @@ describe('Specifying dependencies', () => {
       .promise.should.be.rejectedWith("Unexpected argument [0] " +
         "in invocation [0] of [foo]: " +
         "expected 'one' to equal 'two'")
+  });
+
+  it('assert no invocations', () => {
+    return new Example(Module(dependencies => dependencies))
+
+      .given(the.Stub('foo'))
+
+      .when(anyAction)
+
+      .then(expect.NoInvocations('foo'))
+  });
+
+  it('fails for unexpected invocations', () => {
+    return new Example(Module(dependencies => dependencies.foo()))
+
+      .given(the.Stub('foo'))
+
+      .when(anyAction)
+
+      .then(expect.NoInvocations('foo'))
+
+      .promise.should.be.rejectedWith("Unexpected invocations of [foo]: " +
+        "expected [ [] ] to deeply equal []")
   });
 
   const anyAction = {

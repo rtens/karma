@@ -112,8 +112,21 @@ class InvocationsExpectation extends specification.Expectation {
   }
 }
 
+class NoInvocationsExpectation extends specification.Expectation {
+  constructor(stubKey) {
+    super();
+    this.key = stubKey;
+  }
+
+  assert(result) {
+    let invocations = result.example.stubs[this.key].invocations;
+    expect(invocations).to.eql([], `Unexpected invocations of [${this.key}]`);
+  }
+}
+
 module.exports = {
   ValueDependencyContext,
   StubDependencyContext,
-  InvocationsExpectation
+  InvocationsExpectation,
+  NoInvocationsExpectation
 };
