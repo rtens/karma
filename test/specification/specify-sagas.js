@@ -108,6 +108,25 @@ describe('Specifying Sagas', () => {
       .then({assert: result => result.example.errors.splice(0, 1)})
   });
 
+  it('applies published Event before reacting to it', () => {
+    let reacted = [];
+
+    return new Example(Module(saga => saga
+      .initializing(function () {
+        this.state = [];
+      })
+      .applying('food', function ($) {
+        this.state.push($);
+      })
+      .reactingTo('food', ()=>'foo', function() {
+        reacted.push(this.state)
+      })))
+
+      .when(I.publish(the.Event('food', 'bar')))
+
+      .promise.then(() => reacted.should.eql([['bar']]))
+  });
+
   it('does not use recorded Events to trigger the reaction', () => {
     let reacted = [];
 

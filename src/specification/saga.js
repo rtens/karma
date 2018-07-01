@@ -10,6 +10,8 @@ class PublishEventAction extends specification.Action {
   }
 
   perform(example) {
+    this.event.configure(example);
+
     const consumed = new event.Event('__record-consumed', {recordTime: 1});
     example.metaLog.records.push(new event.Record(consumed, 'Example'));
 
