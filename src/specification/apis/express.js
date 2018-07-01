@@ -32,16 +32,10 @@ class RequestAction extends specification.Action {
   }
 
   perform(example) {
-    return new RequestResult(example, Promise.race([
-
-      new Promise(y => setTimeout(() =>
-        y(this.response), 10)),
-
-      example.module.handle({
-        request: this.request,
-        response: this.response
-      }),
-    ]))
+    return new RequestResult(example, example.module.handle({
+      request: this.request,
+      response: this.response
+    }))
   }
 }
 

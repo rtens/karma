@@ -42,6 +42,13 @@ describe('Specifying Projections', () => {
       .then(expect.Response(['one', 'two']))
   });
 
+  it('catches unresolved promises', () => {
+    return new Example(Module(projection => projection
+      .respondingTo('Bar', ()=>'foo', () => new Promise(() => null))))
+
+      .when(I.get('Bar'))
+  });
+
   it('uses time of recorded Events', () => {
     return new Example(Module(projection => projection
       .applying('food', function ($, record) {

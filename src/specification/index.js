@@ -89,10 +89,14 @@ class Action {
 class Result {
   constructor(example, promise) {
     this.example = example;
-    this.promise = promise
-      .catch(err => err instanceof message.Rejection
-        ? this.rejection = err
-        : Promise.reject(err));
+    this.promise = Promise.race([
+      new Promise(y => setTimeout(() =>
+        y(this.response), 10)),
+      promise
+        .catch(err => err instanceof message.Rejection
+          ? this.rejection = err
+          : Promise.reject(err))
+    ]);
   }
 
   finalAssertion() {

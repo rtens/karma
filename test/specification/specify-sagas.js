@@ -31,6 +31,13 @@ describe('Specifying Sagas', () => {
       .promise.then(() => reacted.should.eql(['bar']))
   });
 
+  it('catches unresolved promises', () => {
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', () => new Promise(() => null))))
+
+      .when(I.publish(the.Event()))
+  });
+
   it('asserts expected failure of reaction', () => {
     return new Example(Module(saga => saga
       .reactingTo('food', ()=>'foo', () => {

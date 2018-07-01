@@ -143,6 +143,17 @@ describe('Specifying Aggregates', () => {
         "expected [ 'food', 'bard' ] to deeply equal [ 'not food' ]")
   });
 
+  it('fails if unexpected Event was recorded', () => {
+    return new Example(Module(aggregate => aggregate))
+
+      .when(I.post('Foo'))
+
+      .then(expect.EventStream('foo', []))
+
+      .promise.should.be.rejectedWith("Unexpected Events: " +
+        "expected [ 'food', 'bard' ] to deeply equal []")
+  });
+
   it('fails if expected do not match recorded Events', () => {
     return new Example(Module(aggregate => aggregate))
 

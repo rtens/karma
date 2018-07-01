@@ -200,7 +200,7 @@ describe('Specifying an express API', () => {
 
   it('fails if header is missing', () => {
     return new Example(Module(server => server
-      .get('/foo', () => null)))
+      .get('/foo', (req, res) => res.send())))
 
       .when(I.get('/foo'))
 
@@ -230,6 +230,7 @@ describe('Specifying an express API', () => {
         res.setHeader('One', 'uno');
         res.header('Two', 'dos');
         res.set('Three', 'tre');
+        res.send()
       })))
 
       .when(I.get('/foo'))
