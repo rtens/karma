@@ -9,15 +9,22 @@ class LoggedErrorExpectation extends specification.Expectation {
   }
 
   assert(result) {
-    expect(result.example.errors).to.contain(this.message, 'Missing Error');
-    result.example.errors.splice(result.example.errors.indexOf(this.message), 1);
+    let messages = result.example.errors.map(e=>e.message);
+    expect(messages).to.contain(this.message, 'Missing Error');
+    result.example.errors.splice(messages.indexOf(this.message), 1);
   }
 }
 
 class NoLoggedErrorExpectation extends specification.Expectation {
 
   assert(result) {
-    expect(result.example.errors).to.eql([], 'Unexpected Error(s)');
+    try {
+      let messages = result.example.errors.map(e=>e.message);
+      expect(messages).to.eql([], 'Unexpected Error(s)');
+    } catch (err) {
+      err.stack += '\n\nCaused by: ' + result.example.errors[0].stack;
+      throw err;
+    }
   }
 }
 

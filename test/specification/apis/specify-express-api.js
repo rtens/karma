@@ -134,7 +134,8 @@ describe('Specifying an express API', () => {
         throw new Error('Should have failed')
       }, err => {
         err.message.should.equal("Unexpected Error(s): " +
-          "expected [ 'Nope' ] to deeply equal []")
+          "expected [ 'Nope' ] to deeply equal []");
+        err.stack.should.contain('Caused by: Error: Nope');
       })
 
       .then({assert: result => result.example.errors.splice(0, 1)})

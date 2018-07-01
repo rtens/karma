@@ -30,7 +30,7 @@ describe('Specifying Aggregates', () => {
     //noinspection JSUnusedGlobalSymbols
     buildHandler() {
       return new k.api.http.CommandHandler(this.domain, request =>
-          new k.Command(request.path))
+        new k.Command(request.path))
     }
   };
 
@@ -115,8 +115,8 @@ describe('Specifying Aggregates', () => {
 
       .then(expect.EventStream('foo', []))
 
-      .promise.should.be.rejectedWith("No streams recorded: " +
-        "expected undefined to exist")
+      .promise.should.be.rejectedWith("Stream not recorded: " +
+        "expected [] to include 'foo'")
   });
 
   it('fails no ID of expected Event stream does not match', () => {
@@ -126,8 +126,8 @@ describe('Specifying Aggregates', () => {
 
       .then(expect.EventStream('not foo', []))
 
-      .promise.should.be.rejectedWith("Unexpected Event stream ID: " +
-        "expected 'foo' to equal 'not foo'")
+      .promise.should.be.rejectedWith("Stream not recorded: " +
+        "expected [ 'foo' ] to include 'not foo'")
   });
 
   it('fails if expected Event was not recorded', () => {
@@ -197,4 +197,37 @@ describe('Specifying Aggregates', () => {
       .promise.should.be.rejectedWith("Unexpected Events: " +
         "expected [ 'food', 'bard' ] to deeply equal []")
   });
+
+  it('asserts Events recorded on difference streams', () => {
+    return new Example(class extends k.Module {
+      //noinspection JSUnusedGlobalSymbols
+      buildDomain() {
+        return super.buildDomain()
+          .add(new k.Aggregate('One')
+            .executing('Foo', $=>$.stream, $ => [
+              new k.Event('food', $.foo),
+            ]));
+      }
+
+      handle() {
+        return Promise.all([
+          this.domain.execute(new k.Command('Foo', {stream: 'one', foo: 'bar'})),
+          this.domain.execute(new k.Command('Foo', {stream: 'one', foo: 'baz'})),
+          this.domain.execute(new k.Command('Foo', {stream: 'two', foo: 'bar'}))
+        ])
+      }
+    })
+
+      .when(I.post())
+
+      .then(expect.EventStream('one', [
+        expect.Event('food', 'bar'),
+      ]))
+      .then(expect.EventStream('one', [
+        expect.Event('food', 'baz'),
+      ]))
+      .then(expect.EventStream('two', [
+        expect.Event('food', 'bar'),
+      ]))
+  })
 });

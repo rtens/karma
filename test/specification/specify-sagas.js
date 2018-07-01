@@ -16,7 +16,7 @@ describe('Specifying Sagas', () => {
     }
 
     handle() {
-      return Promise.resolve(this.domain.execute(new k.Command('Foo')))
+      return this.domain.execute(new k.Command('Foo'))
     }
   };
 
@@ -102,7 +102,8 @@ describe('Specifying Sagas', () => {
         throw new Error('Should have failed')
       }, err => {
         err.message.should.equal("Unexpected Error(s): " +
-          "expected [ 'Nope' ] to deeply equal []")
+          "expected [ 'Nope' ] to deeply equal []");
+        err.stack.should.contain('Caused by: Error: Nope');
       })
 
       .then({assert: result => result.example.errors.splice(0, 1)})

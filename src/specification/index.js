@@ -35,7 +35,7 @@ class Example {
     this.logger = new class extends fake.Logger {
       error(tag, traceId, error) {
         super.error(tag, traceId, error);
-        errors.push(error.message);
+        errors.push(error);
       }
     }();
   }
