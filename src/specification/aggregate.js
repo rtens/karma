@@ -36,7 +36,17 @@ class EventExpectation extends specification.Expectation {
   }
 }
 
+class NoEventsExpectation extends specification.Expectation {
+
+  assert(result) {
+    const stream = result.example.store.recorded[0];
+    const events = stream ? stream.events.map(e=>e.name) : [];
+    expect(events).to.eql([], 'Unexpected Events');
+  }
+}
+
 module.exports = {
   EventStreamExpectation,
-  EventExpectation
+  EventExpectation,
+  NoEventsExpectation
 };

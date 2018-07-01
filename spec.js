@@ -32,6 +32,7 @@ module.exports = (config = {}) => {
       LoggedError: message => new logging.LoggedErrorExpectation(message),
       EventStream: (streamId, events) => new aggregate.EventStreamExpectation(streamId, events),
       Event: (name, payload) => new aggregate.EventExpectation(name, payload),
+      NoEvents: () => new aggregate.NoEventsExpectation(),
       Invocations: (stubKey) => new dependency.InvocationsExpectation(stubKey)
     }
   }

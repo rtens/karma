@@ -177,4 +177,24 @@ describe('Specifying Aggregates', () => {
 
       .promise.should.be.rejectedWith('Events must be expected in an EventStream')
   });
+
+  it('asserts no recorded Events', () => {
+    return new Example(Module(aggregate => aggregate
+      .executing('Bar', ()=>'foo', ()=>null)))
+
+      .when(I.post('Bar'))
+
+      .then(expect.NoEvents())
+  });
+
+  it('fails if unexpected stream exists', () => {
+    return new Example(Module(aggregate => aggregate))
+
+      .when(I.post('Foo'))
+
+      .then(expect.NoEvents())
+
+      .promise.should.be.rejectedWith("Unexpected Events: " +
+        "expected [ 'food', 'bard' ] to deeply equal []")
+  });
 });
