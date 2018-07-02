@@ -80,6 +80,17 @@ describe('Specifying an HTTP API', () => {
       .then(expect.Rejection('NOPE'))
   });
 
+  it('asserts an expected thrown Rejection', () => {
+    return new Example(Module(api => api
+      .handling(() => {
+        throw new k.Rejection('NOPE', 'Nope')
+      })))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Rejection('NOPE'))
+  });
+
   it('fails if the Rejection code does not match', () => {
     return new Example(Module(api => api
       .handling(() => Promise.reject(new k.Rejection('NOT_NOPE', 'Nope')))))

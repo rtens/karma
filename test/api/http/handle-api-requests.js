@@ -20,11 +20,16 @@ describe('Handling HTTP API requests', () => {
       .then(() => traceId.should.equal('trace2'))
   });
 
-  it('responds with 500 for unknown Error', () => {
+  it('responds with 500 for and logs unknown Error', () => {
+    const logged = [];
+    const logger = {
+      error: (tag, traceId, {message}) => logged.push({tag, traceId, message})
+    };
+
     return new k.api.http.ApiHandler({traceId: () => 'trace'})
       .handling(() => Promise.reject(new Error('Nope')))
 
-      .handle(new k.api.http.Request())
+      .handle(new k.api.http.Request(), logger)
       .then(response => {
         response.statusCode.should.equal(500);
         response.body.should.eql({

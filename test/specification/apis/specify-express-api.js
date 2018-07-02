@@ -78,6 +78,16 @@ describe('Specifying an express API', () => {
 
   it('asserts an expected Rejection', () => {
     return new Example(Module(server => server
+      .get('/foo', (req, res, next) =>
+        next(new k.Rejection('NOPE', 'Nope')))))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Rejection('NOPE'))
+  });
+
+  it('asserts an expected thrown Rejection', () => {
+    return new Example(Module(server => server
       .get('/foo', () => {
         throw new k.Rejection('NOPE', 'Nope')
       })))
@@ -89,8 +99,8 @@ describe('Specifying an express API', () => {
 
   it('fails if the Rejection code does not match', () => {
     return new Example(Module(server => server
-      .get('/foo', () => {
-        throw new k.Rejection('NOPE', 'Nope')
+      .get('/foo', (req, res, next) => {
+        next(new k.Rejection('NOPE', 'Nope'))
       })))
 
       .when(I.get('/foo'))
@@ -127,6 +137,25 @@ describe('Specifying an express API', () => {
   it('fails if an unexpected Error is logged', () => {
     return new Example(Module((server, module) => server
       .get('/foo', () => module.logger.error('foo', 'bar', new Error('Nope')))))
+
+      .when(I.get('/foo'))
+
+      .then(() => {
+        throw new Error('Should have failed')
+      }, err => {
+        err.message.should.equal("Unexpected Error(s): " +
+          "expected [ 'Nope' ] to deeply equal []");
+        err.stack.should.contain('Caused by: Error: Nope');
+      })
+
+      .then({assert: result => result.example.errors.splice(0, 1)})
+  });
+
+  it('fails if an unexpected Error is thrown', () => {
+    return new Example(Module((server, module) => server
+      .get('/foo', () => {
+        throw new Error('Nope')
+      })))
 
       .when(I.get('/foo'))
 

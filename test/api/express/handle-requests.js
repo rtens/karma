@@ -67,18 +67,28 @@ describe('Handling express requests', () => {
       })
   });
 
-  it('responds with 500 for unknown Errors', () => {
+  it('responds with 500 for and logs unknown Errors', () => {
     const request  = httpMocks.createRequest({method: 'GET', url: '/foo'});
     const response = httpMocks.createResponse({eventEmitter: events.EventEmitter});
+
+    const logged = [];
+    const log = {
+      error: (tag, traceId, {message}) => logged.push({tag, traceId, message})
+    };
 
     return new k.api.express.ApiHandler(express()
       .get('/foo', () => {
         throw new Error('Nope')
       }), {traceId: () => 'trace'})
 
-      .handle(request, response)
+      .handle(request, response, log)
 
       .then(() => {
+        expect(logged).to.eql([{
+          tag: 'ERROR',
+          traceId: 'trace',
+          message: 'Nope'
+        }]);
         expect(response.statusCode).to.equal(500);
         expect(response._getData()).to.eql({
           code: 'UNKNOWN_ERROR',

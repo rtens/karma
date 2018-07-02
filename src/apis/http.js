@@ -169,7 +169,7 @@ class SlugHandler extends SegmentHandler {
   }
 }
 
-class ApiHandler extends RequestHandler {
+class HttpApiHandler extends RequestHandler {
 
   constructor(options = {}) {
     super();
@@ -180,7 +180,7 @@ class ApiHandler extends RequestHandler {
     return (Math.floor(Math.random() * 0xefffffff) + 0x10000000).toString(16)
   }
 
-  handle(request) {
+  handle(request, log) {
     return super.handle(request.withTraceId(this.generateTraceId()))
 
       .catch(err => {
@@ -203,6 +203,7 @@ class ApiHandler extends RequestHandler {
               traceId: request.traceId
             });
 
+        log.error('ERROR', request.traceId, err);
         return new Response()
           .withStatus(500)
           .withBody({
@@ -257,11 +258,11 @@ class CommandHandler extends Handler {
 class HttpModule extends domain.Module {
 
   buildHandler() {
-    return new ApiHandler()
+    return new HttpApiHandler()
   }
 
   handle(request) {
-    return this.buildHandler().handle(request)
+    return this.buildHandler().handle(request, this.logger)
   }
 }
 
@@ -273,7 +274,7 @@ module.exports = {
   SegmentHandler,
   QueryHandler,
   CommandHandler,
-  ApiHandler,
   NotFoundError,
+  ApiHandler: HttpApiHandler,
   Module: HttpModule
 };
