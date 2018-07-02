@@ -34,7 +34,7 @@ describe('Specifying Aggregates', () => {
     }
   };
 
-  it('asserts recorded Events', () => {
+  it('asserts recorded Events with payloads', () => {
     return new Example(Module(aggregate => aggregate))
 
       .when(I.post('Foo'))
@@ -44,6 +44,19 @@ describe('Specifying Aggregates', () => {
       .then(expect.EventStream('foo', [
         expect.Event('food', {foo: 'bar'}),
         expect.Event('bard', {bar: 'foo'})
+      ]))
+  });
+
+  it('asserts recorded Events with names only', () => {
+    return new Example(Module(aggregate => aggregate))
+
+      .when(I.post('Foo'))
+
+      .then(expect.Response())
+
+      .then(expect.EventStream('foo', [
+        expect.Event('food'),
+        expect.Event('bard')
       ]))
   });
 
