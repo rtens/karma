@@ -50,8 +50,10 @@ class ReactionFailureExpectation extends logging.LoggedErrorExpectation {
       .map(r => r.events
         .filter(e => e.name == '__reaction-failed')
         .map(e => {
-          const message = e.payload.error.substr('Error: '.length,
-            e.payload.error.indexOf("\n") - 'Error: '.length);
+          const errorNameLength = e.payload.error.indexOf(": ") + 2;
+          const endOfLine = e.payload.error.indexOf("\n") - errorNameLength;
+
+          const message = e.payload.error.substr(errorNameLength, endOfLine);
           if (message == this.message) e.name = 'expected:__reaction-failed';
           return message;
         }))

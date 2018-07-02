@@ -49,6 +49,17 @@ describe('Specifying Sagas', () => {
       .then(expect.Failure('Nope'))
   });
 
+  it('asserts expected failure through Rejection of reaction', () => {
+    return new Example(Module(saga => saga
+      .reactingTo('food', ()=>'foo', () => {
+        throw new k.Rejection('Nope');
+      })))
+
+      .when(I.publish(the.Event('food')))
+
+      .then(expect.Failure('Nope'))
+  });
+
   it('fails if expected failure is missing', () => {
     return new Example(Module(saga => saga
       .reactingTo('food', ()=>'foo', () => {
