@@ -223,9 +223,38 @@ describe('Specifying Aggregates', () => {
       }
 
       handle() {
+        return Promise.resolve()
+          .then(() => this.domain.execute(new k.Command('Foo', {stream: 'one', foo: 'bar'})))
+          .then(() =>this.domain.execute(new k.Command('Foo', {stream: 'one', foo: 'baz'})))
+          .then(() => this.domain.execute(new k.Command('Foo', {stream: 'two', foo: 'bar'})))
+      }
+    })
+
+      .when(I.post())
+
+      .then(expect.EventStream('one', [
+        expect.Event('food', 'bar'),
+        expect.Event('food', 'baz')
+      ]))
+      .then(expect.EventStream('two', [
+        expect.Event('food', 'bar')
+      ]))
+  });
+
+  it('fails if Events do not match on difference streams', () => {
+    return new Example(class extends k.Module {
+      //noinspection JSUnusedGlobalSymbols
+      buildDomain() {
+        return super.buildDomain()
+          .add(new k.Aggregate('One')
+            .executing('Foo', $=>$.stream, $ => [
+              new k.Event('food', $.foo),
+            ]));
+      }
+
+      handle() {
         return Promise.all([
           this.domain.execute(new k.Command('Foo', {stream: 'one', foo: 'bar'})),
-          this.domain.execute(new k.Command('Foo', {stream: 'one', foo: 'baz'})),
           this.domain.execute(new k.Command('Foo', {stream: 'two', foo: 'bar'}))
         ])
       }
@@ -234,13 +263,10 @@ describe('Specifying Aggregates', () => {
       .when(I.post())
 
       .then(expect.EventStream('one', [
-        expect.Event('food', 'bar'),
-      ]))
-      .then(expect.EventStream('one', [
         expect.Event('food', 'baz'),
       ]))
-      .then(expect.EventStream('two', [
-        expect.Event('food', 'bar'),
-      ]))
+
+      .promise.should.be.rejectedWith("Unexpected Events: " +
+        "expected [ Array(1) ] to deeply equal [ Array(1) ]")
   })
 });

@@ -10,28 +10,14 @@ class EventStreamExpectation extends specification.Expectation {
   }
 
   assert(result) {
-    const streams = result.example.store.recorded;
+    const streams = result.example.store.streams;
 
-    expect(streams.map(s=>s.streamId)).to.include(this.streamId, 'Stream not recorded');
-
-    let failed = streams.map(stream => {
-      if (stream.streamId == this.streamId) {
-        try {
-          const eventNames = stream.events.map(e=>e.name);
-          if (this.events.length == 0) {
-            expect(eventNames).to.eql(this.events.map(e=>e.name), 'Unexpected Events');
-          }
-          expect(eventNames).to.eql(this.events.map(e=>e.name), 'Event not recorded');
-          expect(this.transformed(stream.events)).to.eql(this.events, 'Unexpected Events');
-          return null;
-        } catch (err) {
-          return err;
-        }
-      }
-    });
-
-    if (!failed.filter(x=>!x).length)
-      throw failed.filter(x=>!!x)[0]
+    expect(Object.keys(streams)).to.include(this.streamId,
+      'Stream not recorded');
+    expect(streams[this.streamId].map(e=>e.name)).to.eql(this.events.map(e=>e.name),
+      this.events.length ? 'Event not recorded' : 'Unexpected Events');
+    expect(this.transformed(streams[this.streamId])).to.eql(this.events,
+      'Unexpected Events');
   }
 
   transformed(events) {

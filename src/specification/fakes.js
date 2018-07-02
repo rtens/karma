@@ -5,9 +5,13 @@ class FakeEventStore extends persistence.EventStore {
   constructor() {
     super();
     this.recorded = [];
+    this.streams = {};
   }
 
   record(events, domainName, streamId, onSequence, traceId) {
+    this.streams[streamId] = this.streams[streamId] || [];
+    events.forEach(event => this.streams[streamId].push(event));
+
     this.recorded.push({events, domainName, streamId, onSequence, traceId});
     return new Promise(y => process.nextTick(y(super.record(events, domainName, streamId, onSequence, traceId))))
   }
