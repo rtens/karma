@@ -301,4 +301,19 @@ describe('Specifying an express API', () => {
       .promise.should.be.rejectedWith("Unexpected response body: " +
         "expected 'not json' to deeply equal { bar: 'baz' }")
   });
+
+  it('waits for asynchronous results', () => {
+    let result;
+
+    return new Example(Module(server => server
+      .get('/foo', (req, res) => {
+        res.send();
+
+        setTimeout(() => result = 'delayed', 0)
+      })))
+
+      .when(I.get('/foo'))
+
+      .then({assert: () => chai.expect(result).to.equal('delayed')})
+  })
 });

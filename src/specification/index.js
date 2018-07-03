@@ -90,8 +90,10 @@ class Result {
   constructor(example, promise) {
     this.example = example;
     this.promise = Promise.race([
+
       new Promise(y => setTimeout(() =>
         y(this.response), 10)),
+
       promise
         .catch(err => err instanceof message.Rejection
           ? this.rejection = err
@@ -104,22 +106,30 @@ class Result {
 
   then(expectation, reject) {
     let resolve = (typeof expectation != 'function')
-      ? this._keepStack(expectation)
+      ? () => this._assertWithRetry(expectation)
       : this._finishUp(expectation, reject);
 
     this.promise = this.promise.then(resolve, reject);
     return this
   }
 
-  _keepStack(expectation) {
+  _assertWithRetry(expectation) {
+    try {
+      expectation.assert(this);
+    } catch (err) {
+      return new Promise(y => setTimeout(y, 0))
+        .then(() => this._assertKeepingStack(expectation))
+    }
+  }
+
+  _assertKeepingStack(expectation) {
     let error = new Error();
-    return () => {
-      try {
-        expectation.assert(this);
-      } catch (err) {
-        err.stack += error.stack;
-        throw err;
-      }
+
+    try {
+      expectation.assert(this)
+    } catch (err) {
+      err.stack += error.stack;
+      throw err;
     }
   }
 
