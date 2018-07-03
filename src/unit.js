@@ -65,7 +65,7 @@ class UnitInstance {
     this.domain = domain;
     this.id = id;
     this.definition = definition;
-    this.state = {};
+    this.state = null;
 
     this._log = log;
     this._snapshots = snapshots;

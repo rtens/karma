@@ -30,7 +30,6 @@ class SagaInstance extends unit.UnitInstance {
   }
 
   reactTo(record) {
-
     return this._lockReaction(record)
       .then(locked => locked ? this._tryToReactTo(record) : null)
   }

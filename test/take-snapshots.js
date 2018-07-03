@@ -240,7 +240,7 @@ describe('Taking a Snapshot', () => {
             domainName: 'Test',
             unitKey: unit.Unit.name + '-One-foo',
             version: 'v1',
-            snapshot: {lastRecordTime: null, heads: {}, state: {}}
+            snapshot: {lastRecordTime: null, heads: {}, state: null}
           }]))
       });
 
