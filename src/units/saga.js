@@ -42,14 +42,14 @@ class SagaInstance extends unit.UnitInstance {
       .call(this, record.event.payload, record, this._unitLogger(record.traceId))))
 
       .catch(err => {
-        this._logger.error(this._key, record.traceId, err);
+        this._logger.error(this.key, record.traceId, err);
         return this._markReactionFailed(record, err.stack || err)
       })
   }
 
   _lockReaction(record) {
     return this._meta.execute(new message.Command('lock-reaction', {
-      sagaKey: '__' + this._key,
+      sagaKey: '__' + this.key,
       recordTime: record.time,
       streamId: record.streamId,
       sequence: record.sequence
@@ -63,7 +63,7 @@ class SagaInstance extends unit.UnitInstance {
   _markReactionFailed(record, error) {
     return this._meta.execute(new message.Command('mark-reaction-as-failed', {
       sagaId: this.id,
-      sagaKey: '__' + this._key,
+      sagaKey: '__' + this.key,
       record,
       error
     }))

@@ -83,7 +83,7 @@ class UnitInstance {
     definition._initializers.forEach(i => i.call(this));
   }
 
-  get _key() {
+  get key() {
     return [
       this.definition.constructor.name,
       this.definition.name,
@@ -105,7 +105,7 @@ class UnitInstance {
   }
 
   _loadSnapshot() {
-    return this._snapshots.fetch(this.domain, this._key, this.definition.version)
+    return this._snapshots.fetch(this.domain, this.key, this.definition.version)
       .then(snapshot => {
         this._lastRecordTime = snapshot.lastRecordTime;
         this._heads = snapshot.heads;
@@ -151,7 +151,7 @@ class UnitInstance {
   }
 
   takeSnapshot() {
-    return this._snapshots.store(this.domain, this._key, this.definition.version,
+    return this._snapshots.store(this.domain, this.key, this.definition.version,
       new persistence.Snapshot(this._lastRecordTime, this._heads, this.state));
   }
 
@@ -177,9 +177,9 @@ class UnitInstance {
 
   _unitLogger(traceId) {
     return {
-      error: message => this._logger.error(this._key, traceId, message),
-      info: message => this._logger.info(this._key, traceId, message),
-      debug: message => this._logger.debug(this._key, traceId, message),
+      error: message => this._logger.error(this.key, traceId, message),
+      info: message => this._logger.info(this.key, traceId, message),
+      debug: message => this._logger.debug(this.key, traceId, message),
     }
   }
 }
