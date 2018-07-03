@@ -126,9 +126,21 @@ class NoInvocationsExpectation extends specification.Expectation {
   }
 }
 
+class DelayedResultExpectation extends specification.Expectation {
+  constructor(waitMillis = 0) {
+    super();
+    this.waitMillis = waitMillis;
+  }
+
+  assert() {
+    return new Promise(y => setTimeout(y, this.waitMillis))
+  }
+}
+
 module.exports = {
   ValueDependencyContext,
   StubDependencyContext,
   InvocationsExpectation,
-  NoInvocationsExpectation
+  NoInvocationsExpectation,
+  DelayedResultExpectation
 };

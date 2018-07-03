@@ -106,27 +106,18 @@ class Result {
 
   then(expectation, reject) {
     let resolve = (typeof expectation != 'function')
-      ? () => this._assertWithRetry(expectation)
+      ? () => this._assertKeepingStack(expectation)
       : this._finishUp(expectation, reject);
 
     this.promise = this.promise.then(resolve, reject);
     return this
   }
 
-  _assertWithRetry(expectation) {
-    try {
-      expectation.assert(this);
-    } catch (err) {
-      return new Promise(y => setTimeout(y, 0))
-        .then(() => this._assertKeepingStack(expectation))
-    }
-  }
-
   _assertKeepingStack(expectation) {
     let error = new Error();
 
     try {
-      expectation.assert(this)
+      return expectation.assert(this)
     } catch (err) {
       err.stack += error.stack;
       throw err;

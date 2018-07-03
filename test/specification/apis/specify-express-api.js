@@ -309,10 +309,12 @@ describe('Specifying an express API', () => {
       .get('/foo', (req, res) => {
         res.send();
 
-        setTimeout(() => result = 'delayed', 0)
+        setTimeout(() => result = 'delayed', 5)
       })))
 
       .when(I.get('/foo'))
+
+      .then(expect.DelayedResult(5))
 
       .then({assert: () => chai.expect(result).to.equal('delayed')})
   })
