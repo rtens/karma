@@ -10,7 +10,12 @@ class LoggedErrorExpectation extends specification.Expectation {
 
   assert(result) {
     let messages = result.example.errors.map(e=>e.message);
-    expect(messages).to.contain(this.message, 'Missing Error');
+    try {
+      expect(messages).to.contain(this.message, 'Missing Error');
+    } catch (err) {
+      err.stack += '\n\nLogged Errors: ' + result.example.errors.map(e=>e.stack).join('\n\n');
+      throw err
+    }
     result.example.errors.splice(messages.indexOf(this.message), 1);
   }
 }

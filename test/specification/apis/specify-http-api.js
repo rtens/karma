@@ -111,10 +111,15 @@ describe('Specifying an HTTP API', () => {
 
       .then(expect.LoggedError('Nope'))
 
-      .promise.should.be.rejectedWith("Missing Error: " +
-        "expected [ 'Not Nope' ] to include 'Nope'")
+      .then(() => {
+        throw new Error('Should have failed')
+      }, err => {
+        err.message.should.equal("Missing Error: " +
+          "expected [ 'Not Nope' ] to include 'Nope'");
+        err.stack.should.contain('Logged Errors: Error: Not Nope');
+      })
 
-      .then({assert: result => result.errors.splice(0, 1)})
+      .then({assert: result => result.example.errors.splice(0, 1)})
   });
 
   it('asserts a logged Error', () => {
