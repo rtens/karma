@@ -31,13 +31,14 @@ class FakeEventLog extends persistence.EventLog {
 
   publish(record) {
     return Promise.all(this.subscriptions
+      .filter(s => s.filter.matches(record))
       .filter(s => s.active)
       .map(s => s.applier(record)));
   }
 
   subscribe(filter, applier) {
     this.replayed.push(filter);
-    let subscription = {applier, active: true};
+    let subscription = {filter, applier, active: true};
     this.subscribed.push({filter, subscription});
 
     try {

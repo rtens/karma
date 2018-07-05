@@ -8,15 +8,11 @@ const {the, Example, I, expect} = require('../../spec')();
 
 describe('Specifying Sagas', () => {
 
-  const Module = (saga, domain = x=>x) => class extends k.Module {
+  const Module = saga => class extends k.Module {
     //noinspection JSUnusedGlobalSymbols
     buildDomain() {
-      return domain(super.buildDomain())
+      return super.buildDomain()
         .add(saga(new k.Saga('One')))
-    }
-
-    handle() {
-      return this.domain.execute(new k.Command('Foo'))
     }
   };
 
@@ -155,16 +151,24 @@ describe('Specifying Sagas', () => {
   it('does not use Events recorded by a Command to trigger the reaction', () => {
     let reacted = [];
 
-    return new Example(Module(
+    return new Example(class extends k.Module {
+      buildDomain() {
+        const domain = super.buildDomain();
+        return domain
 
-      saga => saga
-        .reactingTo('food', ()=>'foo', $=>reacted.push($)),
+          .add(new k.Saga('One')
+            .reactingTo('food', ()=>'foo', ()=>domain.execute(new k.Command('Foo')))
+            .reactingTo('bard', ()=>'foo', $=>reacted.push($)))
 
-      domain => domain
-        .add(new k.Aggregate('One')
-          .executing('Foo', ()=>'foo', () => [new k.Event('food', 'not')]))))
+          .add(new k.Saga('Two')
+            .reactingTo('bard', ()=>'foo', $=>reacted.push($)))
 
-      .when(I.post())
+          .add(new k.Aggregate('One')
+            .executing('Foo', ()=>'foo', () => [new k.Event('bard', 'not')]))
+      }
+    })
+
+      .when(I.publish(the.Event('food')))
 
       .promise.then(() => reacted.should.eql([]))
   })
