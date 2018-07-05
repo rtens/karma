@@ -2,8 +2,9 @@ const persistence = require('../persistence');
 const logging = require('../logging');
 
 class FakeEventStore extends persistence.EventStore {
-  constructor() {
+  constructor(publish) {
     super();
+    this.publish = publish || (() => Promise.resolve());
     this.recorded = [];
     this.streams = {};
   }
@@ -14,6 +15,8 @@ class FakeEventStore extends persistence.EventStore {
 
     this.recorded.push({events, domainName, streamId, onSequence, traceId});
     return new Promise(y => process.nextTick(y(super.record(events, domainName, streamId, onSequence, traceId))))
+      .then(records => Promise.all(records.map(record => this.publish(record)))
+        .then(() => records))
   }
 }
 

@@ -80,6 +80,9 @@ class ResponseExpectation extends specification.Expectation {
   }
 
   assert(result) {
+    //noinspection BadExpressionStatementJS
+    expect(result.response, 'No Response').to.exist;
+
     if (this.body !== null) {
       expect(result.response.body).to.eql(this.body, 'Unexpected response body');
     }

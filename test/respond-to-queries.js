@@ -160,19 +160,19 @@ describe('Responding to a Query', () => {
         .applying('food', payload => applied = payload)
         .respondingTo('Foo', ()=>'foo', () => applied + ' later'));
 
-    let promise = domain.respondTo(new k.Query('Foo').waitFor({bar: 42, baz: 42}))
+    let promise = domain.respondTo(new k.Query('Foo').waitFor({One: {bar: 42, baz: 42}}))
       .then(r => response = r);
 
     return new Promise(y => setTimeout(y, 0))
       .then(() => should.not.exist(response))
 
-      .then(() => log.publish(new _event.Record(new k.Event(), 'Test', 'bar', 41)))
-      .then(() => should.not.exist(response))
+      .then(() => log.publish(new _event.Record(new k.Event(), 'One', 'bar', 42)))
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'Test', 'baz', 42)))
-      .then(() => should.not.exist(response))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'One', 'baz', 41)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'One', 'ban', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Two', 'baz', 42)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'one'), 'One', 'baz', 42)))
 
-      .then(() => log.publish(new _event.Record(new k.Event(), 'Test', 'bar', 42)))
       .then(() => promise.should.eventually.equal('one later'))
   });
 
@@ -185,7 +185,7 @@ describe('Responding to a Query', () => {
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', ()=>null));
 
-    domain.respondTo(new k.Query('Foo').waitFor({bar: 42}));
+    domain.respondTo(new k.Query('Foo').waitFor({Test: {bar: 42}}));
     domain.respondTo(new k.Query('Foo'));
 
     return new Promise(y => setTimeout(y, 0))

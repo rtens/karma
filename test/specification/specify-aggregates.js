@@ -268,5 +268,34 @@ describe('Specifying Aggregates', () => {
 
       .promise.should.be.rejectedWith("Unexpected Events: " +
         "expected [ Array(1) ] to deeply equal [ Array(1) ]")
+  });
+
+  it('uses events recorded by the Aggregate', () => {
+    let applied = [];
+
+    const module = class extends k.Module {
+      buildDomain() {
+        return super.buildDomain()
+
+          .add(new k.Aggregate('One')
+            .applying('food', $ => applied.push($))
+            .executing('Foo', ()=>'foo', () => [new k.Event('food', 'bar')])
+            .executing('Bar', ()=>'foo', () => [new k.Event('done', applied)]))
+      }
+
+      handle() {
+        return this.domain.execute(new k.Command('Foo'))
+          .then(() => this.domain.execute(new k.Command('Bar')));
+      }
+    };
+
+    return new Example(module)
+
+      .when(I.post())
+
+      .then(expect.EventStream('foo', [
+        expect.Event('food', 'bar'),
+        expect.Event('done', ['bar'])
+      ]))
   })
 });

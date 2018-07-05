@@ -41,8 +41,11 @@ class Example {
   }
 
   _setUpPersistence() {
-    this.store = new fake.EventStore();
     this.log = new fake.EventLog();
+    this.store = new fake.EventStore(record => {
+      this.log.records.push(record);
+      return this.log.publish(record);
+    });
 
     this.metaStore = new fake.EventStore();
     this.metaLog = new fake.EventLog();

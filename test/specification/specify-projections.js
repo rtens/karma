@@ -83,4 +83,33 @@ describe('Specifying Projections', () => {
 
       .then({assert: result => result.rejection = null})
   });
+
+  it('uses events recorded by an Aggregate', () => {
+    const applied = [];
+    const module = class extends k.api.http.Module {
+      //noinspection JSUnusedGlobalSymbols
+      buildDomain() {
+        return super.buildDomain()
+
+          .add(new k.Aggregate('One')
+            .executing('Foo', ()=>'foo', () => [new k.Event('food', 'bar')]))
+
+          .add(new k.Projection('One')
+            .applying('food', $ => applied.push($))
+            .respondingTo('Bar', ()=>'bar', () => applied));
+      }
+
+      //noinspection JSUnusedGlobalSymbols
+      buildHandler() {
+        return new k.api.http.CommandHandler(this.domain, () => new k.Command('Foo'))
+          .respondingWith(() => new k.Query('Bar'))
+      }
+    };
+
+    return new Example(module)
+
+      .when(I.get())
+
+      .then(expect.Response(['bar']))
+  })
 });

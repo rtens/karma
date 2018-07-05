@@ -50,6 +50,17 @@ describe('Specifying an HTTP API', () => {
         "expected 201 to equal 202");
   });
 
+  it('fails if there is no response', () => {
+    return new Example(Module(api => api
+      .handling(() => new Promise(()=>null))))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response())
+
+      .promise.should.be.rejectedWith("No Response");
+  });
+
   it('asserts the expected response', () => {
     return new Example(Module(api => api
       .handling(() => 'bar')))

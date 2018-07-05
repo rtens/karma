@@ -249,9 +249,10 @@ class CommandHandler extends Handler {
 
   _waitForResponse(records, query) {
     const lastRecord = records[records.length - 1];
-    const heads = {[lastRecord.streamId]: lastRecord.sequence};
+    const heads = {[lastRecord.domainName]: {[lastRecord.streamId]: lastRecord.sequence}};
 
     return this._domain.respondTo(query.waitFor(heads))
+      .then(response => response instanceof Response ? response : new Response(response))
   }
 }
 

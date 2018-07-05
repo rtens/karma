@@ -72,6 +72,6 @@ describe('Handling Domain Messages via HTTP', () => {
 
       .then(() => log.publish(new _event.Record(new k.Event('bard', 'One'), 'Test', 'foo', 42)))
 
-      .then(() => response.should.eventually.eql('One/foo'))
+      .then(() => response.should.eventually.eql(new k.api.http.Response('One/foo')))
   });
 });

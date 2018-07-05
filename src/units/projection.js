@@ -35,17 +35,30 @@ class ProjectionInstance extends unit.UnitInstance {
   }
 
   _waitFor(heads) {
-    return Promise.all(Object.keys(heads || {})
-      .filter(streamId => (this._heads[streamId] || 0) < heads[streamId])
-      .map(streamId => new Promise(y =>
-        this._waiters.push({streamId, sequence: heads[streamId], resolve: y}))))
+    const delays = [];
+    Object.keys(heads || {})
+      .forEach(domainName => Object.keys(heads[domainName])
+        .filter(streamId => ((this._heads[domainName] || {})[streamId] || 0) < heads[domainName][streamId])
+        .forEach(streamId => delays.push(new Promise(y =>
+          this._waiters.push({domainName, streamId, sequence: heads[domainName][streamId], resolve: y})))));
+
+    return Promise.all(delays);
   }
 
   apply(record) {
     super.apply(record);
 
     this._waiters = this._waiters
-      .filter(w => w.streamId != record.streamId || w.sequence != record.sequence || w.resolve())
+      .filter(w => {
+        if (w.domainName == record.domainName
+          && w.streamId == record.streamId
+          && w.sequence == record.sequence
+        ) {
+          return w.resolve()
+        }
+
+        return true
+      })
   }
 
   unload() {
