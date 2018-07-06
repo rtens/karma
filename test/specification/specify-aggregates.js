@@ -55,8 +55,8 @@ describe('Specifying Aggregates', () => {
       .then(expect.Response())
 
       .then(expect.EventStream('foo', [
-        expect.Event('food'),
-        expect.Event('bard')
+        expect.Event('food').withAnyPayload(),
+        expect.Event('bard').withAnyPayload()
       ]))
   });
 

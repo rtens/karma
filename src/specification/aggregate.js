@@ -33,8 +33,13 @@ class EventExpectation extends specification.Expectation {
     this.time = new Date();
   }
 
+  withAnyPayload() {
+    this.payload = '**ANY**';
+    return this
+  }
+
   transform(actualEvent) {
-    if (actualEvent.name == this.name && this.payload == undefined)
+    if (actualEvent.name == this.name && this.payload == '**ANY**')
       return {
         name: actualEvent.name,
         payload: this.payload,
