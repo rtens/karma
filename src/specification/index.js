@@ -109,17 +109,17 @@ class Result {
   }
 
   then(expectation, reject) {
+    let error = new Error();
+
     let resolve = (typeof expectation != 'function')
-      ? () => this._assertKeepingStack(expectation)
+      ? () => this._assertKeepingStack(expectation, error)
       : this._finishUp(expectation, reject);
 
     this.promise = this.promise.then(resolve, reject);
     return this
   }
 
-  _assertKeepingStack(expectation) {
-    let error = new Error();
-
+  _assertKeepingStack(expectation, error) {
     try {
       return expectation.assert(this)
     } catch (err) {

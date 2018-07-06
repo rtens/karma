@@ -9,46 +9,56 @@ class ValueDependencyContext extends specification.Context {
   }
 
   configure(example) {
-    this.putDependency(example, example.dependencies, this.key.split('.'), []);
+    this.buildDependency(example, example.dependencies, this.key.split('.'), []);
   }
 
-  putDependency(example, object, keysLeft, keysUp) {
-    let key = keysLeft.shift();
-    keysUp = [...keysUp, key];
-
-    if (key.endsWith('()')) {
-      key = key.substr(0, key.length - 2);
-      object[key] = this.buildStub(example, keysLeft, keysUp, object[key]);
+  buildDependency(example, object, keysLeft, keysUp) {
+    if (keysLeft.length == 1) {
+      this.setValue(object, keysLeft.shift());
     } else {
-      object[key] = this.buildDependency(example, keysLeft, keysUp, object[key]);
+      this.setObject(example, object, keysLeft, keysUp);
     }
 
     return object;
   }
 
-  buildStub(example, keys, myKeys, object) {
-    let stub = new StubDependencyContext(myKeys.join('.'))
-      .returning(this.buildDependency(example, keys, myKeys, object));
+  setValue(object, key) {
+    object[key.endsWith('()') ? key.substr(0, key.length - 2) : key] = this.value;
+  }
+
+  setObject(example, object, keysLeft, keysUp) {
+    let key = keysLeft.shift();
+    keysUp = [...keysUp, key];
+
+    if (key.endsWith('()')) {
+      key = key.substr(0, key.length - 2);
+      object[key] = this.buildStub(example, object[key] || {}, keysLeft, keysUp);
+    } else {
+      object[key] = this.buildDependency(example, object[key] || {}, keysLeft, keysUp);
+    }
+  }
+
+  buildStub(example, object, keysLeft, keysUp) {
+    let stub = new StubDependencyContext(keysUp.join('.'))
+      .returning(this.buildDependency(example, object, keysLeft, keysUp));
 
     example.stubs[stub.key] = stub;
     return stub.value;
-  }
-
-  buildDependency(example, keys, myKeys, object = {}) {
-    if (!keys.length) return this.value;
-    return this.putDependency(example, object, keys, myKeys);
   }
 }
 
 class StubDependencyContext extends ValueDependencyContext {
   constructor(key) {
-    super(key, function () {
-      stub.invocations.push([...arguments]);
-      return stub.callback.apply(null, arguments);
-    });
+    super(key);
+
     this.invocations = [];
     this.callback = () => null;
+
     const stub = this;
+    this.value = function () {
+      stub.invocations.push([...arguments]);
+      return stub.callback.apply(null, arguments);
+    }
   }
 
   returning(value) {
@@ -62,23 +72,23 @@ class StubDependencyContext extends ValueDependencyContext {
   }
 
   callingIndexed(callback) {
-    const stub = this;
     this.callback = function () {
-      return callback(stub.invocations.length - 1).apply(null, arguments);
-    };
+      return callback(this.invocations.length - 1).apply(null, arguments);
+    }.bind(this);
+
     return this
   }
 
   configure(example) {
-    example.stubs[this.key] = this;
+    example.stubs[stubKey(this.key)] = this;
     return super.configure(example)
   }
 }
 
 class InvocationsExpectation extends specification.Expectation {
-  constructor(stubKey) {
+  constructor(key) {
     super();
-    this.key = stubKey;
+    this.key = key;
     this.invocations = [];
   }
 
@@ -88,12 +98,15 @@ class InvocationsExpectation extends specification.Expectation {
   }
 
   assert(result) {
-    let invocations = result.example.stubs[this.key].invocations;
+    const stub = result.example.stubs[stubKey(this.key)];
 
     //noinspection BadExpressionStatementJS
-    expect(invocations, `Missing invocations of [${this.key}]`).to.not.be.empty;
-    this._assertArgumentCallbacks(invocations);
-    expect(invocations).to.eql(this.invocations, `Unexpected invocations of [${this.key}]`);
+    expect(stub, `Stub [${this.key}] not found`).to.exist;
+
+    //noinspection BadExpressionStatementJS
+    expect(stub.invocations, `Missing invocations of [${this.key}]`).to.not.be.empty;
+    this._assertArgumentCallbacks(stub.invocations);
+    expect(stub.invocations).to.eql(this.invocations, `Unexpected invocations of [${this.key}]`);
   }
 
   _assertArgumentCallbacks(invocations) {
@@ -115,14 +128,17 @@ class InvocationsExpectation extends specification.Expectation {
 }
 
 class NoInvocationsExpectation extends specification.Expectation {
-  constructor(stubKey) {
+  constructor(key) {
     super();
-    this.key = stubKey;
+    this.key = key;
   }
 
   assert(result) {
-    let invocations = result.example.stubs[this.key].invocations;
-    expect(invocations).to.eql([], `Unexpected invocations of [${this.key}]`);
+    const stub = result.example.stubs[stubKey(this.key)];
+
+    //noinspection BadExpressionStatementJS
+    expect(stub, `Stub [${this.key}] not found`).to.exist;
+    expect(stub.invocations).to.eql([], `Unexpected invocations of [${this.key}]`);
   }
 }
 
@@ -135,6 +151,10 @@ class DelayedResultExpectation extends specification.Expectation {
   assert() {
     return new Promise(y => setTimeout(y, this.waitMillis))
   }
+}
+
+function stubKey(key) {
+  return key + (key.endsWith('()') ? '' : '()')
 }
 
 module.exports = {

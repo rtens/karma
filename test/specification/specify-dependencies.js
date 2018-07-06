@@ -33,13 +33,14 @@ describe('Specifying dependencies', () => {
     let stubbed = null;
 
     new Example(Module(dependencies =>
-      stubbed = dependencies.foo()))
+      stubbed = [dependencies.foo(), dependencies.bar()]))
 
-      .given(the.Stub('foo').returning('bar'))
+      .given(the.Stub('foo').returning('FOO'))
+      .given(the.Stub('bar()').returning('BAR'))
 
       .when(anyAction);
 
-    stubbed.should.equal('bar');
+    stubbed.should.eql(['FOO', 'BAR']);
   });
 
   it('uses dynamic stub', () => {
@@ -99,41 +100,29 @@ describe('Specifying dependencies', () => {
     injected.should.equal('ban');
   });
 
-  it('combines injected values', () => {
-    let injected = [];
-
-    new Example(Module(dependencies => {
-      injected.push(dependencies.foo());
-      injected.push(dependencies.foo.bar());
-      injected.push(dependencies.foo.baz);
-    }))
-
-      .given(the.Stub('foo').returning('one'))
-      .given(the.Stub('foo.bar').returning('two'))
-      .given(the.Value('foo.baz', 'tre'))
-
-      .when(anyAction);
-
-    injected.should.eql(['one', 'two', 'tre'])
-  });
-
   it('asserts expected invocations of static stubs', () => {
     return new Example(Module(dependencies => {
-      dependencies.foo('a').bar('one', 'uno');
-      dependencies.foo('b').bar('two', 'dos');
+      dependencies.foo('a');
+      dependencies.foo('b').bar('one', 'uno');
     }))
 
       .given(the.Stub('foo().bar'))
 
       .when(anyAction)
 
-      .then(expect.Invocations('foo().bar')
-        .withArguments('one', 'uno')
-        .withArguments('two', 'dos'))
-
       .then(expect.Invocations('foo()')
         .withArguments('a')
         .withArguments('b'))
+
+      .then(expect.Invocations('foo')
+        .withArguments('a')
+        .withArguments('b'))
+
+      .then(expect.Invocations('foo().bar')
+        .withArguments('one', 'uno'))
+
+      .then(expect.Invocations('foo().bar()')
+        .withArguments('one', 'uno'))
   });
 
   it('asserts expected invocations of dynamic stub', () => {
@@ -147,6 +136,53 @@ describe('Specifying dependencies', () => {
 
       .then(expect.Invocations('foo')
         .withArguments('one'))
+  });
+
+  it('counts instantiations as invokations', () => {
+    return new Example(Module(dependencies => {
+      new dependencies.foo('one');
+    }))
+
+      .given(the.Stub('foo'))
+
+      .when(anyAction)
+
+      .then(expect.Invocations('foo')
+        .withArguments('one'))
+  });
+
+  it('combines injected values', () => {
+    let injected = [];
+
+    return new Example(Module(dependencies => {
+      injected.push(dependencies.foo('a'));
+      injected.push(dependencies.foo.bar('b').ban('c'));
+      injected.push(dependencies.foo.baz);
+    }))
+
+      .given(the.Stub('foo').returning('one'))
+      .given(the.Stub('foo.bar'))
+      .given(the.Stub('foo.bar().ban').returning('two'))
+      .given(the.Value('foo.baz', 'tre'))
+
+      .when(anyAction)
+
+      .then({assert: () => injected.should.eql(['one', 'two', 'tre'])})
+      .then(expect.Invocations('foo').withArguments('a'))
+      .then(expect.Invocations('foo.bar').withArguments('b'))
+      .then(expect.Invocations('foo.bar()').withArguments('b'))
+      .then(expect.Invocations('foo.bar().ban').withArguments('c'))
+  });
+
+  it('fails if stub does not exist', () => {
+    return new Example(Module(() => null))
+
+      .when(anyAction)
+
+      .then(expect.Invocations('foo'))
+
+      .promise.should.be.rejectedWith('Stub [foo] not found: ' +
+        'expected undefined to exist')
   });
 
   it('fails if expected invocation is missing', () => {
@@ -171,11 +207,11 @@ describe('Specifying dependencies', () => {
       .when(anyAction)
 
       .then(expect.Invocations('foo')
-        .withArguments()
-        .withArguments())
+        .withArguments(1)
+        .withArguments(2))
 
       .promise.should.be.rejectedWith('Unexpected invocations of [foo]: ' +
-        "expected [ [ 'one' ] ] to deeply equal [ [], [] ]")
+        "expected [ [ 'one' ] ] to deeply equal [ [ 1 ], [ 2 ] ]")
   });
 
   it('fails if expected invocations does not match', () => {
@@ -236,6 +272,18 @@ describe('Specifying dependencies', () => {
       .when(anyAction)
 
       .then(expect.NoInvocations('foo'))
+      .then(expect.NoInvocations('foo()'))
+  });
+
+  it('fails if stub without expected invocation does not exist', () => {
+    return new Example(Module(dependencies => dependencies))
+
+      .when(anyAction)
+
+      .then(expect.NoInvocations('foo'))
+
+      .promise.should.be.rejectedWith('Stub [foo] not found: ' +
+        'expected undefined to exist')
   });
 
   it('fails for unexpected invocations', () => {
