@@ -74,6 +74,28 @@ describe('Specifying dependencies', () => {
     stubbed.should.eql([3, 11, 23]);
   });
 
+  it('uses dynamic stub with singular behaviour', () => {
+    let stubbed = [];
+
+    new Example(Module(dependencies => {
+      stubbed.push(dependencies.foo());
+      stubbed.push(dependencies.foo());
+      stubbed.push(dependencies.foo());
+      stubbed.push(dependencies.foo());
+      stubbed.push(dependencies.foo());
+    }))
+
+      .given(the.Stub('foo')
+        .returning('one')
+        .returning('two')
+        .calling(() => 'tre')
+        .returning('for'))
+
+      .when(anyAction);
+
+    stubbed.should.eql(['one', 'two', 'tre', 'for', 'for']);
+  });
+
   it('uses injected values in objects', () => {
     let injected = null;
 

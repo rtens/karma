@@ -52,31 +52,30 @@ class StubDependencyContext extends ValueDependencyContext {
     super(key);
 
     this.invocations = [];
-    this.callback = () => null;
+    this.callbacks = [];
 
     const stub = this;
     this.value = function () {
       stub.invocations.push([...arguments]);
-      return stub.callback.apply(null, arguments);
+
+      let callback = stub.callbacks.length > 1 ? stub.callbacks.shift() : stub.callbacks[0];
+      return callback ? callback.apply(null, arguments) : null;
     }
   }
 
   returning(value) {
-    this.callback = () => value;
-    return this
+    return this.calling(() => value);
   }
 
   calling(callback) {
-    this.callback = callback;
+    this.callbacks.push(callback);
     return this
   }
 
   callingIndexed(callback) {
-    this.callback = function () {
+    return this.calling(function () {
       return callback(this.invocations.length - 1).apply(null, arguments);
-    }.bind(this);
-
-    return this
+    }.bind(this))
   }
 
   configure(example) {
