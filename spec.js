@@ -15,6 +15,7 @@ module.exports = (config = {}) => {
   return {
     Example: specification.Example,
     the: {
+      Time: timeString => new specification.TimeContext(timeString),
       EventStream: (streamId, events) => new unit.EventStreamContext(streamId, events),
       Event: (name, payload) => new unit.EventContext(name, payload),
       Value: (key, value) => new dependency.ValueDependencyContext(key, value),

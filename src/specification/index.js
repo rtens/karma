@@ -149,10 +149,22 @@ class Expectation {
   }
 }
 
+class TimeContext extends Context {
+  constructor(timeString) {
+    super();
+    this.time = timeString;
+  }
+
+  configure(example) {
+    example.time = this.time;
+  }
+}
+
 module.exports = {
   Example,
   Context,
   Action,
   Result,
-  Expectation
+  Expectation,
+  TimeContext
 };

@@ -9,7 +9,6 @@ const {the, Example, I, expect} = require('../../spec')();
 describe('Specifying Aggregates', () => {
 
   const Module = configure => class extends k.api.http.Module {
-    //noinspection JSUnusedGlobalSymbols
     buildDomain() {
       return super.buildDomain()
         .add(configure(new k.Aggregate('One'))
@@ -297,5 +296,43 @@ describe('Specifying Aggregates', () => {
         expect.Event('food', 'bar'),
         expect.Event('done', ['bar'])
       ]))
-  })
+  });
+
+  it('keeps event times consistent', () => {
+    return new Example(Module(aggregate => aggregate))
+
+      .when(I.post('Foo'))
+
+      .then({assert: () => new Promise(y => setTimeout(y, 10))})
+
+      .then({
+        assert: result => expect.EventStream('foo', [
+          expect.Event('food', {foo: 'bar'}),
+          expect.Event('bard', {bar: 'foo'})
+        ]).assert(result)
+      })
+  });
+
+  it('controls event times', () => {
+    let event;
+
+    return new Example(class extends k.api.http.Module {
+      buildDomain() {
+        return super.buildDomain()
+          .add(new k.Aggregate('One')
+            .executing('Foo', ()=>'foo', () => [new k.Event('food')]));
+      }
+
+      handle() {
+        return this.domain.execute(new k.Command('Foo'))
+          .then(records => event = records[0].event)
+      }
+    })
+
+      .given(the.Time('2013-12-11Z'))
+
+      .when(I.post())
+
+      .then({assert: () => chai.expect(event.time).to.eql(new Date('2013-12-11Z'))})
+  });
 });
