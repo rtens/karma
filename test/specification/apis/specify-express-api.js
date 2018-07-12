@@ -64,6 +64,39 @@ describe('Specifying an express API', () => {
       .then(expect.Response('bar'))
   });
 
+  it('asserts redirect', () => {
+    return new Example(Module(server => server
+      .get('/foo', (req, res) => res.redirect('bar'))))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response().redirectingTo('bar'))
+  });
+
+  it('fails if not redirected', () => {
+    return new Example(Module(server => server
+      .get('/foo', (req, res) => res.send())))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response().redirectingTo('bar'))
+
+      .promise.should.be.rejectedWith("Unexpected response status: " +
+        "expected 200 to equal 302");
+  });
+
+  it('fails if redirect does not match', () => {
+    return new Example(Module(server => server
+      .get('/foo', (req, res) => res.redirect('bar'))))
+
+      .when(I.get('/foo'))
+
+      .then(expect.Response().redirectingTo('not_bar'))
+
+      .promise.should.be.rejectedWith("Unexpected redirect target: " +
+        "expected 'bar' to equal 'not_bar'");
+  });
+
   it('fails if an expected Rejection is missing', () => {
     return new Example(Module(server => server
       .get('/foo', (req, res) => res.send('bar'))))

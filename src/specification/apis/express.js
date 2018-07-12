@@ -93,6 +93,11 @@ class ResponseExpectation extends specification.Expectation {
     return this
   }
 
+  redirectingTo(target, status = 302) {
+    this.redirect = target;
+    return this.withStatus(status)
+  }
+
   assert(result) {
     let body = result.response._getData();
     if (typeof this.body != 'string') {
@@ -104,6 +109,10 @@ class ResponseExpectation extends specification.Expectation {
 
     expect(body).to.eql(this.body, 'Unexpected response body');
     expect(result.response.statusCode).to.equal(this.statusCode, 'Unexpected response status');
+
+    if (this.redirect) {
+      expect(result.response._getRedirectUrl()).to.equal(this.redirect, 'Unexpected redirect target');
+    }
 
     Object.keys(this.headers).forEach(header => {
       expect(result.response._headers, 'Missing header').to.have.any.key(header);
