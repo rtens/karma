@@ -41,16 +41,17 @@ class AggregateInstance extends unit.UnitInstance {
   }
 
   execute(command) {
-    try {
-      return this._execute(command)
-    } catch (err) {
-      return Promise.reject(err)
-    }
+    return this._execute(command)
   }
 
   _execute(command, tries = 0) {
-    let events = this.definition._executers[command.name]
-      .call(this, command.payload, command, this._unitLogger(command.traceId));
+    let events;
+    try {
+      events = this.definition._executers[command.name]
+        .call(this, command.payload, command, this._unitLogger(command.traceId));
+    } catch (err) {
+      return Promise.reject(err)
+    }
 
     if (!Array.isArray(events)) return Promise.resolve([]);
 

@@ -10,7 +10,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Executing a Command', () => {
-  let _Date, _setTimeout, waits, Domain, logger;
+  let _Date, _setTimeout, Domain, logger;
 
   beforeEach(() => {
     _Date = Date;
@@ -18,13 +18,6 @@ describe('Executing a Command', () => {
       return new _Date(time || '2011-12-13T14:15:16Z');
     };
     Date.prototype = _Date.prototype;
-
-    waits = [];
-    _setTimeout = setTimeout;
-    setTimeout = (fn, wait) => {
-      waits.push(wait);
-      fn()
-    };
 
     logger = new fake.Logger();
 
@@ -43,7 +36,6 @@ describe('Executing a Command', () => {
 
   afterEach(() => {
     Date = _Date;
-    setTimeout = _setTimeout;
   });
 
   it('fails if no executer is defined', () => {
@@ -264,6 +256,13 @@ describe('Executing a Command', () => {
     let _random = Math.random;
     Math.random = () => Math.PI / 3;
 
+    let waits = [];
+    _setTimeout = setTimeout;
+    setTimeout = (fn, wait) => {
+      waits.push(wait);
+      fn()
+    };
+
     let count = 0;
     let store = new fake.EventStore();
     store.record = () => {
@@ -282,6 +281,8 @@ describe('Executing a Command', () => {
 
       .then(() => Math.random = _random)
 
+      .then(() => setTimeout = _setTimeout)
+
       .then(() => count.should.equal(11))
 
       .then(() => waits.should.eql([12, 14, 18, 27, 44, 77, 144, 278, 546, 1082]))
@@ -295,6 +296,9 @@ describe('Executing a Command', () => {
       y()
     });
 
+    _setTimeout = setTimeout;
+    setTimeout = fn => fn();
+
     return Domain({store})
 
       .add(new k.Aggregate('One')
@@ -303,6 +307,8 @@ describe('Executing a Command', () => {
       .execute(new k.Command('Foo'))
 
       .should.not.be.rejected
+
+      .then(() => setTimeout = _setTimeout)
   });
 
   it('applies only Events of Aggregate stream', () => {
@@ -372,5 +378,25 @@ describe('Executing a Command', () => {
         onSequence: 23,
         traceId: undefined
       }]))
+  });
+
+  it('catches errors while retrying', () => {
+    let store = new fake.EventStore();
+    store.record = () => new Promise(() => {
+      throw new Error();
+    });
+
+    let count = 0;
+    return Domain({store})
+
+      .add(new k.Aggregate('One')
+        .executing('Foo', ()=>'foo', ()=>{
+          if (count++ == 1) throw new Error('Nope');
+          return []
+        }))
+
+      .execute(new k.Command('Foo'))
+
+      .should.eventually.be.rejectedWith('Nope')
   });
 });
