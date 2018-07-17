@@ -431,13 +431,21 @@ describe('Reacting to an Event', () => {
 
       .start()
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Test', 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Test', 'foo', 22, 'trace_1')))
 
       .then(() => metaLog.records = [])
 
-      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Test', 'foo', 22)))
+      .then(() => log.publish(new _event.Record(new k.Event('food', 'not'), 'Test', 'foo', 22, 'trace_2')))
 
       .then(() => reactions.should.eql([]))
+
+      .then(() => logger.logged['info:reaction']
+        .should.eql([
+          {traceId: 'trace_1', message: {food: 'Saga-One-bar'}},
+          {traceId: 'trace_1', message: {locked: 'Saga-One-bar'}},
+          {traceId: 'trace_2', message: {food: 'Saga-One-bar'}},
+          {traceId: 'trace_2', message: {locked: 'Saga-One-bar'}}
+        ]))
   });
 
   it('invokes reactor if reaction has failed after being locked', () => {
@@ -495,7 +503,7 @@ describe('Reacting to an Event', () => {
       .then(() => reactions.should.eql(['one']))
 
       .then(() => metaStore.recorded.map(r=>r.events.map(e=>[e.name, e.payload])).should.eql([
-        [["__reaction-locked", {
+        [['__reaction-locked', {
           sagaKey: '__Saga-One-foo',
           recordTime: new Date('2011-12-13'),
           sequence: 23,
