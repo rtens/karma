@@ -4,7 +4,6 @@ const karma = require('.');
 const mongo = require('./src/persistence/mongo');
 const nest = require('./src/persistence/nest');
 const expressWs = require('express-ws');
-const Datastore = require('nestdb');
 
 let strategy = {
   onAccess: unit => {
@@ -15,13 +14,25 @@ let strategy = {
   }
 };
 
-new karma.Domain('Demo',
-  // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3'),
-  // new mongo.PersistenceFactory('mongodb://localhost', 'mongodb://localhost/local', 'test_karma3', 'meta__'))
+const uri = 'mongodb://localhost';
+const db = 'test_karma3_20180717';
+const oplogUri = 'mongodb://localhost/local';
 
-  new nest.PersistenceFactory(new Datastore({filename: 'data/Demo/store'}), new Datastore({filename: 'data/Demo/snapshots'})),
-  new nest.PersistenceFactory(new Datastore({filename: 'data/Demo/meta_store'}), new Datastore({filename: 'data/Demo/meta_snapshots'})),
-  strategy)
+const log = new mongo.EventLog(uri, oplogUri, db);
+const snapshots = new mongo.SnapshotStore(uri, db);
+const store = new mongo.EventStore(uri, db);
+
+const metaLog = new mongo.EventLog(uri, oplogUri, db, '__meta');
+const metaSnapshots = new mongo.SnapshotStore(uri, db, '__meta');
+const metaStore = new mongo.EventStore(uri, db, '__meta');
+
+const logger = new karma.logging.DebugLogger();
+
+new karma.Domain('Noob',
+  log, snapshots, store, metaLog, metaSnapshots, metaStore, strategy, logger);
+
+new karma.Domain('Demo',
+  log, snapshots, store, metaLog, metaSnapshots, metaStore, strategy, logger)
 
   .add(new karma.Aggregate('Bob')
 
@@ -84,7 +95,7 @@ new karma.Domain('Demo',
   .add(new karma.Saga('Pete')
 
     .reactingTo('food', ()=>'pete', function (payload) {
-      console.log('########### ' + JSON.stringify(payload));
+      console.log('###########PETE ' + JSON.stringify(payload));
     }))
 
   .start()
