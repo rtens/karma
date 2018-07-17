@@ -50,8 +50,8 @@ describe('Reacting to an Event', () => {
   it('invokes the reactor for recorded Events', () => {
     let log = new fake.EventLog();
     log.records = [
-      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23),
-      new _event.Record(new k.Event('food', 'two'), 'Test', 'bar', 21),
+      new _event.Record(new k.Event('food', 'one'), 'Test', 'foo', 23, 'trace_foo'),
+      new _event.Record(new k.Event('food', 'two'), 'Test', 'bar', 21, 'trace_bar'),
     ];
 
     let reactions = [];
@@ -67,6 +67,12 @@ describe('Reacting to an Event', () => {
       .then(() => log.replayed.map(s=>s.lastRecordTime).should.eql([new Date(), undefined]))
 
       .then(() => reactions.should.eql([['one', 23], ['two', 21]]))
+
+      .then(() => logger.logged['info:reaction']
+        .should.eql([
+          {traceId: 'trace_bar', message: {food: 'Saga-One-baz'}},
+          {traceId: 'trace_foo', message: {food: 'Saga-One-baz'}}
+        ]))
   });
 
   it('locks Reactions', () => {

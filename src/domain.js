@@ -146,13 +146,20 @@ class Domain extends BaseDomain {
     return this._sagas
       .getSagasReactingTo(record.event)
       .then(instances => instances.length
-        ? Promise.all(instances.map(this._notifyAccess(instance => instance.reactTo(record))))
+        ? Promise.all(instances.map(this._notifyAccess(this._react(record))))
         : this._consumeRecord(record))
   }
 
   reactToAdmin(record) {
     if (record.event.name == '__reaction-retry-requested') {
       return this.reactTo(record.event.payload.record)
+    }
+  }
+
+  _react(record) {
+    return instance => {
+      this._logger.info('reaction', record.traceId, {[record.event.name]: instance.key});
+      return instance.reactTo(record)
     }
   }
 
