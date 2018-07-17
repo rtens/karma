@@ -140,7 +140,9 @@ describe('Responding to a Query', () => {
 
       .add(new k.Projection('One')
         .respondingTo('Foo', ()=>'foo', () => {
-          throw new k.Rejection('NOPE', 'Not good')
+          const rejection = new k.Rejection('NOPE', 'Not good');
+          rejection.stack = 'Foo\nbar (my/file.js:42)\nbaz';
+          throw rejection
         }))
 
       .respondTo(new k.Query('Foo', 'bar').withTraceId('trace'))
@@ -148,10 +150,9 @@ describe('Responding to a Query', () => {
       .should.be.rejectedWith(k.Rejection, 'Not good')
 
       .then(() => logger.logged['info:query']
-        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
         .should.eql([
           {traceId: 'trace', message: {Foo: 'bar'}},
-          {traceId: 'trace', message: {rejected: 'NOPE', source: '*SOURCE*'}}
+          {traceId: 'trace', message: {rejected: 'NOPE', source: 'my/file.js:42'}}
         ]))
   });
 

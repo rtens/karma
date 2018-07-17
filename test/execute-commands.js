@@ -161,18 +161,18 @@ describe('Executing a Command', () => {
 
       .add(new k.Aggregate('One')
         .executing('Foo', ()=>'foo', function () {
-          throw new k.Rejection('NOPE', 'Nope')
+          const rejection = new k.Rejection('NOPE', 'Nope');
+          rejection.stack = 'Foo\nbar (my/file.js:42)\nbaz';
+          throw rejection
         }))
 
       .execute(new k.Command('Foo', 'one').withTraceId('trace'))
 
       .should.be.rejectedWith(k.Rejection, 'Nope')
 
-      .then(() => logger.logged['info:command']
-        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
-        .should.eql([
+      .then(() => logger.logged['info:command'].should.eql([
         {traceId: 'trace', message: {Foo: 'one'}},
-        {traceId: 'trace', message: {rejected: 'NOPE', source: '*SOURCE*'}}
+        {traceId: 'trace', message: {rejected: 'NOPE', source: 'my/file.js:42'}}
       ]))
   });
 
