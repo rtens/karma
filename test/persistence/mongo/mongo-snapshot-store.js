@@ -68,7 +68,7 @@ describe('MongoDB Snapshot Store', () => {
           v: 'v1',
           t: new Date('2011-12-13T14:15:16Z'),
           h: {foo: 42},
-          s: {foo: 'bar'}
+          s: JSON.stringify({foo: 'bar'})
         }]))
   });
 
@@ -79,7 +79,7 @@ describe('MongoDB Snapshot Store', () => {
       v: 'v1',
       t: new Date('2011-12-13T14:15:16Z'),
       h: {foo: 42},
-      s: {foo: 'bar'}
+      s: JSON.stringify({foo: 'bar'})
     }))
 
       .then(() => snapshots.fetch('Test', 'foo', 'v1'))
@@ -106,7 +106,7 @@ describe('MongoDB Snapshot Store', () => {
           v: 'v1',
           t: new Date('2011-12-14'),
           h: {foo: 42},
-          s: {foo: 'baz', bar: 'bam'}
+          s: JSON.stringify({foo: 'baz', bar: 'bam'})
         }]))
   });
 
@@ -120,5 +120,24 @@ describe('MongoDB Snapshot Store', () => {
       .then(() => snapshots.fetch('Test', 'foo', 'v1'))
 
       .should.be.rejectedWith('No snapshot')
+  });
+
+  it('stores state with dot in key', () => {
+    return snapshots.store('Test', 'foo', 'v1',
+      new _persistence.Snapshot(new Date('2001-01-01'), {}, {'foo.bar': 'baz'}))
+
+      .then(() => onDb(db => db.collection('bla_snapshots').find().toArray()))
+
+      .then(docs => docs
+        .map(d=>({...d, _id: d._id.constructor.name})).should
+        .eql([{
+          _id: 'ObjectID',
+          d: 'Test',
+          k: 'foo',
+          v: 'v1',
+          t: new Date('2001-01-01'),
+          h: {},
+          s: JSON.stringify({'foo.bar': 'baz'})
+        }]))
   });
 });

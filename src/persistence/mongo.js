@@ -287,7 +287,7 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
         v: version,
         t: snapshot.lastRecordTime,
         h: snapshot.heads,
-        s: snapshot.state
+        s: JSON.stringify(snapshot.state)
       }
     };
 
@@ -303,7 +303,7 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
     return this.connect().then(() =>
       this._snapshots
         .findOne({d: domainName, k: unitKey, v: version})
-        .then(doc => doc ? new _persistence.Snapshot(doc.t, doc.h, doc.s) : Promise.reject('No snapshot')))
+        .then(doc => doc ? new _persistence.Snapshot(doc.t, doc.h, JSON.parse(doc.s)) : Promise.reject('No snapshot')))
   }
 
   close() {
