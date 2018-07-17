@@ -53,10 +53,12 @@ describe('Executing a Command', () => {
 
       .should.be.rejectedWith(k.Rejection, 'Cannot handle Command [Foo]')
 
-      .then(() => logger.logged['info:command'].should.eql([
-        {traceId: 'trace', message: {Foo: 'one'}},
-        {traceId: 'trace', message: {rejected: 'COMMAND_NOT_FOUND'}}
-      ]))
+      .then(() => logger.logged['info:command']
+        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
+        .should.eql([
+          {traceId: 'trace', message: {Foo: 'one'}},
+          {traceId: 'trace', message: {rejected: 'COMMAND_NOT_FOUND', source: '*SOURCE*'}}
+        ]))
   });
 
   it('fails if an executer is defined twice in the same Aggregate', () => {
@@ -101,10 +103,12 @@ describe('Executing a Command', () => {
 
       .should.be.rejectedWith(k.Rejection, 'Cannot map [Foo]')
 
-      .then(() => logger.logged['info:command'].should.eql([
-        {traceId: 'trace', message: {Foo: 'one'}},
-        {traceId: 'trace', message: {rejected: 'CANNOT_MAP_MESSAGE'}}
-      ]))
+      .then(() => logger.logged['info:command']
+        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
+        .should.eql([
+          {traceId: 'trace', message: {Foo: 'one'}},
+          {traceId: 'trace', message: {rejected: 'CANNOT_MAP_MESSAGE', source: '*SOURCE*'}}
+        ]))
   });
 
   it('executes the Command', () => {
@@ -164,9 +168,11 @@ describe('Executing a Command', () => {
 
       .should.be.rejectedWith(k.Rejection, 'Nope')
 
-      .then(() => logger.logged['info:command'].should.eql([
+      .then(() => logger.logged['info:command']
+        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
+        .should.eql([
         {traceId: 'trace', message: {Foo: 'one'}},
-        {traceId: 'trace', message: {rejected: 'NOPE'}}
+        {traceId: 'trace', message: {rejected: 'NOPE', source: '*SOURCE*'}}
       ]))
   });
 

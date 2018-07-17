@@ -35,10 +35,12 @@ describe('Responding to a Query', () => {
 
       .should.be.rejectedWith(k.Rejection, 'Cannot handle Query [Foo]')
 
-      .then(() => logger.logged['info:query'].should.eql([
-        {traceId: 'trace', message: {Foo: 'bar'}},
-        {traceId: 'trace', message: {rejected: 'QUERY_NOT_FOUND'}},
-      ]))
+      .then(() => logger.logged['info:query']
+        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
+        .should.eql([
+          {traceId: 'trace', message: {Foo: 'bar'}},
+          {traceId: 'trace', message: {rejected: 'QUERY_NOT_FOUND', source: '*SOURCE*'}},
+        ]))
   });
 
   it('fails if multiple responders exist for that Query in one Projection', () => {
@@ -75,10 +77,12 @@ describe('Responding to a Query', () => {
 
       .should.be.rejectedWith(k.Rejection, 'Cannot map [Foo]')
 
-      .then(() => logger.logged['info:query'].should.eql([
-        {traceId: 'trace', message: {Foo: 'bar'}},
-        {traceId: 'trace', message: {rejected: 'CANNOT_MAP_MESSAGE'}},
-      ]))
+      .then(() => logger.logged['info:query']
+        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
+        .should.eql([
+          {traceId: 'trace', message: {Foo: 'bar'}},
+          {traceId: 'trace', message: {rejected: 'CANNOT_MAP_MESSAGE', source: '*SOURCE*'}},
+        ]))
   });
 
   it('returns a value', () => {
@@ -143,10 +147,12 @@ describe('Responding to a Query', () => {
 
       .should.be.rejectedWith(k.Rejection, 'Not good')
 
-      .then(() => logger.logged['info:query'].should.eql([
-        {traceId: 'trace', message: {Foo: 'bar'}},
-        {traceId: 'trace', message: {rejected: 'NOPE'}}
-      ]))
+      .then(() => logger.logged['info:query']
+        .map(line => 'source' in line.message ? {...line, message: {...line.message, source: '*SOURCE*'}} : line)
+        .should.eql([
+          {traceId: 'trace', message: {Foo: 'bar'}},
+          {traceId: 'trace', message: {rejected: 'NOPE', source: '*SOURCE*'}}
+        ]))
   });
 
   it('can be delayed until Projection reaches stream heads', () => {

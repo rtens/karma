@@ -88,7 +88,13 @@ class BaseDomain {
 
       .catch(err => {
         if (err instanceof message.Rejection) {
-          this._logger.info(name, request.traceId, {rejected: err.code});
+          let source;
+          let stack = err.stack.split('\n');
+          if (stack.length > 1 && stack[1].indexOf(' (') > -1) {
+            let filename = stack[1].indexOf(' (') + 2;
+            source = stack[1].substr(filename, stack[1].length - filename - 1);
+          }
+          this._logger.info(name, request.traceId, {rejected: err.code, source});
         } else {
           this._logger.error(name, request.traceId, err);
         }
