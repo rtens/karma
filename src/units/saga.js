@@ -55,7 +55,7 @@ class SagaInstance extends unit.UnitInstance {
     }))
       .then(() => true)
       .catch(() => {
-        this._logger.info('reaction', record.traceId, {locked: this.domain + '/' + this.key});
+        this._logger.info('reaction', record.traceId, {locked: {[record.event.name]: this.domain + '/' + this.key}});
         return false;
       })
   }

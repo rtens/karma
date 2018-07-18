@@ -442,9 +442,9 @@ describe('Reacting to an Event', () => {
       .then(() => logger.logged['info:reaction']
         .should.eql([
           {traceId: 'trace_1', message: {food: 'Test/Saga-One-bar'}},
-          {traceId: 'trace_1', message: {locked: 'Test/Saga-One-bar'}},
+          {traceId: 'trace_1', message: {locked: {food: 'Test/Saga-One-bar'}}},
           {traceId: 'trace_2', message: {food: 'Test/Saga-One-bar'}},
-          {traceId: 'trace_2', message: {locked: 'Test/Saga-One-bar'}}
+          {traceId: 'trace_2', message: {locked: {food: 'Test/Saga-One-bar'}}}
         ]))
   });
 
