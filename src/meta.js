@@ -42,22 +42,8 @@ class DomainSubscriptionAggregate extends aggregate.Aggregate {
 
     this
 
-      .initializing(function () {
-        this.state = {
-          lastConsumed: null
-        };
-      })
-
       .executing('consume-record', $=>`__Domain-${$.domainName}`, function ({recordTime}) {
-        if (this.state.lastConsumed >= recordTime) {
-          return
-        }
-
         return [new event.Event('__record-consumed', {recordTime})]
-      })
-
-      .applying('__record-consumed', function ({recordTime}) {
-        this.state.lastConsumed = recordTime
       })
   }
 }
@@ -75,15 +61,19 @@ class DomainSubscriptionProjection extends projection.Projection {
       })
 
       .applying('__record-consumed', function ({recordTime}) {
-        if (recordTime > this.state.lastRecordTime) this.state.lastRecordTime = recordTime
+        if (recordTime > new Date(this.state.lastRecordTime)) {
+          this.state.lastRecordTime = recordTime.toISOString()
+        }
       })
 
       .applying('__reaction-locked', function ({recordTime}) {
-        if (recordTime > this.state.lastRecordTime) this.state.lastRecordTime = recordTime
+        if (recordTime > new Date(this.state.lastRecordTime)) {
+          this.state.lastRecordTime = recordTime.toISOString()
+        }
       })
 
       .respondingTo('last-record-time', $=>domainName, function () {
-        return this.state.lastRecordTime || new Date()
+        return this.state.lastRecordTime ? new Date(this.state.lastRecordTime) : new Date()
       })
   }
 }

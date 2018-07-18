@@ -1,3 +1,4 @@
+const chai = require('chai');
 const persistence = require('../persistence');
 const logging = require('../logging');
 
@@ -94,6 +95,9 @@ class FakeSnapshotStore extends persistence.SnapshotStore {
   }
 
   store(domainName, unitKey, version, snapshot) {
+    chai.expect(JSON.parse(JSON.stringify(snapshot.state))).to.eql(snapshot.state,
+      'Snapshot not serializable: ' + domainName + '/' + unitKey);
+
     this.stored.push({domainName, unitKey, version, snapshot});
     this.snapshots.push({domainName, unitKey, version, snapshot});
     return super.store(domainName, unitKey, version, snapshot);
