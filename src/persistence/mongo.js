@@ -19,16 +19,22 @@ class MongoEventStore extends _persistence.EventStore {
 
     this._client = null;
     this._db = null;
+
+    this._connecting = false;
+    this._onConnected = [];
   }
 
   connect() {
     if (this._client) return Promise.resolve();
+    if (this._connecting) return new Promise(y => this._onConnected.push(y));
 
+    this._connecting = true;
     return new mongodb.MongoClient(this._uri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
       .then(() => this._db.collection(this._collection))
       .then(collection => collection.createIndex({d: 1, a: 1, v: 1}, {unique: true}))
+      .then(() => this._onConnected.forEach(fn=>fn()))
       .catch(err => Promise.reject(new Error('EventStore cannot connect to MongoDB database: ' + err)))
   }
 
@@ -75,11 +81,16 @@ class MongoEventLog extends _persistence.EventLog {
     this._db = null;
     this._oplog = null;
     this._oplogError = null;
+
+    this._connecting = false;
+    this._onConnected = [];
   }
 
   connect() {
     if (this._client) return Promise.resolve();
+    if (this._connecting) return new Promise(y => this._onConnected.push(y));
 
+    this._connecting = true;
     return new mongodb.MongoClient(this._dbUri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
@@ -106,6 +117,7 @@ class MongoEventLog extends _persistence.EventLog {
       }))
       .then(() => this._oplog.tail())
       .then(() => this._oplogError ? Promise.reject(this._oplogError) : null)
+      .then(() => this._onConnected.forEach(fn=>fn()))
       .catch(err => Promise.reject(new Error('EventLog cannot connect to MongoDB oplog: ' + err)))
   }
 
@@ -261,16 +273,22 @@ class MongoSnapshotStore extends _persistence.SnapshotStore {
     this._client = null;
     this._db = null;
     this._snapshots = null;
+
+    this._connecting = false;
+    this._onConnected = [];
   }
 
   connect() {
     if (this._client) return Promise.resolve();
+    if (this._connecting) return new Promise(y => this._onConnected.push(y));
 
+    this._connecting = true;
     return new mongodb.MongoClient(this._uri, this._options).connect()
       .then(client => this._client = client)
       .then(client => this._db = client.db(this._dbName))
       .then(() => this._snapshots = this._db.collection(this._prefix + 'snapshots'))
       .then(() => this._snapshots.createIndex({d: 1, k: 1, v: 1}))
+      .then(() => this._onConnected.forEach(fn=>fn()))
       .catch(err => Promise.reject(new Error('SnapshotStore cannot connect to MongoDB database: ' + err)))
   }
 
