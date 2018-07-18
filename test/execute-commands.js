@@ -10,7 +10,7 @@ const fake = require('./../src/specification/fakes');
 const k = require('..');
 
 describe('Executing a Command', () => {
-  let _Date, _setTimeout, Domain, logger;
+  let _Date, Domain, logger;
 
   beforeEach(() => {
     _Date = Date;
@@ -149,6 +149,9 @@ describe('Executing a Command', () => {
   });
 
   it('fails if the Command is rejected', () => {
+    let _setTimeout = setTimeout;
+    setTimeout = fn => fn();
+
     return Domain()
 
       .add(new k.Aggregate('One')
@@ -166,9 +169,14 @@ describe('Executing a Command', () => {
         {traceId: 'trace', message: {Foo: 'one'}},
         {traceId: 'trace', message: {rejected: 'NOPE', source: 'my/file.js:42'}}
       ]))
+
+      .then(() => setTimeout = _setTimeout)
   });
 
   it('fails if the Command handler throws an Error', () => {
+    let _setTimeout = setTimeout;
+    setTimeout = fn => fn();
+
     return Domain()
 
       .add(new k.Aggregate('One')
@@ -183,6 +191,8 @@ describe('Executing a Command', () => {
       .then(() => logger.logged['error:command'].should.eql([
         {traceId: 'trace', message: 'Error: Nope'}
       ]))
+
+      .then(() => setTimeout = _setTimeout)
   });
 
   it('records Events', () => {
@@ -257,7 +267,8 @@ describe('Executing a Command', () => {
     Math.random = () => Math.PI / 3;
 
     let waits = [];
-    _setTimeout = setTimeout;
+
+    let _setTimeout = setTimeout;
     setTimeout = (fn, wait) => {
       waits.push(wait);
       fn()
@@ -296,7 +307,7 @@ describe('Executing a Command', () => {
       y()
     });
 
-    _setTimeout = setTimeout;
+    let _setTimeout = setTimeout;
     setTimeout = fn => fn();
 
     return Domain({store})
@@ -307,6 +318,38 @@ describe('Executing a Command', () => {
       .execute(new k.Command('Foo'))
 
       .should.not.be.rejected
+
+      .then(() => setTimeout = _setTimeout)
+  });
+
+  it('retries if command throws and error', () => {
+    let store = new fake.EventStore();
+    let count = 0;
+
+    let _setTimeout = setTimeout;
+    setTimeout = fn => fn();
+
+    return Domain({store})
+
+      .add(new k.Aggregate('One')
+        .executing('Foo', ()=>'foo', () => {
+          if (count++ < 3) throw new Error(count);
+          return []
+        }))
+
+      .execute(new k.Command('Foo').withTraceId('trace'))
+
+      .should.not.be.rejected
+
+      .then(() => store.recorded.should.eql([{
+        events: [],
+        domainName: 'Test',
+        streamId: 'foo',
+        onSequence: undefined,
+        traceId: 'trace'
+      }]))
+
+      .then(() => chai.expect(count).to.equal(4))
 
       .then(() => setTimeout = _setTimeout)
   });
@@ -386,17 +429,20 @@ describe('Executing a Command', () => {
       throw new Error();
     });
 
-    let count = 0;
+    let _setTimeout = setTimeout;
+    setTimeout = fn => _setTimeout(fn, 0);
+
     return Domain({store})
 
       .add(new k.Aggregate('One')
-        .executing('Foo', ()=>'foo', ()=>{
-          if (count++ == 1) throw new Error('Nope');
-          return []
+        .executing('Foo', ()=>'foo', () => {
+          throw new Error('Nope');
         }))
 
       .execute(new k.Command('Foo'))
 
       .should.eventually.be.rejectedWith('Nope')
+
+      .then(() => setTimeout = _setTimeout)
   });
 });

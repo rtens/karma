@@ -372,6 +372,9 @@ describe('Reacting to an Event', () => {
 
     let reactions = [];
 
+    let _setTimeout = setTimeout;
+    setTimeout = fn => fn();
+
     return Domain({metaLog, log, metaStore})
 
       .add(new k.Saga('One')
@@ -408,6 +411,8 @@ describe('Reacting to an Event', () => {
         onSequence: 3,
         traceId: undefined
       }]))
+
+      .then(() => setTimeout = _setTimeout)
   });
 
   it('keeps state of locked Reactions', () => {
@@ -423,6 +428,9 @@ describe('Reacting to an Event', () => {
     let metaSnapshots = new fake.SnapshotStore();
 
     let reactions = [];
+
+    let _setTimeout = setTimeout;
+    setTimeout = fn => fn();
 
     return Domain({metaLog, log, strategy, metaSnapshots})
 
@@ -446,6 +454,8 @@ describe('Reacting to an Event', () => {
           {traceId: 'trace_2', message: {food: 'Test/Saga-One-bar'}},
           {traceId: 'trace_2', message: {locked: {food: 'Test/Saga-One-bar'}}}
         ]))
+
+      .then(() => setTimeout = _setTimeout)
   });
 
   it('invokes reactor if reaction has failed after being locked', () => {
