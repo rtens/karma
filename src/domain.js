@@ -158,7 +158,7 @@ class Domain extends BaseDomain {
 
   _react(record) {
     return instance => {
-      this._logger.info('reaction', record.traceId, {[record.event.name]: instance.key});
+      this._logger.info('reaction', record.traceId, {[record.event.name]: instance.domain + '/' + instance.key});
       return instance.reactTo(record)
     }
   }

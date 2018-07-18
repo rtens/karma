@@ -70,8 +70,8 @@ describe('Reacting to an Event', () => {
 
       .then(() => logger.logged['info:reaction']
         .should.eql([
-          {traceId: 'trace_bar', message: {food: 'Saga-One-baz'}},
-          {traceId: 'trace_foo', message: {food: 'Saga-One-baz'}}
+          {traceId: 'trace_bar', message: {food: 'Test/Saga-One-baz'}},
+          {traceId: 'trace_foo', message: {food: 'Test/Saga-One-baz'}}
         ]))
   });
 
@@ -441,10 +441,10 @@ describe('Reacting to an Event', () => {
 
       .then(() => logger.logged['info:reaction']
         .should.eql([
-          {traceId: 'trace_1', message: {food: 'Saga-One-bar'}},
-          {traceId: 'trace_1', message: {locked: 'Saga-One-bar'}},
-          {traceId: 'trace_2', message: {food: 'Saga-One-bar'}},
-          {traceId: 'trace_2', message: {locked: 'Saga-One-bar'}}
+          {traceId: 'trace_1', message: {food: 'Test/Saga-One-bar'}},
+          {traceId: 'trace_1', message: {locked: 'Test/Saga-One-bar'}},
+          {traceId: 'trace_2', message: {food: 'Test/Saga-One-bar'}},
+          {traceId: 'trace_2', message: {locked: 'Test/Saga-One-bar'}}
         ]))
   });
 
