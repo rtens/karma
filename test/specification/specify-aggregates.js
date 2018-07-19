@@ -59,7 +59,7 @@ describe('Specifying Aggregates', () => {
       ]))
   });
 
-  it.skip('fails if the Command is rejected', () => {
+  it('fails if the Command is rejected', () => {
     return new Example(Module(aggreagte => aggreagte
       .executing('Bar', ()=>'foo', () => {
         throw new k.Rejection('NOPE')

@@ -264,7 +264,7 @@ describe('Executing a Command', () => {
 
   it('fails if Events cannot be recorded', () => {
     let _random = Math.random;
-    Math.random = () => Math.PI / 3;
+    Math.random = () => 1;
 
     let waits = [];
 
@@ -294,16 +294,16 @@ describe('Executing a Command', () => {
 
       .then(() => setTimeout = _setTimeout)
 
-      .then(() => count.should.equal(11))
+      .then(() => count.should.equal(6))
 
-      .then(() => waits.should.eql([12, 14, 18, 27, 44, 77, 144, 278, 546, 1082]))
+      .then(() => waits.should.eql([12, 14, 18, 26, 42]))
   });
 
   it('retries recording if fails', () => {
     let store = new fake.EventStore();
     let count = 0;
     store.record = () => new Promise(y => {
-      if (count++ < 10) throw new Error(count);
+      if (count++ < 5) throw new Error(count);
       y()
     });
 

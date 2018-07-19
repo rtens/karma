@@ -6,10 +6,14 @@ const domain = require('../domain');
 const message = require('../message');
 const fake = require('./fakes');
 
+const _setTimeout = setTimeout;
+
 class Example {
   constructor(Module) {
     this.Module = Module;
     this.domainName = 'Example';
+
+    setTimeout = fn => _setTimeout(fn, 0);
 
     this._setUpDate();
     this._setUpErrorLogging();
@@ -95,7 +99,7 @@ class Result {
     this.example = example;
     this.promise = Promise.race([
 
-      new Promise(y => setTimeout(() =>
+      new Promise(y => _setTimeout(() =>
         y(this.response), 10)),
 
       promise
