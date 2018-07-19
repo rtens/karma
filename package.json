@@ -17,7 +17,7 @@
     "body-parser": "^1.18.2",
     "debug": "^3.1.0",
     "express": "^4.16.2",
-    "express-ws": "^3.0.0",
+    "express-ws": "^4.0.0",
     "mongo-oplog": "^2.1.0",
     "mongodb": "^3.0.4",
     "nestdb": "git+https://github.com/JamesMGreene/nestdb.git",
