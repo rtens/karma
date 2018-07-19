@@ -148,7 +148,7 @@ class DelayedResultExpectation extends specification.Expectation {
   }
 
   assert() {
-    return new Promise(y => setTimeout(y, this.waitMillis))
+    return new Promise(y => setTimeout.forReal(y, this.waitMillis))
   }
 }
 

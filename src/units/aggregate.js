@@ -45,7 +45,6 @@ class AggregateInstance extends unit.UnitInstance {
   }
 
   _execute(command, tries = 0) {
-
     return this._tryToExecute(command)
       .then(events => {
         if (!Array.isArray(events)) return [];

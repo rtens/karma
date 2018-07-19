@@ -47,6 +47,8 @@ describe('Specifying Projections', () => {
       .respondingTo('Bar', ()=>'foo', () => new Promise(() => null))))
 
       .when(I.get('Bar'))
+
+      .should.be.rejectedWith('No Response')
   });
 
   it('uses time of recorded Events', () => {

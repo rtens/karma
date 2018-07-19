@@ -13,7 +13,8 @@ class Example {
     this.Module = Module;
     this.domainName = 'Example';
 
-    setTimeout = fn => _setTimeout(fn, 0);
+    setTimeout = fn => fn();
+    setTimeout.forReal = _setTimeout;
 
     this._setUpDate();
     this._setUpErrorLogging();
@@ -99,8 +100,8 @@ class Result {
     this.example = example;
     this.promise = Promise.race([
 
-      new Promise(y => _setTimeout(() =>
-        y(this.response), 10)),
+      new Promise((y, n) => setTimeout.forReal(() =>
+        n(new Error('No Response')), 10)),
 
       promise
         .catch(err => err instanceof message.Rejection
@@ -144,6 +145,8 @@ class Result {
       } catch (err) {
         reject(err)
       }
+
+      setTimeout = _setTimeout;
     }
   }
 }

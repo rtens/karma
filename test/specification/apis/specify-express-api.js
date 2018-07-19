@@ -23,11 +23,13 @@ describe('Specifying an express API', () => {
       .promise.should.be.rejectedWith('Cannot GET /foo')
   });
 
-  it('ignores if no response was sent', () => {
+  it('fails if no response was sent', () => {
     return new Example(Module(server => server
       .get('/foo', () => null)))
 
       .when(I.get('/foo'))
+
+      .should.be.rejectedWith('No Response')
   });
 
   it('fails if the response does not match', () => {
@@ -146,7 +148,10 @@ describe('Specifying an express API', () => {
 
   it('fails if an expected Error is not logged', () => {
     return new Example(Module((server, module) => server
-      .get('/foo', () => module.logger.error('foo', 'bar', new Error('Not Nope')))))
+      .get('/foo', (req, res) => {
+        module.logger.error('foo', 'bar', new Error('Not Nope'));
+        res.end();
+      })))
 
       .when(I.get('/foo'))
 
@@ -160,7 +165,10 @@ describe('Specifying an express API', () => {
 
   it('asserts a logged Error', () => {
     return new Example(Module((server, module) => server
-      .get('/foo', () => module.logger.error('foo', 'bar', new Error('Nope')))))
+      .get('/foo', (req, res) => {
+        module.logger.error('foo', 'bar', new Error('Nope'));
+        res.end()
+      })))
 
       .when(I.get('/foo'))
 
@@ -169,7 +177,10 @@ describe('Specifying an express API', () => {
 
   it('fails if an unexpected Error is logged', () => {
     return new Example(Module((server, module) => server
-      .get('/foo', () => module.logger.error('foo', 'bar', new Error('Nope')))))
+      .get('/foo', (req, res) => {
+        module.logger.error('foo', 'bar', new Error('Nope'));
+        res.end()
+      })))
 
       .when(I.get('/foo'))
 
@@ -342,7 +353,7 @@ describe('Specifying an express API', () => {
       .get('/foo', (req, res) => {
         res.send();
 
-        setTimeout(() => result = 'delayed', 5)
+        setTimeout.forReal(() => result = 'delayed', 5)
       })))
 
       .when(I.get('/foo'))
