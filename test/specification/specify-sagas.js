@@ -171,6 +171,18 @@ describe('Specifying Sagas', () => {
       .when(I.publish(the.Event('food')))
 
       .promise.then(() => reacted.should.eql([]))
-  })
+  });
+
+  it('fails if snapshot is not serializable', () => {
+    return new Example(Module(saga => saga
+      .initializing(function () {
+        this.state = new Date();
+      })
+      .reactingTo('food', ()=>'foo', ()=>null)))
+
+      .when(I.publish(the.Event('food')))
+
+      .promise.should.be.rejectedWith('Snapshot not serializable')
+  });
 })
 ;

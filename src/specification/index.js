@@ -55,6 +55,13 @@ class Example {
 
     this.metaStore = new fake.EventStore();
     this.metaLog = new fake.EventLog();
+
+    this.strategy = new class extends unit.UnitStrategy {
+      //noinspection JSUnusedGlobalSymbols
+      onAccess(unit) {
+        unit.takeSnapshot()
+      }
+    }
   }
 
   _setUpDependencies() {
@@ -77,7 +84,7 @@ class Example {
       this.metaLog,
       new fake.SnapshotStore(),
       this.metaStore,
-      new unit.UnitStrategy(),
+      this.strategy,
       this.logger,
       this.dependencies);
 

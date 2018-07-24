@@ -12,10 +12,10 @@ describe('Specifying Projections', () => {
     //noinspection JSUnusedGlobalSymbols
     buildDomain() {
       return super.buildDomain()
-        .add(configure(new k.Projection('foo'))
+        .add(configure(new k.Projection('foo')
           .initializing(function () {
             this.state = [];
-          })
+          }))
           .respondingTo('Foo', ()=>'foo', function () {
             return this.state
           }));
@@ -113,5 +113,16 @@ describe('Specifying Projections', () => {
       .when(I.get())
 
       .then(expect.Response(['bar']))
-  })
+  });
+
+  it('fails if snapshot is not serializable', () => {
+    return new Example(Module(projection => projection
+      .initializing(function () {
+        this.state = new Date();
+      })))
+
+      .when(I.get('Foo'))
+
+      .promise.should.be.rejectedWith('Snapshot not serializable')
+  });
 });

@@ -11,13 +11,13 @@ describe('Specifying Aggregates', () => {
   const Module = configure => class extends k.api.http.Module {
     buildDomain() {
       return super.buildDomain()
-        .add(configure(new k.Aggregate('One'))
+        .add(configure(new k.Aggregate('One')
           .initializing(function () {
             this.state = {
               foo: 'bar',
               bar: 'foo'
             };
-          })
+          }))
           .executing('Foo', ()=>'foo', function () {
             return [
               new k.Event('food', {foo: this.state.foo}),
@@ -334,5 +334,46 @@ describe('Specifying Aggregates', () => {
       .when(I.post())
 
       .then({assert: () => chai.expect(event.time).to.eql(new Date('2013-12-11Z'))})
+  });
+
+  it('fails if snapshot is not serializable', () => {
+    return new Example(Module(aggregate => aggregate
+      .initializing(function () {
+        this.state = new Date()
+      })
+      .executing('Bar', ()=>'foo', ()=>null)))
+
+      .when(I.post('Bar'))
+
+      .promise.should.be.rejectedWith('Snapshot not serializable')
+  });
+
+  it('ignore undefined state', () => {
+    return new Example(Module(aggregate => aggregate
+      .initializing(function () {
+        this.state = undefined
+      })
+      .executing('Bar', ()=>'foo', ()=>null)))
+
+      .when(I.post('Bar'))
+  });
+
+  it('fail if state contains circular structures', () => {
+    return new Example(Module(aggregate => aggregate
+      .initializing(function () {
+        this.state = {foo: []};
+        this.state.bar = this.state.foo;
+      })
+      .applying('food', function ($) {
+        this.state.foo.push($);
+      })))
+
+      .given(the.EventStream('foo', [
+        the.Event('food', 'one'),
+      ]))
+
+      .when(I.post('Foo'))
+
+      .promise.should.be.rejectedWith('Converting circular structure to JSON')
   });
 });
