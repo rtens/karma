@@ -376,4 +376,14 @@ describe('Specifying Aggregates', () => {
 
       .promise.should.be.rejectedWith('Converting circular structure to JSON')
   });
+
+  it('accept undefined property', () => {
+    return new Example(Module(aggregate => aggregate
+      .initializing(function () {
+        this.state = {foo: undefined}
+      })
+      .executing('Bar', ()=>'foo', ()=>null)))
+
+      .when(I.post('Bar'))
+  });
 });

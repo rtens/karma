@@ -96,7 +96,19 @@ class FakeSnapshotStore extends persistence.SnapshotStore {
 
   store(domainName, unitKey, version, snapshot) {
     if (snapshot.state) {
-      chai.expect(JSON.parse(JSON.stringify(snapshot.state))).to.eql(snapshot.state,
+      const replacer = (k, v) => v === undefined ? null : v;
+      const normalize = v => {
+        if (v && Array.isArray(v)) {
+          return v.map(i => normalize(i))
+        } else if (v && typeof v == 'object') {
+          return Object.keys(v).reduce((o, k) => ({...o, [k]: normalize(v[k])}), {})
+        } else if (v === undefined) {
+          return null
+        } else {
+          return v
+        }
+      };
+      chai.expect(JSON.parse(JSON.stringify(snapshot.state, replacer))).to.eql(normalize(snapshot.state),
         'Snapshot not serializable: ' + domainName + '/' + unitKey);
     }
 
