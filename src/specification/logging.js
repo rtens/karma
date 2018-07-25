@@ -27,8 +27,7 @@ class NoLoggedErrorExpectation extends specification.Expectation {
       let messages = result.example.errors.map(e=>e.message);
       expect(messages).to.eql([], 'Unexpected Error(s)');
     } catch (err) {
-      err.stack += '\n\nCaused by: ' + result.example.errors[0].stack;
-      throw err;
+      throw result.example.errors[0]
     }
   }
 }

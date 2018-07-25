@@ -151,9 +151,7 @@ describe('Specifying an HTTP API', () => {
       .then(() => {
         throw new Error('Should have failed')
       }, err => {
-        err.message.should.equal("Unexpected Error(s): " +
-          "expected [ 'Nope' ] to deeply equal []");
-        err.stack.should.contain('Caused by: Error: Nope');
+        err.message.should.equal('Nope');
       })
 
       .then({assert: result => result.example.errors.splice(0, 1)})
