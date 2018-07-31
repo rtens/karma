@@ -51,7 +51,9 @@ class MongoEventStore extends _persistence.EventStore {
 
     return this.connect()
       .then(() => this._db.collection(this._collection).insertOne(document))
-      .catch(err => Promise.reject(err.code == 11000 ? new Error('Out of sequence') : err))
+      .catch(err => Promise.reject(err.code == 11000
+        ? new Error('Out of sequence: ' + JSON.stringify(document))
+        : err))
       .then(() => events.map((e, i) => new _event.Record(e, domainName, streamId, sequence + i, traceId)))
   }
 
@@ -195,7 +197,8 @@ class MongoEventLog extends _persistence.EventLog {
   }
 
   _flushBuffer(until) {
-    this._buffer.sort((a, b) => a.recordSet.v - b.recordSet.v);
+    const order = recordSet => recordSet._id; //.getTimestamp().getTime() + '' + recordSet.v;
+    this._buffer.sort((a, b) => (order(a.recordSet) < order(b.recordSet)) ? -1 : 1);
     this._buffer = this._buffer.filter(({recordSet, subscriptions}) => {
       if (recordSet._id.getTimestamp().getTime() > until) return true;
 

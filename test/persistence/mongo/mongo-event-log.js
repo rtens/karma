@@ -338,11 +338,11 @@ describe('MongoDB Event Log', () => {
       .then(() => log.subscribe(log.filter(), record => records.push(record)))
 
       .then(() => records.map(r=>r.event.name).should.eql([
-        'bar one',
-        'foo one',
-        'foo two',
-        'bar two',
         'foo tre',
+        'bar two',
+        'bar one',
+        'foo two',
+        'foo one',
         'foo for'
       ]))
   })

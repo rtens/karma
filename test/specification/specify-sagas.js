@@ -171,7 +171,7 @@ describe('Specifying Sagas', () => {
       .promise.then(() => reacted.should.eql([]))
   });
 
-  it('fails if snapshot is not serializable', () => {
+  it('logs error if snapshot is not serializable', () => {
     return new Example(Module(saga => saga
       .initializing(function () {
         this.state = new Date();
@@ -180,7 +180,8 @@ describe('Specifying Sagas', () => {
 
       .when(I.publish(the.Event('food')))
 
-      .promise.should.be.rejectedWith('Snapshot not serializable')
+      .then(expect.LoggedError("Snapshot not serializable: " +
+        "Example/Saga-One-foo: expected '2011-12-13T14:15:16.789Z' to deeply equal {}"))
   });
 })
 ;

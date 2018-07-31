@@ -134,9 +134,11 @@ class Domain extends BaseDomain {
       .then(lastRecordTime => {
         return Promise.all([
           this._log.subscribe(this._log.filter().after(lastRecordTime),
-            record => this.reactTo(record)),
+            record => this.reactTo(record)
+              .catch(e => this._logger.error('reaction', record.traceId, e))),
           this._meta._log.subscribe(this._meta._log.filter().after(lastRecordTime),
-            record => this.reactToAdmin(record))
+            record => this.reactToAdmin(record)
+              .catch(e => this._logger.error('admin-reaction', record.traceId, e)))
         ])
       })
       .then(() => this)
@@ -151,9 +153,11 @@ class Domain extends BaseDomain {
   }
 
   reactToAdmin(record) {
-    if (record.event.name == '__reaction-retry-requested') {
-      return this.reactTo(record.event.payload.record)
+    if (record.event.name != '__reaction-retry-requested') {
+      return Promise.resolve();
     }
+
+    return this.reactTo(record.event.payload.record)
   }
 
   _react(record) {

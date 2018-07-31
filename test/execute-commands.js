@@ -294,9 +294,9 @@ describe('Executing a Command', () => {
 
       .then(() => setTimeout = _setTimeout)
 
-      .then(() => count.should.equal(6))
+      .then(() => count.should.equal(21))
 
-      .then(() => waits.should.eql([12, 14, 18, 26, 42]))
+      .then(() => waits.every(n=>n==20).should.equal(true))
   });
 
   it('retries recording if fails', () => {
